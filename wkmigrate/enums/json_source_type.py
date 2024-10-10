@@ -1,0 +1,6 @@
+from enum import StrEnum
+
+
+class JSONSourceType(StrEnum):
+    DATABRICKS_WORKFLOW = "DATABRICKS_WORKFLOW"
+    DATA_FACTORY_PIPELINE = "DATA_FACTORY_PIPELINE"

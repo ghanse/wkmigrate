@@ -1,0 +1,90 @@
+[
+    {
+        "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001",
+        "name": "adf_trigger_002",
+        "type": "Microsoft.DataFactory/factories/triggers",
+        "etag": "3002df00-0000-0100-0000-66e6f0e10000"
+    },
+    {
+        "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001",
+        "name": "adf_trigger_003",
+        "type": "Microsoft.DataFactory/factories/triggers",
+        "etag": "3002df00-0000-0100-0000-66e6f0e10000",
+        "properties": {
+            "type": "ScheduleTrigger",
+            "runtime_state": "Stopped",
+            "annotations": [
+                "tst"
+            ],
+            "recurrence": {
+                "frequency": "Week",
+                "interval": 1,
+                "start_time": "2024-05-27T00:00:00.000Z",
+                "time_zone": "Eastern Standard Time", "schedule": {
+                "minutes": [5, 30], "hours": [1, 20], "week_days": [
+                    "Sunday", "Tuesday"
+                ]}}}},
+    {
+        "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001",
+        "name": "adf_trigger_004",
+        "type": "Microsoft.DataFactory/factories/triggers",
+        "etag": "3002df00-0000-0100-0000-66e6f0e10000",
+        "properties": {
+            "type": "ScheduleTrigger",
+            "runtime_state": "Stopped",
+            "annotations": [
+                "tst"
+            ],
+            "pipelines": [
+                {
+                    "pipeline_reference": {
+                        "type": "PipelineReference",
+                        "reference_name": "NOT_A_VALID_PIPELINE_NAME"
+                    },
+                    "parameters": {}
+                }
+            ],
+            "recurrence": {
+                "frequency": "Week",
+                "interval": 1,
+                "start_time": "2024-05-27T00:00:00.000Z",
+                "time_zone": "Eastern Standard Time", "schedule": {
+                "minutes": [5, 30], "hours": [1, 20], "week_days": [
+                    "Sunday", "Tuesday"
+                ]}}}},
+    {
+        "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001",
+        "name": "adf_trigger_001",
+        "type": "Microsoft.DataFactory/factories/triggers",
+        "etag": "3002df00-0000-0100-0000-66e6f0e10000",
+        "properties": {
+            "type": "ScheduleTrigger",
+            "runtime_state": "Stopped",
+            "annotations": [
+                "tst"
+            ],
+            "pipelines": [
+                {
+                    "pipeline_reference": {
+                        "type": "PipelineReference",
+                        "reference_name": "TEST_PIPELINE_NAME"
+                    },
+                    "parameters": {}
+                },
+                {
+                    "pipeline_reference": {
+                        "type": "PipelineReference",
+                        "reference_name": "test_adf_pipeline_2"
+                    },
+                    "parameters": {}
+                }
+            ],
+            "recurrence": {
+                "frequency": "Week",
+                "interval": 1,
+                "start_time": "2024-05-27T00:00:00.000Z",
+                "time_zone": "Eastern Standard Time", "schedule": {
+                "minutes": [5, 30], "hours": [1, 20], "week_days": [
+                    "Sunday", "Tuesday"
+                ]}}}}
+]

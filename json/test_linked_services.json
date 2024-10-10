@@ -1,0 +1,49 @@
+[
+    {
+        "name": "db_linkedservice_001",
+        "type": "Microsoft.DataFactory/factories/linkedservices",
+        "properties": {
+            "description": "Cluster description allalala.",
+            "annotations": [],
+            "type": "AzureDatabricks",
+            "typeProperties": {
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "newClusterNodeType": "Standard_DS3_v2",
+                "newClusterNumOfWorker": "1:3",
+                "newClusterSparkConf": {
+                    "spark.sql.shuffle.partitions": "400"
+                },
+                "newClusterSparkEnvVars": {
+                    "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+                },
+                "newClusterCustomTags": {
+                    "test_tag": "test_value"
+                },
+                "newClusterVersion": "15.4.x-photon-scala2.12",
+                "newClusterLogDestination": "dbfs:/logs",
+                "newClusterDriverNodeType": "Standard_DS3_v2",
+                "clusterOption": "Autoscaling",
+                "newClusterInitScripts": [
+                    "/Users/test@databricks.com/init_scripts/init.sh",
+                    "dbfs:/FileStore/init_scripts/dbfs.sh",
+                    "/Volumes/test/init_scripts/volume.sh"
+                ],
+                "dataSecurityMode": "SINGLE_USER",
+                "encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+            }
+        }
+    },
+    {
+        "name": "delta_linkedservice_001",
+        "type": "Microsoft.DataFactory/factories/linkedservices",
+        "properties": {
+            "annotations": [],
+            "type": "AzureDatabricksDeltaLake",
+            "typeProperties": {
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "clusterId": "0915-210252-fkp83v31",
+                "encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql8yZDUxNjU3ZC1mOGFjLTQ0MGEtOTBiZC1kNzg1N2YxNGQxM2MiDQp9"
+            }
+        }
+    }
+]

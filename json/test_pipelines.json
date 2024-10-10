@@ -1,0 +1,1026 @@
+[
+  {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/pipelines/test_adf_pipeline",
+    "name": "TEST_PIPELINE_NAME",
+    "type": "Microsoft.DataFactory/factories/pipelines",
+    "etag": "3001489f-0000-0100-0000-66ee07c80000",
+    "description": "Test pipeline for testing.",
+    "activities": [
+      {
+        "name": "run_test_notebook_2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [
+          {
+            "activity": "for_each_task",
+            "dependency_conditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "db_linkedservice_001"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2"
+      },
+      {
+        "name": "for_each_task",
+        "type": "ForEach",
+        "depends_on": [],
+        "user_properties": [],
+        "is_sequential": "False",
+        "batch_count": 2,
+        "items": {
+          "type": "Expression",
+          "value": "@array(['a', 'b', 'c'])"
+        },
+        "activities": [
+          {
+            "name": "run_test_notebook_2_copy1",
+            "type": "DatabricksNotebook",
+            "description": "Run test_notebook_2 in ADB",
+            "depends_on": [],
+            "user_properties": [
+              {}
+            ],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.12:00:00",
+              "retry": 1,
+              "retry_interval_in_seconds": 90,
+              "secure_input": "False",
+              "secure_output": "False"
+            },
+            "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+            "base_parameters": {
+              "param1": {
+                "value": "@item()",
+                "type": "Expression"
+              }
+            }
+          },
+          {
+            "name": "run_test_notebook_2_copy1_copy1",
+            "type": "DatabricksNotebook",
+            "description": "Run test_notebook_2 in ADB",
+            "depends_on": [
+              {
+                "activity": "run_test_notebook_2_copy1",
+                "dependency_conditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "user_properties": [
+              {}
+            ],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.12:00:00",
+              "retry": 1,
+              "retry_interval_in_seconds": 90,
+              "secure_input": "False",
+              "secure_output": "False"
+            },
+            "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+            "base_parameters": {
+              "param1": {
+                "value": "@item()",
+                "type": "Expression"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "test_param": {
+        "type": "string",
+        "default_value": "param_val"
+      },
+      "array_param": {
+        "type": "array",
+        "default_value": "['a', 'b', 'c']"
+      },
+      "test_int": {
+        "type": "int",
+        "default_value": 1
+      }
+    },
+    "variables": {
+      "current_timestamp": {
+        "type": "String"
+      },
+      "directory": {
+        "type": "Array"
+      },
+      "script_name": {
+        "type": "String"
+      },
+      "directory_path": {
+        "type": "String"
+      }
+    },
+    "annotations": [],
+    "policy": {
+      "elapsed_time_metric": {}
+    },
+    "trigger": {
+      "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001",
+      "name": "adf_trigger_001",
+      "type": "Microsoft.DataFactory/factories/triggers",
+      "etag": "3002df00-0000-0100-0000-66e6f0e10000",
+      "properties": {
+        "type": "ScheduleTrigger",
+        "runtime_state": "Stopped",
+        "annotations": [
+          "tst"
+        ],
+        "pipelines": [
+          {
+            "pipeline_reference": {
+              "type": "PipelineReference",
+              "reference_name": "test_adf_pipeline"
+            },
+            "parameters": {}
+          }
+        ],
+        "recurrence": {
+          "frequency": "Week",
+          "interval": 1,
+          "start_time": "2024-05-27T00:00:00.000Z",
+          "time_zone": "Eastern Standard Time",
+          "schedule": {
+            "minutes": [
+              5,
+              30
+            ],
+            "hours": [
+              1,
+              20
+            ],
+            "week_days": [
+              "Sunday",
+              "Tuesday"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/pipelines/test_adf_pipeline_2",
+    "name": "test_adf_pipeline_2",
+    "type": "Microsoft.DataFactory/factories/pipelines",
+    "etag": "31010e59-0000-0100-0000-66ee13980000",
+    "activities": [
+      {
+        "name": "run_test_notebook_2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "db_linkedservice_001"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+        "linked_service_definition": {
+          "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+          "name": "db_linkedservice_001",
+          "type": "Microsoft.DataFactory/factories/linkedservices",
+          "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+          "properties": {
+            "type": "AzureDatabricks",
+            "description": "Cluster description allalala.",
+            "annotations": [],
+            "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+            "new_cluster_version": "15.4.x-photon-scala2.12",
+            "new_cluster_num_of_worker": "1:3",
+            "new_cluster_node_type": "Standard_DS3_v2",
+            "new_cluster_spark_conf": {
+              "spark.sql.shuffle.partitions": "400"
+            },
+            "new_cluster_spark_env_vars": {
+              "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+            },
+            "new_cluster_custom_tags": {
+              "test_tag": "test_value",
+              "CREATED_BY_WKMIGRATE": ""
+            },
+            "new_cluster_log_destination": "dbfs:/logs",
+            "new_cluster_driver_node_type": "Standard_DS3_v2",
+            "new_cluster_init_scripts": [
+              "/Users/test@databricks.com/init_scripts/init.sh",
+              "dbfs:/FileStore/init_scripts/dbfs.sh",
+              "/Volumes/test/init_scripts/volume.sh"
+            ],
+            "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+          }
+        }
+      },
+      {
+        "name": "If Condition1",
+        "type": "IfCondition",
+        "depends_on": [
+          {
+            "activity": "run_test_notebook_2",
+            "dependency_conditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "user_properties": [],
+        "expression": {
+          "type": "Expression",
+          "value": "@equals('true', 'true')"
+        },
+        "if_true_activities": [
+          {
+            "name": "run_jar_activity",
+            "type": "DatabricksSparkJar",
+            "description": "Runs a Databricks JAR activity",
+            "depends_on": [],
+            "user_properties": [],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.12:00:00",
+              "retry": 3,
+              "retry_interval_in_seconds": 30,
+              "secure_input": "True",
+              "secure_output": "True"
+            },
+            "main_class_name": "TestJarClass",
+            "parameters": [
+              "test_parameter_"
+            ],
+            "libraries": [
+              {
+                "jar": "dbfs:/FileStore/jars/library.jar"
+              },
+              {
+                "egg": "dbfs:/FileStore/eggs/library.egg"
+              },
+              {
+                "whl": "dbfs:/FileStore/wheels/library.whl"
+              },
+              {
+                "pypi": {
+                  "package": "simplejson"
+                }
+              },
+              {
+                "maven": {
+                  "coordinates": "org.jsoup:jsoup:1.0.3"
+                }
+              },
+              {
+                "cran": {
+                  "package": "SparkR"
+                }
+              }
+            ],
+            "linked_service_definition": {
+              "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+              "name": "db_linkedservice_001",
+              "type": "Microsoft.DataFactory/factories/linkedservices",
+              "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+              "properties": {
+                "type": "AzureDatabricks",
+                "description": "Cluster description allalala.",
+                "annotations": [],
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "new_cluster_version": "15.4.x-photon-scala2.12",
+                "new_cluster_num_of_worker": "1:3",
+                "new_cluster_node_type": "Standard_DS3_v2",
+                "new_cluster_spark_conf": {
+                  "spark.sql.shuffle.partitions": "400"
+                },
+                "new_cluster_spark_env_vars": {
+                  "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+                },
+                "new_cluster_custom_tags": {
+                  "test_tag": "test_value"
+                },
+                "new_cluster_log_destination": "dbfs:/logs",
+                "new_cluster_driver_node_type": "Standard_DS3_v2",
+                "new_cluster_init_scripts": [
+                  "/Users/test@databricks.com/init_scripts/init.sh",
+                  "dbfs:/FileStore/init_scripts/dbfs.sh",
+                  "/Volumes/test/init_scripts/volume.sh"
+                ],
+                "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+              }
+            }
+          },
+          {
+            "name": "run_python_script_activity",
+            "type": "DatabricksSparkPython",
+            "depends_on": [
+              {
+                "activity": "run_jar_activity",
+                "dependency_conditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "user_properties": [],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.3:00:00",
+              "retry": 1,
+              "retry_interval_in_seconds": 10,
+              "secure_input": "False",
+              "secure_output": "False"
+            },
+            "python_file": "dbfs:/scripts/my_script.py",
+            "parameters": [
+              "test_param"
+            ],
+            "linked_service_definition": {
+              "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+              "name": "db_linkedservice_001",
+              "type": "Microsoft.DataFactory/factories/linkedservices",
+              "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+              "properties": {
+                "type": "AzureDatabricks",
+                "description": "Cluster description allalala.",
+                "annotations": [],
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "new_cluster_version": "15.4.x-photon-scala2.12",
+                "new_cluster_num_of_worker": "1:3",
+                "new_cluster_node_type": "Standard_DS3_v2",
+                "new_cluster_spark_conf": {
+                  "spark.sql.shuffle.partitions": "400"
+                },
+                "new_cluster_spark_env_vars": {
+                  "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+                },
+                "new_cluster_custom_tags": {
+                  "test_tag": "test_value"
+                },
+                "new_cluster_log_destination": "dbfs:/logs",
+                "new_cluster_driver_node_type": "Standard_DS3_v2",
+                "new_cluster_init_scripts": [
+                  "/Users/test@databricks.com/init_scripts/init.sh",
+                  "dbfs:/FileStore/init_scripts/dbfs.sh",
+                  "/Volumes/test/init_scripts/volume.sh"
+                ],
+                "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+              }
+            }
+          }
+        ],
+        "if_false_activities": [
+          {
+            "name": "for_each_task",
+            "type": "ForEach",
+            "depends_on": [],
+            "user_properties": [],
+            "is_sequential": "False",
+            "batch_count": 2,
+            "items": {
+              "type": "Expression",
+              "value": "@array(['a', 'b', 'c'])"
+            },
+            "activities": [
+              {
+                "name": "run_test_notebook_2_copy1",
+                "type": "DatabricksNotebook",
+                "description": "Run test_notebook_2 in ADB",
+                "depends_on": [],
+                "user_properties": [
+                  {}
+                ],
+                "linked_service_name": {
+                  "type": "LinkedServiceReference",
+                  "reference_name": "db_linkedservice_001"
+                },
+                "policy": {
+                  "timeout": "0.12:00:00",
+                  "retry": 1,
+                  "retry_interval_in_seconds": 90,
+                  "secure_input": "False",
+                  "secure_output": "False"
+                },
+                "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+                "base_parameters": {
+                  "param1": {
+                    "value": "@item()",
+                    "type": "Expression"
+                  }
+                }
+              },
+              {
+                "name": "run_test_notebook_2_copy1_copy1",
+                "type": "DatabricksNotebook",
+                "description": "Run test_notebook_2 in ADB",
+                "depends_on": [
+                  {
+                    "activity": "run_test_notebook_2_copy1",
+                    "dependency_conditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "user_properties": [
+                  {}
+                ],
+                "linked_service_name": {
+                  "type": "LinkedServiceReference",
+                  "reference_name": "db_linkedservice_001"
+                },
+                "policy": {
+                  "timeout": "0.12:00:00",
+                  "retry": 1,
+                  "retry_interval_in_seconds": 90,
+                  "secure_input": "False",
+                  "secure_output": "False"
+                },
+                "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+                "base_parameters": {
+                  "param1": {
+                    "value": "@item()",
+                    "type": "Expression"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "run_test_notebook_2_copy2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [
+          {
+            "activity": "run_test_notebook_2",
+            "dependency_conditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "db_linkedservice_001"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+        "linked_service_definition": {
+          "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+          "name": "db_linkedservice_001",
+          "type": "Microsoft.DataFactory/factories/linkedservices",
+          "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+          "properties": {
+            "type": "AzureDatabricks",
+            "description": "Cluster description allalala.",
+            "annotations": [],
+            "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+            "new_cluster_version": "15.4.x-photon-scala2.12",
+            "new_cluster_num_of_worker": "1:3",
+            "new_cluster_node_type": "Standard_DS3_v2",
+            "new_cluster_spark_conf": {
+              "spark.sql.shuffle.partitions": "400"
+            },
+            "new_cluster_spark_env_vars": {
+              "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+            },
+            "new_cluster_custom_tags": {
+              "test_tag": "test_value"
+            },
+            "new_cluster_log_destination": "dbfs:/logs",
+            "new_cluster_driver_node_type": "Standard_DS3_v2",
+            "new_cluster_init_scripts": [
+              "/Users/test@databricks.com/init_scripts/init.sh",
+              "dbfs:/FileStore/init_scripts/dbfs.sh",
+              "/Volumes/test/init_scripts/volume.sh"
+            ],
+            "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+          }
+        }
+      }
+    ],
+    "variables": {
+      "directory": {
+        "type": "Array"
+      },
+      "script_name": {
+        "type": "String"
+      }, "directory_path": {
+      "type": "String"
+    }, "run_jar": {
+      "type": "Boolean"
+    }, "planet": {
+      "type": "Array"
+    }, "planet_2": {
+      "type": "String"
+    }, "planet_1": {
+      "type": "String"
+    }}, "annotations": [], "policy": {
+    "elapsed_time_metric": {}}, "trigger": {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001", "name": "adf_trigger_001", "type": "Microsoft.DataFactory/factories/triggers", "etag": "3101692d-0000-0100-0000-66ee10660000", "properties": {
+      "type": "ScheduleTrigger", "runtime_state": "Stopped", "annotations": [
+        "tst"
+      ], "pipelines": [{
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline"
+        }, "parameters": {}}, {
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline_2"
+        }, "parameters": {}}], "recurrence": {
+        "frequency": "Week", "interval": 1, "start_time": "2024-05-27T00:00:00.000Z", "time_zone": "Eastern Standard Time", "schedule": {
+          "minutes": [5, 30], "hours": [1, 20], "week_days": [
+            "Sunday", "Tuesday"
+          ]}}}}},
+  {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/pipelines/test_adf_pipeline_2",
+    "name": "test_pipeline_no_triggers",
+    "type": "Microsoft.DataFactory/factories/pipelines",
+    "etag": "31010e59-0000-0100-0000-66ee13980000",
+    "activities": [
+      {
+        "name": "run_test_notebook_2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "db_linkedservice_001"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+        "linked_service_definition": {
+          "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+          "name": "db_linkedservice_001",
+          "type": "Microsoft.DataFactory/factories/linkedservices",
+          "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+          "properties": {
+            "type": "AzureDatabricks",
+            "description": "Cluster description allalala.",
+            "annotations": [],
+            "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+            "new_cluster_version": "15.4.x-photon-scala2.12",
+            "new_cluster_num_of_worker": "1:3",
+            "new_cluster_node_type": "Standard_DS3_v2",
+            "new_cluster_spark_conf": {
+              "spark.sql.shuffle.partitions": "400"
+            },
+            "new_cluster_spark_env_vars": {
+              "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+            },
+            "new_cluster_custom_tags": {
+              "test_tag": "test_value",
+              "CREATED_BY_WKMIGRATE": ""
+            },
+            "new_cluster_log_destination": "dbfs:/logs",
+            "new_cluster_driver_node_type": "Standard_DS3_v2",
+            "new_cluster_init_scripts": [
+              "/Users/test@databricks.com/init_scripts/init.sh",
+              "dbfs:/FileStore/init_scripts/dbfs.sh",
+              "/Volumes/test/init_scripts/volume.sh"
+            ],
+            "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+          }
+        }
+      },
+      {
+        "name": "If Condition1",
+        "type": "IfCondition",
+        "depends_on": [
+          {
+            "activity": "run_test_notebook_2",
+            "dependency_conditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "user_properties": [],
+        "expression": {
+          "type": "Expression",
+          "value": "@equals('true', 'true')"
+        },
+        "if_true_activities": [
+          {
+            "name": "run_jar_activity",
+            "type": "DatabricksSparkJar",
+            "description": "Runs a Databricks JAR activity",
+            "depends_on": [],
+            "user_properties": [],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.12:00:00",
+              "retry": 3,
+              "retry_interval_in_seconds": 30,
+              "secure_input": "True",
+              "secure_output": "True"
+            },
+            "main_class_name": "TestJarClass",
+            "parameters": [
+              "test_parameter_"
+            ],
+            "libraries": [
+              {
+                "jar": "dbfs:/FileStore/jars/library.jar"
+              },
+              {
+                "egg": "dbfs:/FileStore/eggs/library.egg"
+              },
+              {
+                "whl": "dbfs:/FileStore/wheels/library.whl"
+              },
+              {
+                "pypi": {
+                  "package": "simplejson"
+                }
+              },
+              {
+                "maven": {
+                  "coordinates": "org.jsoup:jsoup:1.0.3"
+                }
+              },
+              {
+                "cran": {
+                  "package": "SparkR"
+                }
+              }
+            ],
+            "linked_service_definition": {
+              "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+              "name": "db_linkedservice_001",
+              "type": "Microsoft.DataFactory/factories/linkedservices",
+              "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+              "properties": {
+                "type": "AzureDatabricks",
+                "description": "Cluster description allalala.",
+                "annotations": [],
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "new_cluster_version": "15.4.x-photon-scala2.12",
+                "new_cluster_num_of_worker": "1:3",
+                "new_cluster_node_type": "Standard_DS3_v2",
+                "new_cluster_spark_conf": {
+                  "spark.sql.shuffle.partitions": "400"
+                },
+                "new_cluster_spark_env_vars": {
+                  "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+                },
+                "new_cluster_custom_tags": {
+                  "test_tag": "test_value"
+                },
+                "new_cluster_log_destination": "dbfs:/logs",
+                "new_cluster_driver_node_type": "Standard_DS3_v2",
+                "new_cluster_init_scripts": [
+                  "/Users/test@databricks.com/init_scripts/init.sh",
+                  "dbfs:/FileStore/init_scripts/dbfs.sh",
+                  "/Volumes/test/init_scripts/volume.sh"
+                ],
+                "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+              }
+            }
+          },
+          {
+            "name": "run_python_script_activity",
+            "type": "DatabricksSparkPython",
+            "depends_on": [
+              {
+                "activity": "run_jar_activity",
+                "dependency_conditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "user_properties": [],
+            "linked_service_name": {
+              "type": "LinkedServiceReference",
+              "reference_name": "db_linkedservice_001"
+            },
+            "policy": {
+              "timeout": "0.3:00:00",
+              "retry": 1,
+              "retry_interval_in_seconds": 10,
+              "secure_input": "False",
+              "secure_output": "False"
+            },
+            "python_file": "dbfs:/scripts/my_script.py",
+            "parameters": [
+              "test_param"
+            ],
+            "linked_service_definition": {
+              "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+              "name": "db_linkedservice_001",
+              "type": "Microsoft.DataFactory/factories/linkedservices",
+              "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+              "properties": {
+                "type": "AzureDatabricks",
+                "description": "Cluster description allalala.",
+                "annotations": [],
+                "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+                "new_cluster_version": "15.4.x-photon-scala2.12",
+                "new_cluster_num_of_worker": "1:3",
+                "new_cluster_node_type": "Standard_DS3_v2",
+                "new_cluster_spark_conf": {
+                  "spark.sql.shuffle.partitions": "400"
+                },
+                "new_cluster_spark_env_vars": {
+                  "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+                },
+                "new_cluster_custom_tags": {
+                  "test_tag": "test_value"
+                },
+                "new_cluster_log_destination": "dbfs:/logs",
+                "new_cluster_driver_node_type": "Standard_DS3_v2",
+                "new_cluster_init_scripts": [
+                  "/Users/test@databricks.com/init_scripts/init.sh",
+                  "dbfs:/FileStore/init_scripts/dbfs.sh",
+                  "/Volumes/test/init_scripts/volume.sh"
+                ],
+                "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+              }
+            }
+          }
+        ],
+        "if_false_activities": [
+          {
+            "name": "for_each_task",
+            "type": "ForEach",
+            "depends_on": [],
+            "user_properties": [],
+            "is_sequential": "False",
+            "batch_count": 2,
+            "items": {
+              "type": "Expression",
+              "value": "@array(['a', 'b', 'c'])"
+            },
+            "activities": [
+              {
+                "name": "run_test_notebook_2_copy1",
+                "type": "DatabricksNotebook",
+                "description": "Run test_notebook_2 in ADB",
+                "depends_on": [],
+                "user_properties": [
+                  {}
+                ],
+                "linked_service_name": {
+                  "type": "LinkedServiceReference",
+                  "reference_name": "db_linkedservice_001"
+                },
+                "policy": {
+                  "timeout": "0.12:00:00",
+                  "retry": 1,
+                  "retry_interval_in_seconds": 90,
+                  "secure_input": "False",
+                  "secure_output": "False"
+                },
+                "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+                "base_parameters": {
+                  "param1": {
+                    "value": "@item()",
+                    "type": "Expression"
+                  }
+                }
+              },
+              {
+                "name": "run_test_notebook_2_copy1_copy1",
+                "type": "DatabricksNotebook",
+                "description": "Run test_notebook_2 in ADB",
+                "depends_on": [
+                  {
+                    "activity": "run_test_notebook_2_copy1",
+                    "dependency_conditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "user_properties": [
+                  {}
+                ],
+                "linked_service_name": {
+                  "type": "LinkedServiceReference",
+                  "reference_name": "db_linkedservice_001"
+                },
+                "policy": {
+                  "timeout": "0.12:00:00",
+                  "retry": 1,
+                  "retry_interval_in_seconds": 90,
+                  "secure_input": "False",
+                  "secure_output": "False"
+                },
+                "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+                "base_parameters": {
+                  "param1": {
+                    "value": "@item()",
+                    "type": "Expression"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "run_test_notebook_2_copy2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [
+          {
+            "activity": "run_test_notebook_2",
+            "dependency_conditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "db_linkedservice_001"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2",
+        "linked_service_definition": {
+          "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/linkedservices/db_linkedservice_001",
+          "name": "db_linkedservice_001",
+          "type": "Microsoft.DataFactory/factories/linkedservices",
+          "etag": "0d00b014-0000-0100-0000-66d77eab0000",
+          "properties": {
+            "type": "AzureDatabricks",
+            "description": "Cluster description allalala.",
+            "annotations": [],
+            "domain": "https://adb-244380453645744.4.azuredatabricks.net",
+            "new_cluster_version": "15.4.x-photon-scala2.12",
+            "new_cluster_num_of_worker": "1:3",
+            "new_cluster_node_type": "Standard_DS3_v2",
+            "new_cluster_spark_conf": {
+              "spark.sql.shuffle.partitions": "400"
+            },
+            "new_cluster_spark_env_vars": {
+              "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+            },
+            "new_cluster_custom_tags": {
+              "test_tag": "test_value"
+            },
+            "new_cluster_log_destination": "dbfs:/logs",
+            "new_cluster_driver_node_type": "Standard_DS3_v2",
+            "new_cluster_init_scripts": [
+              "/Users/test@databricks.com/init_scripts/init.sh",
+              "dbfs:/FileStore/init_scripts/dbfs.sh",
+              "/Volumes/test/init_scripts/volume.sh"
+            ],
+            "encrypted_credential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQEVEQkE1QTFBLTIwRkEtNDcyNi05ODk1LUExQjdBQUI1OTc0Ql9kZmZkNjQ4ZC05ZDMyLTRhNzUtOTBlMi1iNDkwY2U4MDZkYzAiDQp9"
+          }
+        }
+      }
+    ],
+    "variables": {
+      "directory": {
+        "type": "Array"
+      },
+      "script_name": {
+        "type": "String"
+      }, "directory_path": {
+      "type": "String"
+    }, "run_jar": {
+      "type": "Boolean"
+    }, "planet": {
+      "type": "Array"
+    }, "planet_2": {
+      "type": "String"
+    }, "planet_1": {
+      "type": "String"
+    }}, "annotations": [], "policy": {
+    "elapsed_time_metric": {}}, "trigger": {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001", "name": "adf_trigger_001", "type": "Microsoft.DataFactory/factories/triggers", "etag": "3101692d-0000-0100-0000-66ee10660000", "properties": {
+      "type": "ScheduleTrigger", "runtime_state": "Stopped", "annotations": [
+        "tst"
+      ], "pipelines": [{
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline"
+        }, "parameters": {}}, {
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline_2"
+        }, "parameters": {}}], "recurrence": {
+        "frequency": "Week", "interval": 1, "start_time": "2024-05-27T00:00:00.000Z", "time_zone": "Eastern Standard Time", "schedule": {
+          "minutes": [5, 30], "hours": [1, 20], "week_days": [
+            "Sunday", "Tuesday"
+          ]}}}}},
+  {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/pipelines/test_adf_pipeline_2",
+    "name": "test_pipeline_invalid_linked_service",
+    "type": "Microsoft.DataFactory/factories/pipelines",
+    "etag": "31010e59-0000-0100-0000-66ee13980000",
+    "activities": [
+      {
+        "name": "run_test_notebook_2",
+        "type": "DatabricksNotebook",
+        "description": "Run test_notebook_2 in ADB",
+        "depends_on": [],
+        "user_properties": [
+          {}
+        ],
+        "linked_service_name": {
+          "type": "LinkedServiceReference",
+          "reference_name": "invalid_linked_service_name"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retry_interval_in_seconds": 90,
+          "secure_input": "False",
+          "secure_output": "False"
+        },
+        "notebook_path": "/Users/gregory.a.hansen@gmail.com/test_notebook_2"
+      }
+    ],
+    "variables": {
+      "directory": {
+        "type": "Array"
+      },
+      "script_name": {
+        "type": "String"
+      }, "directory_path": {
+      "type": "String"
+    }, "run_jar": {
+      "type": "Boolean"
+    }, "planet": {
+      "type": "Array"
+    }, "planet_2": {
+      "type": "String"
+    }, "planet_1": {
+      "type": "String"
+    }}, "annotations": [], "policy": {
+    "elapsed_time_metric": {}}, "trigger": {
+    "id": "/subscriptions/be7017f0-caac-4093-8cdf-f2d6b6f4fcc6/resourceGroups/test-rg-001/providers/Microsoft.DataFactory/factories/ghanse-datafactory-001/triggers/adf_trigger_001", "name": "adf_trigger_001", "type": "Microsoft.DataFactory/factories/triggers", "etag": "3101692d-0000-0100-0000-66ee10660000", "properties": {
+      "type": "ScheduleTrigger", "runtime_state": "Stopped", "annotations": [
+        "tst"
+      ], "pipelines": [{
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline"
+        }, "parameters": {}}, {
+        "pipeline_reference": {
+          "type": "PipelineReference", "reference_name": "test_adf_pipeline_2"
+        }, "parameters": {}}], "recurrence": {
+        "frequency": "Week", "interval": 1, "start_time": "2024-05-27T00:00:00.000Z", "time_zone": "Eastern Standard Time", "schedule": {
+          "minutes": [5, 30], "hours": [1, 20], "week_days": [
+            "Sunday", "Tuesday"
+          ]}}}}}
+  ]
