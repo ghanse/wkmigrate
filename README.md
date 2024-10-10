@@ -18,7 +18,7 @@ Use `pip install wkmigrate` to install the PyPi package.
 `wkmigrate` is a standalone project. Using some features (e.g. serverless jobs compute options) may
 require a premium-tier Databricks workspace.
 
-## Using the Data Generator
+## Using the Workflow Migrator
 To use the `wkmigrate`, install the library using the `%pip install wkmigrate` method or install the 
 Python wheel directly in your environment.
 
