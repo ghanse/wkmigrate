@@ -3,11 +3,17 @@ import warnings
 from datetime import datetime, timedelta
 from importlib import import_module
 from typing import Optional
+from wkmigrate.datasets import dataset_parsers, property_parsers
 from wkmigrate.enums.condition_operation_pattern import ConditionOperationPattern
-from wkmigrate.enums.isolation_level import IsolationLevel
 
 
-def parse_data_column_mapping(mapping: dict) -> list[dict]:
+def parse_dataset(datasets: list[dict]) -> dict:
+    dataset = datasets[0]
+    properties = dataset.get('properties')
+    return dataset_parsers[properties.get('type')](dataset)
+
+
+def parse_dataset_mapping(mapping: dict) -> list[dict]:
     """ Parses a mapping from one set of data columns to another.
         :parameter mapping: Data column mapping as a ``dict``
         :return: Parsed data column mapping as a ``list[dict]``
@@ -19,24 +25,12 @@ def parse_data_column_mapping(mapping: dict) -> list[dict]:
     } for mapping in mapping.get('mappings')]
 
 
-def parse_query_timeout_seconds(properties: Optional[dict]) -> int:
-    """ Parses the timeout number of seconds from the dataset properties.
-        :parameter properties: Dataset properties as a ``dict``
-        :return: Timeout seconds as an ``int``
+def parse_dataset_properties(dataset_definition: dict) -> dict:
+    """ Parses various properties (e.g. query timeout, isolation level) from an input dataset definition.
+        :parameter dataset_definition: Dataset definition as a ``dict``
+        :return: Parsed dataset properties as a ``dict``
     """
-    if properties is None or 'query_timeout' not in properties:
-        return 0
-    return _parse_query_timeout_string(properties.get('query_timeout'))
-
-
-def parse_query_isolation_level(properties: Optional[dict]) -> Optional[str]:
-    """ Parses the database transaction isolation level from the dataset properties.
-        :parameter properties: Dataset properties as a ``dict``
-        :return: Isolation level as an ``str``
-    """
-    if properties is None or 'isolation_level' not in properties:
-        return 'READ_COMMITTED'
-    return IsolationLevel[properties.get('isolation_level')]
+    return property_parsers[dataset_definition.get('type')](dataset_definition)
 
 
 def parse_for_each_tasks(tasks: Optional[list[dict]]) -> Optional[list[dict]]:
@@ -150,17 +144,6 @@ def parse_condition_expression(condition: dict) -> dict:
             }
     raise ValueError('Condition expression must include "equals", "greaterThan", "greaterThanOrEquals", "lessThan", or '
                      '"lessThanOrEquals" operation.')
-
-
-def _parse_query_timeout_string(timeout_string: str) -> int:
-    """ Parses a timeout string in the format ``hh:mm:ss`` into an integer number of seconds.
-        :parameter timeout_string: Timeout string in the format ``hh:mm:ss``
-        :return: Integer number of seconds
-    """
-    time_format = '%H:%M:%S'
-    date_time = datetime.strptime(timeout_string, time_format)
-    time_delta = timedelta(hours=date_time.hour, minutes=date_time.minute, seconds=date_time.second)
-    return int(time_delta.total_seconds())
 
 
 def _parse_activity_timeout_string(timeout_string: str) -> int:

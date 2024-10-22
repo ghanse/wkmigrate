@@ -1,15 +1,14 @@
 """ This module defines methods for translating Databricks Spark jar activities."""
 from wkmigrate.utils import identity, translate
-from wkmigrate.activity_translators.parsers import parse_data_column_mapping, \
-    parse_query_isolation_level, parse_query_timeout_seconds
+from wkmigrate.activity_translators.parsers import parse_dataset, parse_dataset_mapping, parse_dataset_properties
 
 
 mapping = {
-    'source_query_timeout': {'key': 'source', 'parser': parse_query_timeout_seconds},
-    'source_query_isolation_level': {'key': 'source', 'parser': parse_query_isolation_level},
-    'column_mapping': {'key': 'translator', 'parser': parse_data_column_mapping},
-    'source_dataset_definition': {'key': 'input_dataset_definitions', 'parser': identity},
-    'sink_dataset_definition': {'key': 'output_dataset_definitions', 'parser': identity}
+    'source_properties': {'key': 'source', 'parser': parse_dataset_properties},
+    'sink_properties': {'key': 'sink', 'parser': parse_dataset_properties},
+    'column_mapping': {'key': 'translator', 'parser': parse_dataset_mapping},
+    'source_dataset': {'key': 'input_dataset_definitions', 'parser': parse_dataset},
+    'sink_dataset': {'key': 'output_dataset_definitions', 'parser': parse_dataset}
 }
 
 
