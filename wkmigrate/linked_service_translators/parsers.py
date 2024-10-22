@@ -1,4 +1,5 @@
 """ This module defines methods for parsing cluster spec objects to the Databricks SDK's object model."""
+import re
 from typing import Optional
 from wkmigrate.enums.init_script_type import InitScriptType
 
@@ -44,6 +45,14 @@ def parse_init_scripts(init_scripts: Optional[list[str]]) -> Optional[list[dict]
     return [{
         _get_init_script_type(init_script_path=init_script): {'destination': init_script}
     } for init_script in init_scripts]
+
+
+def parse_storage_account_name(url: str) -> str:
+    """ Parses an Azure Storage account name from the URL.
+        :parameter url: Azure Storage account URL as a ``str``
+        :return: Azure Storage account name as a ``str``
+    """
+    return re.search(pattern=r'https://([A-Za-z0-9]*).dfs.core.windows.net', string=url)[1]
 
 
 def _get_init_script_type(init_script_path: str) -> str:
