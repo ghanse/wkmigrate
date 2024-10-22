@@ -18,6 +18,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
     tenant_id: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
+    files_to_delta_sinks: Optional[bool] = True
     workspace_client: Optional[DatabricksWorkspaceClient] = field(init=False)
     _use_test_client: Optional[bool] = False
     _valid_authentication_types = ['pat', 'basic', 'azure-client-secret']

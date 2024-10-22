@@ -1,14 +1,16 @@
 """ Defines ``WorkspaceClient`` classes."""
+import autopep8
 import base64
 import json
-import warnings
 import wkmigrate
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Optional
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import BaseJob, CronSchedule, Job, Task
+from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
+from wkmigrate.datasets import options, secrets
 
 
 class DatabricksWorkspaceClient(ABC):
@@ -20,7 +22,7 @@ class DatabricksWorkspaceClient(ABC):
     def get_workflow(self, job_name: str) -> dict:
         pass
 
-    def create_workflow(self, job_definition: dict) -> int | None:
+    def create_workflow(self, job_definition: dict, translation_options: Optional[dict] = None) -> int | None:
         pass
 
 
@@ -132,9 +134,10 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             raise ValueError(f'No workflows found in the target workspace with name "{job_name}"')
         return workflows
 
-    def create_workflow(self, job_definition: dict) -> int:
-        """ Creates a workflow with the specified definition as a ``dict``.
-            :parameter job_definition: Workflow definition settings
+    def create_workflow(self, job_definition: dict, translation_options: Optional[dict] = None) -> int:
+        """ Creates a workflow with the specified definition and options.
+            :parameter job_definition: Workflow definition settings as a ``dict``
+            :parameter translation_options: Workflow translation options as a ``dict``
             :return: Created Job ID as an ``int``
         """
         job_settings = job_definition.get('settings')
@@ -163,15 +166,16 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
                     description=job_settings.get('description'),
                     schedule=WorkspaceManagementClient._get_schedule(job_settings.get('schedule')),
                     tags=job_settings.get('tags'),
-                    tasks=[self._create_task(task) for task in job_settings.get('tasks')],
+                    tasks=[self._create_task(task, translation_options) for task in job_settings.get('tasks')],
                     timeout_seconds=job_settings.get('timeout_seconds')
                 )
             )
             return response.job_id
 
-    def _create_task(self, task: dict) -> Task:
+    def _create_task(self, task: dict, translation_options: Optional[dict]) -> Task:
         """ Creates a Databricks workflow ``Task`` object from the task definition.
             :parameter task: Workflow task definition as a ``dict``
+            :parameter translation_options: Workflow translation options as a ``dict``
             :return: Workflow ``Task`` object
         """
         if 'type' not in task:
@@ -179,90 +183,108 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if task.get('type') == 'DatabricksNotebook':
             self._create_notebook_task_dependencies(task)
         if task.get('type') == 'Copy':
-            notebook_path = self._create_copy_task_dependencies(task)
+            files_to_delta_sinks = True
+            if translation_options is not None:
+                files_to_delta_sinks = translation_options.get('files_to_delta_sinks', True)
+            dependency_object = self._create_copy_task_dependencies(task, files_to_delta_sinks)
             task.pop('copy_data_task')
-            task['notebook_task'] = {'notebook_path': notebook_path}
+            if not files_to_delta_sinks:
+                task['notebook_task'] = {'notebook_path': dependency_object}
+            else:
+                task['pipeline_task'] = {'pipeline_id': dependency_object}
         if task.get('type') == 'ForEach':
             return self._create_for_each_task(task)
         return Task.from_dict(task)
 
-    def _create_copy_task_dependencies(self, task: dict) -> str:
+    def _create_copy_task_dependencies(self, task: dict, files_to_delta_sinks: bool) -> str:
+        """ Creates a Databricks notebook to copy data.
+            :parameter task: Workflow task definition as a ``dict``
+            :parameter options: Workflow translation options as a ``dict``
+            :return: Databricks notebook path as a ``str``
+        """
         copy_data_task = task.get('copy_data_task')
-        source_definition = copy_data_task.get('source_dataset_definition')[0]
-        sink_definition = copy_data_task.get('sink_dataset_definition')[0]
+        source_definition = {**copy_data_task.get('source_dataset'), **copy_data_task.get('source_properties')}
+        self._create_data_source_secrets(source_definition)
+        sink_definition = {**copy_data_task.get('sink_dataset'), **copy_data_task.get('sink_properties')}
+        self._create_data_source_secrets(sink_definition)
         column_mapping = copy_data_task.get('column_mapping')
-        notebook_path = self._create_copy_data_notebook(source_definition, sink_definition, column_mapping)
-        return notebook_path
+        notebook_path = self._create_copy_data_notebook(
+            source_definition,
+            sink_definition,
+            column_mapping,
+            files_to_delta_sinks
+        )
+        if not files_to_delta_sinks:
+            return notebook_path
+        # Create a DLT pipeline from the notebook path:
+        pipeline_response = self.workspace_client.pipelines.create(
+            allow_duplicate_names=True,
+            catalog='wkmigrate',
+            channel='CURRENT',
+            continuous=False,
+            development=False,
+            libraries=[PipelineLibrary(notebook=NotebookLibrary(path=notebook_path))],
+            name=f'{task.get("task_key")}_pipeline',
+            photon=True,
+            serverless=True,
+            target='wkmigrate'
+        )
+        return pipeline_response.pipeline_id
 
     def _create_copy_data_notebook(self, source_definition: dict, sink_definition: dict,
-                                   column_mapping: dict) -> str:
+                                   column_mapping: dict, files_to_delta_sinks: bool) -> str:
         """ Creates a notebook in the target workspace to copy data between specified data source and sink with
             the given column mapping.
             :parameter source_definition: Source dataset definition as a ``dict``
             :parameter sink_definition: Sink dataset definition as a ``dict``
             :parameter column_mapping: Column-level mapping as a ``dict``
+            :parameter files_to_delta_sinks: A ``bool`` indicating whether file sinks should be
+                                                converted to Delta tables
             :return: Databricks notebook path in the target workspace as a ``str``
         """
         script_lines = [
             '# Databricks notebook source',
             'import pyspark.sql.types as T',
             'import pyspark.sql.functions as F',
-            'data_source_options = {}'
+            '',
+            '# Set the source options:'
         ]
-        # Get the source properties:
-        source_dataset_name = source_definition.get('name')
-        source_service = source_definition.get('linked_service_definition')
-        source_service_name = source_service.get('name')
-        source_properties = source_definition.get('properties')
-        source_schema = source_properties.get('schema_type_properties_schema')
-        source_table = source_properties.get('table')
-        # Append code blocks to get source dataset options from the Databricks secret scope:
-        option_mappings = {'server': 'host', 'database': 'database', 'user_name': 'user_name', 'credential': 'password'}
-        script_lines.extend([
-            f'''data_source_options["{option_key}"] = dbutils.secrets.get(
-                    scope="wkmigrate_credentials_scope", 
-                    key="{source_service_name}_{property_key}"
+        # Append code blocks to set source dataset options from the Databricks secret scope:
+        script_lines.extend(WorkspaceManagementClient._get_option_expressions(source_definition))
+        if not files_to_delta_sinks:
+            # Append code blocks to set source dataset options from the Databricks secret scope:
+            script_lines.append('# Set the target options:')
+            script_lines.extend(WorkspaceManagementClient._get_option_expressions(sink_definition))
+            # Append a code block to read the source as a DataFrame:
+            script_lines.append('# Read from the source:')
+            script_lines.append(WorkspaceManagementClient._get_read_expression(source_definition))
+            # Append code blocks to create a new DataFrame with mapped column names and data types:
+            script_lines.append('# Map the source columns to the target columns:')
+            script_lines.append(
+                WorkspaceManagementClient._get_mapping(
+                    source_definition,
+                    sink_definition,
+                    column_mapping
                 )
-            '''
-            for property_key, option_key in option_mappings.items()
-        ])
-        # Append a code block to read the source as a DataFrame:
-        script_lines.append(
-            f'''{source_dataset_name}_df = ( 
-                    spark.read.format("sqlserver")
-                        .options(**data_source_options)
-                        .option("dbtable", "{source_schema}.{source_table}")
-                        .load()
-                    )
-            '''
-        )
-        # Get the sink properties:
-        sink_dataset_name = sink_definition.get('name')
-        sink_properties = sink_definition.get('properties')
-        sink_database = sink_properties.get('database')
-        sink_table = sink_properties.get('table')
-        # Append code blocks to create a new DataFrame with mapped column names and data types:
-        mapping_expressions = [
-            f'"cast({mapping["source_column_name"]} as {mapping["sink_column_type"]}) as {mapping["sink_column_name"]}"'
-            for mapping in column_mapping
-        ]
-        script_lines.append(
-            f'''{sink_dataset_name}_df = {source_dataset_name}_df.selectExpr({
-                ", \n\t".join(mapping_expressions)
-                })    
-            '''
-        )
-        # Append a code block to write the DataFrame to Delta:
-        script_lines.append(
-            f'''({sink_dataset_name}_df.write.format("delta")
-                        .mode("overwrite")
-                        .saveAsTable("hive_metastore.{sink_database}.{sink_table}")
+            )
+            # Append a code block to write the DataFrame to Delta:
+            script_lines.append('# Write to the target:')
+            script_lines.append(WorkspaceManagementClient._get_write_expression(sink_definition))
+        else:
+            # Append a code block to define the Delta table in DLT:
+            script_lines.append('# Load the data with DLT as a materialized view:')
+            script_lines.append(
+                WorkspaceManagementClient._get_dlt_definition(
+                    source_definition,
+                    sink_definition,
+                    column_mapping
                 )
-            '''
-        )
+            )
         # Create and upload the script as a Python notebook:
-        notebook_str = '\n'.join(script_lines)
-        notebook_path = f'/wkmigrate/copy_data_notebooks/copy_{source_dataset_name}'
+        source_dataset_name = source_definition.get('dataset_name')
+        sink_dataset_name = sink_definition.get('dataset_name')
+        notebook_str = autopep8.fix_code('\n'.join(script_lines))
+        notebook_path = f'/wkmigrate/copy_data_notebooks/copy_{source_dataset_name}_to_{sink_dataset_name}'
         self.workspace_client.workspace.mkdirs('/wkmigrate/copy_data_notebooks')
         self.workspace_client.workspace.import_(
             content=base64.b64encode(notebook_str.encode()).decode(),
@@ -273,37 +295,354 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         )
         return notebook_path
 
-    def _create_data_source_secrets(self, source_service: dict) -> list[str]:
+    @staticmethod
+    def _get_dlt_definition(source_dataset: dict, sink_dataset: dict, column_mapping: dict) -> str:
+        """ Creates a DLT table definition for a give source, sink, and column mapping.
+            :parameter source_dataset: Source dataset properties as a ``dict``
+            :parameter sink_dataset: Sink dataset properties as a ``dict``
+            :parameter column_mapping: Column mapping as a ``dict``
+            :return: A DLT table definition in Python as a ``str``
+        """
+        source_name = source_dataset.get('dataset_name')
+        sink_name = sink_dataset.get('dataset_name')
+        return f'''@dlt.table(
+                        name="{sink_name}",
+                        comment="Data copied from {source_name}; Previously targeted {sink_name}."
+                        tbl_properties={{'delta.createdBy.wkmigrate': 'true'}}
+                    )
+                    def {sink_name}:
+                        {WorkspaceManagementClient._get_read_expression(source_dataset)}
+                        {WorkspaceManagementClient._get_mapping(source_dataset, sink_dataset, column_mapping)}
+                        return {sink_name}_df
+                '''
+
+    @staticmethod
+    def _get_mapping(source_dataset: dict, sink_dataset: dict, column_mapping: dict) -> str:
+        """ Creates a PySpark expression mapping columns from a source DataFrame to a sink DataFrame.
+            :parameter source_dataset: Source dataset properties as a ``dict``
+            :parameter sink_dataset: Sink dataset properties as a ``dict``
+            :parameter column_mapping: Column mapping as a ``dict``
+            :return: PySpark expression creating a new DataFrame with the mapped columns
+        """
+        source_name = source_dataset.get('dataset_name')
+        sink_name = sink_dataset.get('dataset_name')
+        mapping_expressions = [
+            f'"cast({mapping["source_column_name"]} as {mapping["sink_column_type"]}) as {mapping["sink_column_name"]}"'
+            for mapping in column_mapping
+        ]
+        return f'''{sink_name}_df = {source_name}_df.selectExpr(\n\t{
+                    ", \n\t".join(mapping_expressions)
+                    }\n)    
+                '''
+
+    @staticmethod
+    def _get_write_expression(sink_definition: dict) -> str:
+        """ Creates a PySpark expression writing to a specified data sink.
+            :parameter sink_definition: Sink dataset properties as a ``dict``
+            :return: PySpark expression writing a DataFrame to the sink
+        """
+        sink_name = sink_definition.get('dataset_name')
+        sink_type = sink_definition.get('type')
+        if sink_type == 'avro':
+            container_name = sink_definition.get('container')
+            storage_account_name = sink_definition.get('storage_account_name')
+            folder_path = sink_definition.get('folder_path')
+            return rf'''{sink_name}_df.write.format("avro")  \
+                        .mode("overwrite")  \
+                        .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    '''
+        if sink_type == 'csv':
+            container_name = sink_definition.get('container')
+            storage_account_name = sink_definition.get('storage_account_name')
+            folder_path = sink_definition.get('folder_path')
+            return rf'''{sink_name}_df.write.format("csv")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    '''
+        if sink_type == 'delta':
+            database_name = sink_definition.get('database_name')
+            table_name = sink_definition.get('table_name')
+            return rf'''{sink_name}_df.write.format("delta")  \
+                        .mode("overwrite")  \
+                        .saveAsTable("hive_metastore.{database_name}.{table_name}")
+                    '''
+        if sink_type == 'json':
+            container_name = sink_definition.get('container')
+            storage_account_name = sink_definition.get('storage_account_name')
+            folder_path = sink_definition.get('folder_path')
+            return rf'''{sink_name}_df.write.format("json")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    '''
+        if sink_type == 'orc':
+            container_name = sink_definition.get('container')
+            storage_account_name = sink_definition.get('storage_account_name')
+            folder_path = sink_definition.get('folder_path')
+            return rf'''{sink_name}_df.write.format("orc")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    '''
+        if sink_type == 'parquet':
+            container_name = sink_definition.get('container')
+            storage_account_name = sink_definition.get('storage_account_name')
+            folder_path = sink_definition.get('folder_path')
+            return rf'''{sink_name}_df.write.format("parquet")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    '''
+        if sink_type == 'sqlserver':
+            return ''  # TODO: SET UP A WRITE TO SQL SERVER
+        raise ValueError(f'Writing data to "{sink_type}" not supported')
+
+    @staticmethod
+    def _get_read_expression(source_definition: dict) -> str:
+        """ Creates a PySpark expression reading from a specified data source.
+            :parameter sink_definition: Source dataset properties as a ``dict``
+            :return: PySpark expression reading from the source to a DataFrame
+        """
+        source_name = source_definition.get('dataset_name')
+        source_type = source_definition.get('type')
+        if source_type == 'avro':
+            container_name = source_definition.get('container')
+            storage_account_name = source_definition.get('storage_account_name')
+            folder_path = source_definition.get('folder_path')
+            return f'''{source_name}_df = ( 
+                        spark.read.format("avro")
+                            .load("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                    )
+                    '''
+        if source_type == 'csv':
+            container_name = source_definition.get('container')
+            storage_account_name = source_definition.get('storage_account_name')
+            folder_path = source_definition.get('folder_path')
+            return f'''{source_name}_df = ( 
+                        spark.read.format("csv")
+                            .options(**{source_name}_options)
+                            .load("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                        )
+                    '''
+        if source_type == 'delta':
+            database_name = source_definition.get('database_name')
+            table_name = source_definition.get('table_name')
+            return f'{source_name}_df = spark.read.table("hive_metastore.{database_name}.{table_name}'
+        if source_type == 'json':
+            container_name = source_definition.get('container')
+            storage_account_name = source_definition.get('storage_account_name')
+            folder_path = source_definition.get('folder_path')
+            return f'''{source_name}_df = ( 
+                        spark.read.format("json")
+                            .options(**{source_name}_options)
+                            .load("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                        )
+                    '''
+        if source_type == 'orc':
+            container_name = source_definition.get('container')
+            storage_account_name = source_definition.get('storage_account_name')
+            folder_path = source_definition.get('folder_path')
+            return f'''{source_name}_df = ( 
+                        spark.read.format("orc")
+                            .options(**{source_name}_options)
+                            .load("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                        )
+                    '''
+        if source_type == 'parquet':
+            container_name = source_definition.get('container')
+            storage_account_name = source_definition.get('storage_account_name')
+            folder_path = source_definition.get('folder_path')
+            return f'''{source_name}_df = ( 
+                        spark.read.format("parquet")
+                            .options(**{source_name}_options)
+                            .load("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
+                        )
+                    '''
+        if source_type == 'sqlserver':
+            schema_name = source_definition.get('schema_name')
+            table_name = source_definition.get('table_name')
+            return f'''{source_name}_df = ( 
+                    spark.read.format("sqlserver")
+                        .options(**{source_name}_options)
+                        .option("dbtable", "{schema_name}.{table_name}")
+                        .load()
+                    )
+                    '''
+        raise ValueError(f'Reading data from "{source_type}" not supported')
+
+    @staticmethod
+    def _get_option_expressions(dataset_definition: dict) -> list[str]:
+        """ Creates a PySpark expression defining DataFrameReader or DataFrameWriter options.
+            :parameter sink_definition: Sink dataset properties as a ``dict``
+            :return: PySpark expression writing a DataFrame to the sink
+        """
+        dataset_name = dataset_definition.get('dataset_name')
+        service_name = dataset_definition.get('service_name')
+        dataset_type = dataset_definition.get('type')
+        if dataset_type == 'avro':
+            config_lines = [
+                f'''spark.conf.set(
+                    "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                    dbutils.secrets.get(
+                        scope="wkmigrate_credentials_scope", 
+                        key="{service_name}_storage_account_key"
+                    )
+                )''',
+                f'''spark.conf.set(
+                    "spark.sql.files.maxRecordsPerFile",
+                    "{dataset_definition.get('records_per_file')}"
+                )'''
+            ]
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        if dataset_type == 'csv':
+            config_lines = [
+                rf'{dataset_name}_options["{option}"] = r"{dataset_definition.get(option)}"'
+                for option in options[dataset_type]
+                if dataset_definition.get(option)
+            ]
+            if 'records_per_file' in dataset_definition:
+                records_per_file = dataset_definition.get('records_per_file')
+                config_lines.append(
+                    f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")'
+                )
+            config_lines.append(
+                f'''spark.conf.set(
+                    "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                        dbutils.secrets.get(
+                            scope="wkmigrate_credentials_scope", 
+                            key="{service_name}_storage_account_key"
+                    )
+                )
+                '''
+            )
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        if dataset_type == 'json':
+            config_lines = [
+                rf'{dataset_name}_options["{option}"] = r"{dataset_definition.get(option)}"'
+                for option in options[dataset_type]
+                if dataset_definition.get(option)
+            ]
+            if 'records_per_file' in dataset_definition:
+                records_per_file = dataset_definition.get('records_per_file')
+                config_lines.append(
+                    f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")'
+                )
+            config_lines.append(
+                f'''spark.conf.set(
+                    "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                        dbutils.secrets.get(
+                            scope="wkmigrate_credentials_scope", 
+                            key="{service_name}_storage_account_key"
+                    )
+                )
+                '''
+            )
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        if dataset_type == 'orc':
+            config_lines = [
+                rf'{dataset_name}_options["{option}"] = r"{dataset_definition.get(option)}"'
+                for option in options[dataset_type]
+                if dataset_definition.get(option)
+            ]
+            if 'records_per_file' in dataset_definition:
+                records_per_file = dataset_definition.get('records_per_file')
+                config_lines.append(
+                    f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")'
+                )
+            config_lines.append(
+                f'''spark.conf.set(
+                    "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                        dbutils.secrets.get(
+                            scope="wkmigrate_credentials_scope", 
+                            key="{service_name}_storage_account_key"
+                    )
+                )
+                '''
+            )
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        if dataset_type == 'parquet':
+            config_lines = [
+                rf'{dataset_name}_options["{option}"] = r"{dataset_definition.get(option)}"'
+                for option in options[dataset_type]
+                if dataset_definition.get(option)
+            ]
+            if 'records_per_file' in dataset_definition:
+                records_per_file = dataset_definition.get('records_per_file')
+                config_lines.append(
+                    f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")'
+                )
+            config_lines.append(
+                f'''spark.conf.set(
+                    "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                        dbutils.secrets.get(
+                            scope="wkmigrate_credentials_scope", 
+                            key="{service_name}_storage_account_key"
+                    )
+                )
+                '''
+            )
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        if dataset_type == 'sqlserver':
+            config_lines = [
+                f'''{dataset_name}_options["{option}"] = dbutils.secrets.get(
+                    scope="wkmigrate_credentials_scope", 
+                    key="{service_name}_{option}"
+                )
+                '''
+                for option in options[dataset_type]
+            ]
+            return [
+                f'{dataset_name}_options = {{}}',
+                *config_lines
+            ]
+        return []
+
+    def _create_data_source_secrets(self, source_definition: dict) -> list[str]:
+        """ Creates Databricks secrets for credentials and connection strings in a given data source definition.
+            :parameter source_definition: Data source definition as a ``dict``
+            :return: Created secret keys as a ``list[str]``
+        """
         secret_keys = []
-        source_service_name = source_service.get('name')
-        properties = source_service.get('properties')
+        source_service_name = source_definition.get('service_name')
+        source_service_type = source_definition.get('type')
         scopes = [scope.name for scope in self.workspace_client.secrets.list_scopes()]
         if 'wkmigrate_credentials_scope' not in scopes:
             self.workspace_client.secrets.create_scope(scope='wkmigrate_credentials_scope')
-        for property_key in ['database', 'server', 'user_name']:
-            secrets = [
-                secret.key for secret in self.workspace_client.secrets.list_secrets('wkmigrate_credentials_scope')
-            ]
-            if f'{source_service_name}_{property_key}' in secrets:
-                continue
+        for secret in secrets[source_service_type]:
+            secret_value = source_definition.get(secret)
+            if secret_value is None:
+                secret_value = input(
+                    f'Enter {secret} for dataset {source_service_name}'
+                )
             self.workspace_client.secrets.put_secret(
                 scope='wkmigrate_credentials_scope',
-                key=f'{source_service_name}_{property_key}',
-                string_value=properties.get(property_key)
+                key=f'{source_service_name}_{secret}',
+                string_value=secret_value
             )
-            secret_keys.append(f'{source_service_name}_{property_key}')
-        db_pwd = input(
-            f'Enter database password for user {properties.get('user_name')} on host {properties.get('server')}'
-        )
-        self.workspace_client.secrets.put_secret(
-            scope='wkmigrate_credentials_scope',
-            key=f'{source_service_name}_credential',
-            string_value=db_pwd
-        )
-        secret_keys.append(f'{source_service_name}_credential')
+            secret_keys.append(f'{source_service_name}_{secret}')
         return secret_keys
 
     def _create_notebook_task_dependencies(self, task: dict) -> str:
+        """ Creates a Databricks notebook if it does not exist in the target workspace.
+            :parameter task: Task definition as a ``dict``
+            :return: Notebook path in the target workspace as a ``str``
+        """
         notebook_task = task.get('notebook_task')
         notebook_path = f'/Workspace{notebook_task.get('notebook_path')}'
         cluster_definition = task.get('new_cluster')
@@ -316,7 +655,12 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             self._upload_notebook(host_name, pat, notebook_path)
             return notebook_path
 
-    def _upload_notebook(self, host_name, pat, notebook_path) -> None:
+    def _upload_notebook(self, host_name: str, pat: str, notebook_path: str) -> None:
+        """ Uploads a Databricks notebook to the target workspace.
+            :parameter host_name: Workspace host as a ``str``
+            :parameter pat: Workspace PAT as a ``str``
+            :parameter notebook_path: Target notebook path as a ``str``
+        """
         source_client = WorkspaceManagementClient(host_name=host_name, pat=pat, authentication_type='pat')
         target_folder = '/'.join(notebook_path.split('/')[:-1])
         self.workspace_client.workspace.mkdirs(target_folder)
@@ -352,25 +696,6 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         task['for_each_task']['task'] = {'task_key': task_key, 'run_job_task': {'job_id': job_id}}
         return Task.from_dict(task)
 
-    def _create_copy_task(self, task: dict) -> Task:
-        """ Creates a Databricks workflow ``Task`` object from a copy data task definition.
-            :parameter task: Workflow copy data task definition as a ``dict``
-            :return: Workflow ``Task`` object (Notebook task)
-        """
-        # TODO: AUTHOR THE NOTEBOOK
-        if 'notebook_task' not in task:
-            raise ValueError('No "notebook_task" value for copy data task type')
-        notebook_task = task.get('notebook_task')
-        # TODO: CREATE THE NOTEBOOK TASK
-        pass
-
-    def _create_copy_notebook(self, task: dict) -> int:
-        """ Creates a Databricks notebook defining a copy data task.
-            :parameter task: Workflow copy data task definition as a ``dict``
-            :return: Notebook ID as an ``int``
-        """
-        pass
-
     @staticmethod
     def _get_schedule(schedule: Optional[dict]) -> Optional[CronSchedule]:
         if schedule is None:
@@ -399,5 +724,5 @@ class WorkspaceTestClient(DatabricksWorkspaceClient):
             # If no workflow was found:
             raise ValueError(f'No workflow found with job name {job_name}."')
 
-    def create_workflow(self, job_definition: dict) -> None:
+    def create_workflow(self, job_definition: dict, translation_options: Optional[dict] = None) -> None:
         pass
