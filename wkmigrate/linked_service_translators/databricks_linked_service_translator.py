@@ -33,4 +33,4 @@ def translate_cluster_spec(cluster_spec: Optional[dict]) -> Optional[dict]:
     # Get the cluster properties:
     properties = cluster_spec.get('properties')
     # Translate the properties:
-    return translate(properties, mapping)
+    return {'service_name': cluster_spec.get('name'), **translate(properties, mapping)}

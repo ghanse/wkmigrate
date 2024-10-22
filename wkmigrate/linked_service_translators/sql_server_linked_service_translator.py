@@ -4,7 +4,7 @@ from wkmigrate.utils import identity, translate
 
 
 mapping = {
-    'server': {'key': 'server', 'parser': identity},
+    'host': {'key': 'server', 'parser': identity},
     'database': {'key': 'database', 'parser': identity},
     'user_name': {'key': 'user_name', 'parser': identity},
     'authentication_type': {'key': 'authentication_type', 'parser': identity}
@@ -22,4 +22,4 @@ def translate_sql_server_spec(sql_server_spec: Optional[dict]) -> Optional[dict]
     # Get the cluster properties:
     properties = sql_server_spec.get('properties')
     # Translate the properties:
-    return translate(properties, mapping)
+    return {'service_name': sql_server_spec.get('name'), **translate(properties, mapping)}
