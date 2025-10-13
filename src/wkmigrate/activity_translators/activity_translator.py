@@ -86,10 +86,18 @@ def parse_activity_properties(activity: dict) -> dict | tuple[dict, list[dict]]:
     if activity_type is None:
         raise ValueError("Activity type cannot be None")
 
-    translated_task = type_translators[activity_type](activity)
+    type_translator = type_translators.get(activity_type)
+    if not type_translator:
+        return get_placeholder_activity()
+
+    translated_task = type_translator(activity)
     # Check if any downstream activities were created:
     if isinstance(translated_task, tuple):
         translated_activity[type_mapping[activity_type]] = translated_task[0]
         return translated_activity, translated_task[1]
     translated_activity[type_mapping[activity_type]] = translated_task
     return translated_activity
+
+
+def get_placeholder_activity() -> dict:
+    return {"notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"}, "unsupported": True}

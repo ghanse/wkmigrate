@@ -2,6 +2,7 @@
 
 import base64
 import json
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -665,8 +666,11 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         notebook_path = f"/Workspace{notebook_path_value}"
         cluster_definition = task.get("new_cluster")
         if cluster_definition is None:
-            raise ValueError('No "new_cluster" found in task')
-        host_name = cluster_definition.pop("host_name")
+            warnings.warn('No "new_cluster" found in task, using serverless compute')
+        else:
+            host_name = cluster_definition.pop("host_name")
+        if task.get("unsupported"):
+            return notebook_path
         try:
             if self.workspace_client is None:
                 raise ValueError("workspace_client is not initialized")
@@ -710,23 +714,24 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if for_each_task is None:
             raise ValueError('"for_each_task" cannot be None')
         inner_tasks = for_each_task.get("task")
+        print(inner_tasks[0])
         if len(inner_tasks) == 1:
             task["for_each_task"]["task"] = inner_tasks[0]
-            return self._create_task(task, None)
-        task_key = f"{task.get('task_key')}_inner_tasks"
-        job_id = self.create_workflow(
-            {
-                "settings": {
-                    "name": task_key,
-                    "tasks": inner_tasks,
-                    "tags": {"CREATED_BY_WKMIGRATE": ""},
+        else:
+            task_key = f"{task.get('task_key')}_inner_tasks"
+            job_id = self.create_workflow(
+                {
+                    "settings": {
+                        "name": task_key,
+                        "tasks": inner_tasks,
+                        "tags": {"CREATED_BY_WKMIGRATE": ""},
+                    }
                 }
+            )
+            task["for_each_task"]["task"] = {
+                "task_key": task_key,
+                "run_job_task": {"job_id": job_id},
             }
-        )
-        task["for_each_task"]["task"] = {
-            "task_key": task_key,
-            "run_job_task": {"job_id": job_id},
-        }
         return Task.from_dict(task)
 
     @staticmethod

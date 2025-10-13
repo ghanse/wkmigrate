@@ -1,3 +1,4 @@
+import ast
 import re
 import warnings
 from datetime import datetime, timedelta
@@ -67,11 +68,18 @@ def parse_for_each_items(items: dict | None) -> str | None:
     if value is None:
         return None
     # TODO: Move all dynamic function patterns to a common enum list
-    array_pattern = r"@array\((.+)\)"
+    array_pattern = r"@array\('(.+)'\)"
     match = re.match(string=value, pattern=array_pattern)
     if match:
-        inputs = match.group(1)
-        return _parse_array_string(inputs)
+        matched_item = match.group(1)
+        return f'["{matched_item}"]'
+
+    create_array_pattern = r"@createArray\((.+)\)"
+    match = re.match(string=value, pattern=create_array_pattern)
+    if match:
+        matched_item = match.group(1)
+        list_items = ast.literal_eval(matched_item)
+        return f'[{",".join([f'"{item}"' for item in list_items])}]'
     return None
 
 
@@ -213,8 +221,9 @@ def _parse_array_string(array_string: str) -> str:
     """
     double_quote_character = '"'
     single_quote_character = "'"
-    return f"""[{','.join([f'"{element.replace(single_quote_character, "").replace(double_quote_character, "")}"' for element in array_string.split(',')])}]"""
-
+    test = f"""["{'","'.join([f'{element.replace(single_quote_character, "").replace(double_quote_character, "")}' for element in array_string.split(',')])}"]"""
+    print(test)
+    return test
 
 def _parse_for_each_task(task: dict | None) -> dict | None:
     """Parses a single task definition within a ForEach task to a common object model.

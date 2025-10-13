@@ -21,7 +21,9 @@ def get_version(version: str) -> VersionInfo:
     :parameter version: Version to get info for as a ``str``; must be compatible with the `bump` package
     :return: Version info as a ``namedtuple``
     """
-    version_expression = re.compile(r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+){0,1}(?P<release>\D*)(?P<build>\d*)")
+    version_expression = re.compile(
+        r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+){0,1}(?P<release>\D*)(?P<build>\d*)"
+    )
     match = version_expression.match(version)
     if match is None:
         raise ValueError(f"Invalid version format: {version}")

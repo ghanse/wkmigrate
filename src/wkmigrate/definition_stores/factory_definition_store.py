@@ -123,7 +123,10 @@ class FactoryDefinitionStore(DefinitionStore):
                 if self.factory_client is None:
                     raise ValueError("factory_client is not initialized")
                 # Get the linked service details from data factory:
-                activity["linked_service_definition"] = self.factory_client.get_linked_service(linked_service_name)
+                linked_service = self.factory_client.get_linked_service(linked_service_name)
+                if linked_service["type"] == "AzureDatabricks":
+                    activity["linked_service_definition"] = self.factory_client.get_linked_service(linked_service_name)
+
         # Check the nested "if false" activities:
         if "if_false_activities" in activity:
             if_false_activities = activity.get("if_false_activities")
