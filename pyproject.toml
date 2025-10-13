@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wkmigrate"
-version = "0.1.0"
+version = "0.0.1-post2"
 description = "wkmigrate is a Python library for converting orchestration definitions between various systems"
 authors = ["Greg Hansen <gregory.hansen@databricks.com>"]
 readme = "README.md"
