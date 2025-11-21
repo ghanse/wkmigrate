@@ -25,7 +25,7 @@ def parse_dataset_mapping(mapping: dict) -> list[dict]:
     """
     return [
         {
-            "source_column_name": mapping.get("source").get("name"),
+            "source_column_name": mapping.get("source").get("name") or f"_c{mapping.get("source").get("ordinal") - 1}",
             "sink_column_name": mapping.get("sink").get("name"),
             "sink_column_type": mapping.get("sink").get("type"),
         }
@@ -224,6 +224,7 @@ def _parse_array_string(array_string: str) -> str:
     test = f"""["{'","'.join([f'{element.replace(single_quote_character, "").replace(double_quote_character, "")}' for element in array_string.split(',')])}"]"""
     print(test)
     return test
+
 
 def _parse_for_each_task(task: dict | None) -> dict | None:
     """Parses a single task definition within a ForEach task to a common object model.

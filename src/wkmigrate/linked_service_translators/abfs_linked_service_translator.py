@@ -1,12 +1,14 @@
 """This module defines methods for translating Azure SQL Server linked services from data pipeline definitions."""
 
-from wkmigrate.linked_service_translators.parsers import parse_storage_account_name
+from wkmigrate.linked_service_translators.parsers import (
+    parse_storage_account_name, parse_storage_account_connection_string
+)
 from wkmigrate.utils import identity, translate
 
 
 mapping = {
-    "url": {"key": "url", "parser": identity},
-    "storage_account_name": {"key": "url", "parser": parse_storage_account_name},
+    "url": {"key": "connection_string", "parser": parse_storage_account_connection_string},
+    "storage_account_name": {"key": "connection_string", "parser": parse_storage_account_name},
 }
 
 

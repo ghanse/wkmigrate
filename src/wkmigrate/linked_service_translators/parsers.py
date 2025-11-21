@@ -51,15 +51,30 @@ def parse_init_scripts(init_scripts: list[str] | None) -> list[dict] | None:
     ]
 
 
-def parse_storage_account_name(url: str) -> str:
+def parse_storage_account_connection_string(connection_string: str) -> str:
+    """Parses an Azure Storage account connection string.
+    :parameter connection_string: Azure Storage account connection string as a ``str``
+    :return: Azure Storage account URL as a ``str``
+    """
+    account_name = _extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")
+    protocol = _extract_group(connection_string, r"DefaultEndpointsProtocol=([a-zA-Z0-9]+);")
+    suffix = _extract_group(connection_string, r"EndpointSuffix=([a-zA-Z0-9\.]+);")
+    return f"{protocol}://{account_name}.blob.{suffix}/"
+
+
+def parse_storage_account_name(connection_string: str) -> str:
     """Parses an Azure Storage account name from the URL.
-    :parameter url: Azure Storage account URL as a ``str``
+    :parameter connection_string: Azure Storage account URL as a ``str``
     :return: Azure Storage account name as a ``str``
     """
-    match = re.search(pattern=r"https://([A-Za-z0-9]*).dfs.core.windows.net", string=url)
+    return _extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")
+
+
+def _extract_group(input_string: str, regex: str) -> str:
+    match = re.search(pattern=regex, string=input_string)
     if match is None:
-        raise ValueError(f"Invalid Azure Storage URL format: {url}")
-    return match[1]
+        raise ValueError(f"No match for regex '{regex}' found in input string '{input_string}'")
+    return match.group(1)
 
 
 def _get_init_script_type(init_script_path: str) -> str:

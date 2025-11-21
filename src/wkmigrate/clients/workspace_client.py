@@ -14,6 +14,7 @@ from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Languag
 
 import wkmigrate
 from wkmigrate.datasets import options, secrets
+from wkmigrate.datasets.data_type_mapping import parse_spark_data_type
 
 
 class DatabricksWorkspaceClient(ABC):
@@ -204,10 +205,16 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if task.get("type") == "DatabricksNotebook":
             self._create_notebook_task_dependencies(task)
         if task.get("type") == "Copy":
-            files_to_delta_sinks = True
+            copy_data_task = task.get("copy_data_task")
+            sink_dataset = copy_data_task.get("sink_dataset")
+            files_to_delta_sinks = sink_dataset.get("type") == "delta"
+            #files_to_delta_sinks = True
             if translation_options is not None:
                 files_to_delta_sinks = translation_options.get("files_to_delta_sinks", True)
-            dependency_object = self._create_copy_task_dependencies(task, files_to_delta_sinks)
+            dependency_object = self._create_copy_task_dependencies(
+                task,
+                files_to_delta_sinks
+            )
             task.pop("copy_data_task")
             if not files_to_delta_sinks:
                 task["notebook_task"] = {"notebook_path": dependency_object}
@@ -217,7 +224,11 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             return self._create_for_each_task(task)
         return Task.from_dict(task)
 
-    def _create_copy_task_dependencies(self, task: dict, files_to_delta_sinks: bool) -> str:
+    def _create_copy_task_dependencies(
+        self,
+        task: dict,
+        files_to_delta_sinks: bool
+    ) -> str:
         """Creates a Databricks notebook to copy data.
         :parameter task: Workflow task definition as a ``dict``
         :parameter files_to_delta_sinks: Whether to create Lakeflow Declarative Pipelines to copy data files to Delta table sinks
@@ -234,7 +245,6 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             **source_dataset,
             **source_properties,
         }
-        self._create_data_source_secrets(source_definition)
         sink_dataset = copy_data_task.get("sink_dataset")
         sink_properties = copy_data_task.get("sink_properties")
         if sink_dataset is None or sink_properties is None:
@@ -243,6 +253,7 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             **sink_dataset,
             **sink_properties,
         }
+        self._create_data_source_secrets(source_definition)
         self._create_data_source_secrets(sink_definition)
         column_mapping = copy_data_task.get("column_mapping")
         notebook_path = self._create_copy_data_notebook(
@@ -305,7 +316,7 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             # Append code blocks to create a new DataFrame with mapped column names and data types:
             script_lines.append("# Map the source columns to the target columns:")
             script_lines.append(
-                WorkspaceManagementClient._get_mapping(source_definition, sink_definition, column_mapping)
+                WorkspaceManagementClient._get_mapping(source_definition, sink_definition, column_mapping, True)
             )
             # Append a code block to write the DataFrame to Delta:
             script_lines.append("# Write to the target:")
@@ -350,22 +361,26 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
                     )
                     def {sink_name}:
                         {WorkspaceManagementClient._get_read_expression(source_dataset)}
-                        {WorkspaceManagementClient._get_mapping(source_dataset, sink_dataset, column_mapping)}
+                        {WorkspaceManagementClient._get_mapping(source_dataset, sink_dataset, column_mapping, True)}
                         return {sink_name}_df
                 """
 
     @staticmethod
-    def _get_mapping(source_dataset: dict, sink_dataset: dict, column_mapping: dict) -> str:
+    def _get_mapping(source_dataset: dict, sink_dataset: dict, column_mapping: dict, cast_column_types: bool) -> str:
         """Creates a PySpark expression mapping columns from a source DataFrame to a sink DataFrame.
         :parameter source_dataset: Source dataset properties as a ``dict``
         :parameter sink_dataset: Sink dataset properties as a ``dict``
         :parameter column_mapping: Column mapping as a ``dict``
+        :parameter cast_column_types: Whether to cast column data types
         :return: PySpark expression creating a new DataFrame with the mapped columns
         """
         source_name = source_dataset.get("dataset_name")
         sink_name = sink_dataset.get("dataset_name")
         mapping_expressions = [
-            f'"cast({mapping["source_column_name"]} as {mapping["sink_column_type"]}) as {mapping["sink_column_name"]}"'
+            (
+                f'"cast({mapping["source_column_name"]} as {parse_spark_data_type(mapping["sink_column_type"], sink_dataset["type"])}) as {mapping["sink_column_name"]}"'
+                if cast_column_types else f'"{mapping["source_column_name"]} as {mapping["sink_column_name"]}"'
+            )
             for mapping in column_mapping
         ]
         newline_characters = ", \n\t"
@@ -431,7 +446,10 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
                         .save("abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}")
                     """
         if sink_type == "sqlserver":
-            return ""  # TODO: SET UP A WRITE TO SQL SERVER
+            return rf"""{sink_name}_df.write.format("jdbc")  \
+                        .options(**{sink_name}_options)  \
+                        .save()
+                    """  # TODO: SET UP A WRITE TO SQL SERVER
         raise ValueError(f'Writing data to "{sink_type}" not supported')
 
     @staticmethod
@@ -612,15 +630,19 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             )
             return [f"{dataset_name}_options = {{}}", *config_lines]
         if dataset_type == "sqlserver":
-            config_lines = [
-                f"""{dataset_name}_options["{option}"] = dbutils.secrets.get(
+            secrets_lines = [
+                f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
                     scope="wkmigrate_credentials_scope", 
-                    key="{service_name}_{option}"
+                    key="{service_name}_{secret}"
                 )
                 """
+                for secret in secrets[dataset_type]
+            ]
+            options_lines = [
+                f"""{dataset_name}_options["{option}"] = '{dataset_definition.get(option)}'"""
                 for option in options[dataset_type]
             ]
-            return [f"{dataset_name}_options = {{}}", *config_lines]
+            return [f"{dataset_name}_options = {{}}", *secrets_lines, *options_lines]
         return []
 
     def _create_data_source_secrets(self, source_definition: dict) -> list[str]:

@@ -308,6 +308,9 @@ def parse_sql_server_dataset(dataset: dict) -> dict:
             "parser": lambda x: x.get("schema_type_properties_schema"),
         },
         "table_name": {"key": "properties", "parser": lambda x: x.get("table")},
+        "dbtable": {
+            "key": "properties", "parser": lambda x: f"{x.get("schema_type_properties_schema")}.{x.get("table")}"
+        }
     }
     translated_dataset = translate(dataset, mapping)
     linked_service_def = dataset.get("linked_service_definition")
@@ -336,9 +339,21 @@ def parse_sql_server_properties(properties: dict) -> dict:
             "key": "query_timeout",
             "parser": _parse_query_timeout_seconds,
         },
+        "numPartitions": {
+            "key": "max_concurrent_connections", "parser": identity
+        },
+        "batchsize": {"key": "write_batch_size", "parser": identity},
+        "sessionInitStatement": {"key": "pre_copy_script", "parser": identity},
+        "mode": {"key": "write_behavior", "parser": _parse_sql_write_behavior}
     }
     translated = translate(properties, mapping)
     return translated if translated is not None else {}
+
+
+def _parse_sql_write_behavior(write_behavior: str) -> str:
+    if write_behavior == "insert":
+        return "append"
+    raise ValueError(f"Cannot create an equivalent Copy Data task for writing to SQL Server in '{write_behavior}' mode")
 
 
 def _parse_character_value(char: str) -> str:
@@ -421,7 +436,7 @@ def _parse_abfs_container_name(properties: dict) -> str:
     location = properties.get("location")
     if location is None:
         raise ValueError("Location cannot be None")
-    return location.get("file_system")
+    return location.get("container")
 
 
 def _parse_abfs_file_path(properties: dict) -> str:
@@ -432,4 +447,6 @@ def _parse_abfs_file_path(properties: dict) -> str:
     location = properties.get("location")
     if location is None:
         raise ValueError("Location cannot be None")
-    return location.get("folder_path")
+    folder_path = location.get("folder_path")
+    file_name = location.get("file_name")
+    return file_name if not folder_path else f"{folder_path}/{file_name}"

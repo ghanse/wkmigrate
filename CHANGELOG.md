@@ -3,6 +3,11 @@
 ## Change History
 All notable changes to the Workflow Migrator will be documented in this file.
 
+### Version 0.0.2
+
+#### Added
+* Added support for Copy Data activities with SQL Server as a target
+
 ### Version 0.0.1-post2
 
 #### Added

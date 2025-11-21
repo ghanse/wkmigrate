@@ -42,7 +42,7 @@ options = {
     "json": ["encoding", "compression"],
     "orc": ["compression"],
     "parquet": ["compression"],
-    "sqlserver": ["host", "database", "user_name", "password"],
+    "sqlserver": ["mode", "dbtable", "numPartitions", "batchsize", "sessionInitStatement"],
 }
 
 
