@@ -92,6 +92,9 @@ def parse_policy(policy: dict | None) -> dict:
     """
     if policy is None:
         return {}
+    cached_policy = policy.get("_wkmigrate_cached_policy")
+    if cached_policy is not None:
+        return cached_policy
     # Warn about secure input/output logging:
     if "secure_input" in policy:
         warnings.warn(
@@ -124,6 +127,7 @@ def parse_policy(policy: dict | None) -> dict:
     # Parse the retry wait time in milliseconds:
     if "retry_interval_in_seconds" in policy:
         parsed_policy["min_retry_interval_millis"] = 1000 * int(policy.get("retry_interval_in_seconds", 0))
+    policy["_wkmigrate_cached_policy"] = parsed_policy
     return parsed_policy
 
 

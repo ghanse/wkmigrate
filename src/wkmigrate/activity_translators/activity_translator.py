@@ -5,6 +5,7 @@ from wkmigrate.activity_translators.parsers import parse_dependencies, parse_pol
 from wkmigrate.linked_service_translators.databricks_linked_service_translator import (
     translate_cluster_spec,
 )
+from wkmigrate.not_translatable import not_translatable_context
 from wkmigrate.utils import identity, translate
 
 
@@ -59,20 +60,20 @@ def translate_activity(activity: dict) -> dict | tuple[dict, list[dict]]:
     """Translates a data pipeline activity to a common object model.
     :parameter activity: Dictionary definition of the source pipeline activity
     :return: Dictionary definition of the target workflows activity"""
-    # Translate the activity properties:
-    translated_activity = translate(activity, mapping)
-    if translated_activity is None:
-        translated_activity = {}
-    # Parse the type properties for the task type:
-    parsed_properties = parse_activity_properties(activity)
-    # Check if any downstream activities were created:
-    if isinstance(parsed_properties, tuple):
-        if parsed_properties[0] is not None:
-            return ({**translated_activity, **parsed_properties[0]}), parsed_properties[1]
-        return translated_activity, parsed_properties[1]
-    if parsed_properties is not None:
-        return {**translated_activity, **parsed_properties}
-    return translated_activity
+    activity_name = activity.get("name")
+    activity_type = activity.get("type")
+    with not_translatable_context(activity_name, activity_type):
+        translated_activity = translate(activity, mapping)
+        if translated_activity is None:
+            translated_activity = {}
+        parsed_properties = parse_activity_properties(activity)
+        if isinstance(parsed_properties, tuple):
+            if parsed_properties[0] is not None:
+                return ({**translated_activity, **parsed_properties[0]}), parsed_properties[1]
+            return translated_activity, parsed_properties[1]
+        if parsed_properties is not None:
+            return {**translated_activity, **parsed_properties}
+        return translated_activity
 
 
 def parse_activity_properties(activity: dict) -> dict | tuple[dict, list[dict]]:

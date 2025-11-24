@@ -15,7 +15,6 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 
 import wkmigrate
-from wkmigrate import datasets
 from wkmigrate.datasets import options, secrets
 from wkmigrate.datasets.data_type_mapping import parse_spark_data_type
 
@@ -960,12 +959,19 @@ class LocalArtifactsCollector:
     def get_unsupported_with_warnings(self) -> list[dict]:
         unsupported = list(self.unsupported)
         for warning in self._not_translatable:
+            activity_name = warning.get("activity_name") or warning.get("property", "pipeline")
+            activity_type = warning.get("activity_type") or "not_translatable"
+            metadata = {
+                key: value
+                for key, value in warning.items()
+                if key not in {"activity_name", "activity_type"}
+            }
             unsupported.append(
                 {
-                    "activity_name": warning.get("property", "pipeline"),
-                    "activity_type": "not_translatable",
+                    "activity_name": activity_name,
+                    "activity_type": activity_type,
                     "reason": warning.get("message", "Property could not be translated"),
-                    "metadata": warning,
+                    "metadata": metadata,
                 }
             )
         return unsupported

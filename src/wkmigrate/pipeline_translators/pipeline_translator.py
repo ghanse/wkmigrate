@@ -37,12 +37,17 @@ def translate_pipeline(pipeline: dict) -> dict:
             continue
         message = str(warning.message)
         property_name = getattr(warning.message, "property_name", "unknown")
-        not_translatable.append(
-            {
-                "property": property_name,
-                "message": message,
-            }
-        )
+        activity_name = getattr(warning.message, "activity_name", None)
+        activity_type = getattr(warning.message, "activity_type", None)
+        entry = {
+            "property": property_name,
+            "message": message,
+        }
+        if activity_name is not None:
+            entry["activity_name"] = activity_name
+        if activity_type is not None:
+            entry["activity_type"] = activity_type
+        not_translatable.append(entry)
     if not_translatable:
         translated_pipeline["not_translatable"] = not_translatable
 
