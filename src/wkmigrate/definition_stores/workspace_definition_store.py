@@ -11,7 +11,7 @@ from wkmigrate.definition_stores.definition_store import DefinitionStore
 
 @dataclass
 class WorkspaceDefinitionStore(DefinitionStore):
-    """This class is used to list, describe, and update objects in a Databricks workspace."""
+    """Lists, describes, and updates objects in a Databricks workspace."""
 
     authentication_type: str | None = None
     host_name: str | None = None
@@ -28,7 +28,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
 
     def __post_init__(self) -> None:
-        """Sets up the workspace client for the provided authentication credentials."""
         if self._use_test_client:
             self.workspace_client = WorkspaceTestClient()
             return
@@ -51,24 +50,26 @@ class WorkspaceDefinitionStore(DefinitionStore):
         )
 
     def load(self, job_name: str) -> dict:
-        """Gets a dictionary representation of a Databricks workflow from the Databricks workspace.
-        :parameter job_name: Job name for the specified workflow
-        :return: Workflow definition as a ``dict``
-        """
         if self.workspace_client is None:
             raise ValueError("workspace_client is not initialized")
         job = self.workspace_client.get_workflow(job_name=job_name)
         return job.as_dict()
 
     def dump(self, job_settings: dict) -> int:
-        """Creates workflow in the Databricks workspace with the specified definition.
-        :parameter job_settings: Workflow definition as a ``dict``
-        :return: ``None``
-        """
-        job_definition = {"settings": job_settings}
         if self.workspace_client is None:
             raise ValueError("workspace_client is not initialized")
-        result = self.workspace_client.create_workflow(job_definition=job_definition)
-        if result is None:
+        job_definition = {"settings": job_settings}
+        job_id = self.workspace_client.create_workflow(job_definition=job_definition)
+        if job_id is None:
             raise ValueError("Failed to create workflow")
-        return result
+        return job_id
+
+    def to_local_files(self, job_settings: dict, local_directory: str) -> None:
+        if self.workspace_client is None:
+            raise ValueError("workspace_client is not initialized")
+        job_definition = {"settings": job_settings}
+        self.workspace_client.create_workflow(
+            job_definition=job_definition,
+            create_in_workspace=False,
+            local_directory=local_directory,
+        )

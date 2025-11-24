@@ -2,6 +2,7 @@
 
 import warnings
 from wkmigrate.enums.interval_type import IntervalType
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def parse_cron_expression(recurrence: dict | None) -> str | None:
@@ -14,7 +15,10 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
     interval_type = recurrence.get("frequency")
     num_intervals = recurrence.get("interval")
     if num_intervals is None:
-        warnings.warn('Setting empty "num_intervals" to "1" by default', stacklevel=2)
+        warnings.warn(
+            NotTranslatableWarning("schedule.num_intervals", 'Setting empty "num_intervals" to "1" by default'),
+            stacklevel=2,
+        )
         num_intervals = 1
     schedule = recurrence.get("schedule")
     if interval_type == IntervalType.HOUR:
@@ -26,7 +30,10 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
     if interval_type == IntervalType.WEEK:
         if num_intervals > 1:
             warnings.warn(
-                'Ignoring "num_intervals" > 1 for weekly triggers; Using weekly interval',
+                NotTranslatableWarning(
+                    "schedule.num_intervals",
+                    'Ignoring "num_intervals" > 1 for weekly triggers; Using weekly interval',
+                ),
                 stacklevel=2,
             )
         if schedule is None:
@@ -35,7 +42,10 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
     if interval_type == IntervalType.MONTH:
         if num_intervals > 1:
             warnings.warn(
-                'Ignoring "num_intervals" > 1 for monthly triggers; Using monthly interval',
+                NotTranslatableWarning(
+                    "schedule.num_intervals",
+                    'Ignoring "num_intervals" > 1 for monthly triggers; Using monthly interval',
+                ),
                 stacklevel=2,
             )
         if schedule is None:

@@ -309,8 +309,9 @@ def parse_sql_server_dataset(dataset: dict) -> dict:
         },
         "table_name": {"key": "properties", "parser": lambda x: x.get("table")},
         "dbtable": {
-            "key": "properties", "parser": lambda x: f"{x.get("schema_type_properties_schema")}.{x.get("table")}"
-        }
+            "key": "properties",
+            "parser": lambda x: f"{x.get('schema_type_properties_schema')}.{x.get('table')}",
+        },
     }
     translated_dataset = translate(dataset, mapping)
     linked_service_def = dataset.get("linked_service_definition")

@@ -3,6 +3,7 @@
 import warnings
 from wkmigrate.activity_translators.parsers import parse_condition_expression
 from wkmigrate.utils import translate
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 mapping = {
     "op": {
@@ -31,7 +32,10 @@ def translate_if_condition_activity(activity: dict) -> dict | tuple[dict, list[d
     if translated_activity is None:
         raise ValueError('Translation failed')
     if "if_false_activities" not in activity and "if_true_activities" not in activity:
-        warnings.warn("No child activities of if-else condition activity", stacklevel=2)
+        warnings.warn(
+            NotTranslatableWarning("if_condition.activities", "No child activities of if-else condition activity"),
+            stacklevel=2,
+        )
         return translated_activity
     child_activities = []
     if "if_false_activities" in activity:

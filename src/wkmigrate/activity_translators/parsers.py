@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from importlib import import_module
 from wkmigrate.datasets import dataset_parsers, property_parsers
 from wkmigrate.enums.condition_operation_pattern import ConditionOperationPattern
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def parse_dataset(datasets: list[dict]) -> dict:
@@ -25,7 +26,7 @@ def parse_dataset_mapping(mapping: dict) -> list[dict]:
     """
     return [
         {
-            "source_column_name": mapping.get("source").get("name") or f"_c{mapping.get("source").get("ordinal") - 1}",
+            "source_column_name": mapping.get("source").get("name") or f"_c{mapping.get('source').get('ordinal') - 1}",
             "sink_column_name": mapping.get("sink").get("name"),
             "sink_column_type": mapping.get("sink").get("type"),
         }
@@ -79,7 +80,8 @@ def parse_for_each_items(items: dict | None) -> str | None:
     if match:
         matched_item = match.group(1)
         list_items = ast.literal_eval(matched_item)
-        return f'[{",".join([f'"{item}"' for item in list_items])}]'
+        quoted_items = ",".join([f'"{item}"' for item in list_items])
+        return f"[{quoted_items}]"
     return None
 
 
@@ -92,10 +94,19 @@ def parse_policy(policy: dict | None) -> dict:
         return {}
     # Warn about secure input/output logging:
     if "secure_input" in policy:
-        warnings.warn("Secure input logging not applicable to Databricks workflows.", stacklevel=2)
+        warnings.warn(
+            NotTranslatableWarning(
+                "policy.secure_input",
+                "Secure input logging not applicable to Databricks workflows.",
+            ),
+            stacklevel=2,
+        )
     if "secure_output" in policy:
         warnings.warn(
-            "Secure output logging not applicable to Databricks workflows.",
+            NotTranslatableWarning(
+                "policy.secure_output",
+                "Secure output logging not applicable to Databricks workflows.",
+            ),
             stacklevel=2,
         )
     # Parse the policy attributes:
@@ -154,7 +165,10 @@ def parse_notebook_parameters(parameters: dict | None) -> dict | None:
     for name, value in parameters.items():
         if not isinstance(value, str):
             warnings.warn(
-                f'Could not resolve default value for parameter {name}, setting to ""',
+                NotTranslatableWarning(
+                    f"parameters.{name}",
+                    f'Could not resolve default value for parameter {name}, setting to ""',
+                ),
                 stacklevel=2,
             )
             value = ""
@@ -240,7 +254,13 @@ def _filter_parameters(activity: dict | None) -> dict | None:
     if activity is None:
         return None
     if "base_parameters" not in activity:
-        warnings.warn("No baseParameters for ForEach inner activity", stacklevel=2)
+        warnings.warn(
+            NotTranslatableWarning(
+                "for_each.base_parameters",
+                "No baseParameters for ForEach inner activity",
+            ),
+            stacklevel=2,
+        )
         return activity
     base_parameters = activity.get("base_parameters")
     if base_parameters is None:
@@ -251,7 +271,13 @@ def _filter_parameters(activity: dict | None) -> dict | None:
     filtered_parameters = {}
     for name, expression in parameters.items():
         if expression is not None and expression.get("value") == "@item()":
-            warnings.warn(f"Removing redundant parameter {name} with value {expression.get('value')}")
+            warnings.warn(
+                NotTranslatableWarning(
+                    f"for_each.parameters.{name}",
+                    f"Removing redundant parameter {name} with value {expression.get('value')}",
+                ),
+                stacklevel=2,
+            )
             continue
         filtered_parameters.update({name: expression})
     activity["base_parameters"] = filtered_parameters

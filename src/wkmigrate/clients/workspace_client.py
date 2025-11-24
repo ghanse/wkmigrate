@@ -2,8 +2,10 @@
 
 import base64
 import json
+import os
 import warnings
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 import autopep8  # type: ignore
@@ -13,6 +15,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 
 import wkmigrate
+from wkmigrate import datasets
 from wkmigrate.datasets import options, secrets
 from wkmigrate.datasets.data_type_mapping import parse_spark_data_type
 
@@ -29,7 +32,13 @@ class DatabricksWorkspaceClient(ABC):
         pass
 
     @abstractmethod
-    def create_workflow(self, job_definition: dict, translation_options: dict | None = None) -> int | None:
+    def create_workflow(
+        self,
+        job_definition: dict,
+        translation_options: dict | None = None,
+        create_in_workspace: bool = True,
+        local_directory: str | None = None,
+    ) -> int | dict | None:
         pass
 
 
@@ -49,6 +58,7 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
     client_id: str | None = None
     client_secret: str | None = None
     workspace_client: WorkspaceClient | None = field(init=False)
+    _local_artifacts_collector: "LocalArtifactsCollector | None" = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         """Sets up the workspace client for the provided authentication credentials."""
@@ -150,10 +160,18 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             raise ValueError(f'No workflows found in the target workspace with name "{job_name}"')
         return workflows
 
-    def create_workflow(self, job_definition: dict, translation_options: dict | None = None) -> int:
+    def create_workflow(
+        self,
+        job_definition: dict,
+        translation_options: dict | None = None,
+        create_in_workspace: bool = True,
+        local_directory: str | None = None,
+    ) -> int | dict | None:
         """Creates a workflow with the specified definition and options.
         :parameter job_definition: Workflow definition settings as a ``dict``
         :parameter translation_options: Workflow translation options as a ``dict``
+        :parameter create_in_workspace: Whether to create the workflow in Databricks or export locally
+        :parameter local_directory: Optional output directory when exporting locally
         :return: Created Job ID as an ``int``
         """
         job_settings = job_definition.get("settings")
@@ -176,6 +194,10 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         # queue = job_settings.get("queue", None)
         # run_as_principal = job_settings.get("run_as_principal", None)
         # webhook_notifications = job_settings.get("webhook_notifications", None)
+        if not create_in_workspace:
+            collector = LocalArtifactsCollector(local_directory)
+            return self._create_workflow_locally(job_settings, translation_options, collector)
+
         if self.workspace_client is None:
             raise ValueError("workspace_client is not initialized")
         tasks = job_settings.get("tasks")
@@ -193,6 +215,27 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if job_id is None:
             raise ValueError("Created job ID cannot be None")
         return job_id
+
+    def _create_workflow_locally(
+        self,
+        job_settings: dict,
+        translation_options: dict | None,
+        collector: "LocalArtifactsCollector",
+    ) -> dict:
+        tasks = job_settings.get("tasks")
+        if tasks is None:
+            raise ValueError('No "tasks" provided in job_settings')
+        original_collector = self._local_artifacts_collector
+        self._local_artifacts_collector = collector
+        try:
+            for task in tasks:
+                self._create_task(task, translation_options)
+            collector.record_workflow(job_settings)
+            if collector.output_dir is not None:
+                collector.write_to_directory()
+            return collector.build_result()
+        finally:
+            self._local_artifacts_collector = original_collector
 
     def _create_task(self, task: dict, translation_options: dict | None) -> Task:
         """Creates a Databricks workflow ``Task`` object from the task definition.
@@ -262,6 +305,8 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if not files_to_delta_sinks:
             return notebook_path
         # Create a DLT pipeline from the notebook path:
+        if self._local_artifacts_collector is not None:
+            return self._local_artifacts_collector.add_pipeline_reference(task.get("task_key"), notebook_path)
         if self.workspace_client is None:
             raise ValueError("workspace_client is not initialized")
         pipeline_response = self.workspace_client.pipelines.create(
@@ -332,6 +377,13 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         sink_dataset_name = sink_definition.get("dataset_name")
         notebook_str = autopep8.fix_code("\n".join(script_lines))
         notebook_path = f"/wkmigrate/copy_data_notebooks/copy_{source_dataset_name}_to_{sink_dataset_name}"
+        if self._local_artifacts_collector is not None:
+            self._local_artifacts_collector.add_notebook(
+                databricks_path=notebook_path,
+                content=notebook_str,
+                language="python",
+            )
+            return notebook_path
         if self.workspace_client is None:
             raise ValueError("workspace_client is not initialized")
         self.workspace_client.workspace.mkdirs("/wkmigrate/copy_data_notebooks")
@@ -653,17 +705,40 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         secret_keys = []
         source_service_name = source_definition.get("service_name")
         source_service_type = source_definition.get("type")
-        if self.workspace_client is None:
-            raise ValueError("workspace_client is not initialized")
-        scopes = [scope.name for scope in self.workspace_client.secrets.list_scopes()]
-        if "wkmigrate_credentials_scope" not in scopes:
-            self.workspace_client.secrets.create_scope(scope="wkmigrate_credentials_scope")
+        collector = self._local_artifacts_collector
+        if collector is None:
+            if self.workspace_client is None:
+                raise ValueError("workspace_client is not initialized")
+            scopes = [scope.name for scope in self.workspace_client.secrets.list_scopes()]
+            if "wkmigrate_credentials_scope" not in scopes:
+                self.workspace_client.secrets.create_scope(scope="wkmigrate_credentials_scope")
         if source_service_type is None:
             raise ValueError("Source service type cannot be None")
         for secret in secrets[source_service_type]:
             secret_value = source_definition.get(secret)
             if secret_value is None:
+                if collector is not None:
+                    collector.add_secret(
+                        scope="wkmigrate_credentials_scope",
+                        key=f"{source_service_name}_{secret}",
+                        service_name=source_service_name,
+                        service_type=source_service_type,
+                        provided_value=None,
+                        user_input_required=True,
+                    )
+                    continue
                 secret_value = input(f"Enter {secret} for dataset {source_service_name}")
+            if collector is not None:
+                collector.add_secret(
+                    scope="wkmigrate_credentials_scope",
+                    key=f"{source_service_name}_{secret}",
+                    service_name=source_service_name,
+                    service_type=source_service_type,
+                    provided_value=secret_value,
+                    user_input_required=False,
+                )
+                secret_keys.append(f"{source_service_name}_{secret}")
+                continue
             if self.workspace_client is None:
                 raise ValueError("workspace_client is not initialized")
             self.workspace_client.secrets.put_secret(
@@ -687,6 +762,7 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
             raise ValueError('No "notebook_path" found in notebook_task')
         notebook_path = f"/Workspace{notebook_path_value}"
         cluster_definition = task.get("new_cluster")
+        host_name = self.host_name
         if cluster_definition is None:
             warnings.warn('No "new_cluster" found in task, using serverless compute')
         else:
@@ -736,7 +812,6 @@ class WorkspaceManagementClient(DatabricksWorkspaceClient):
         if for_each_task is None:
             raise ValueError('"for_each_task" cannot be None')
         inner_tasks = for_each_task.get("task")
-        print(inner_tasks[0])
         if len(inner_tasks) == 1:
             task["for_each_task"]["task"] = inner_tasks[0]
         else:
@@ -780,7 +855,7 @@ class WorkspaceTestClient(DatabricksWorkspaceClient):
             raise ValueError('Must provide a value for "job_id" or "job_name".')
 
         # Open the test workflows file:
-        with open(f"{self.test_json_path}/test_workflows.json", "r") as file:
+        with open(f"{self.test_json_path}/test_workflows.json", "r", encoding="utf-8") as file:
             # Load the data from JSON:
             workflows = json.load(file)
 
@@ -804,3 +879,112 @@ class WorkspaceTestClient(DatabricksWorkspaceClient):
 
     def create_workflow(self, job_definition: dict, translation_options: dict | None = None) -> None:
         pass
+
+
+class LocalArtifactsCollector:
+    """Collects workflow artifacts when running WorkspaceManagementClient offline."""
+
+    def __init__(self, output_dir: str | None):
+        self.output_dir = output_dir
+        self.workflows: list[dict] = []
+        self.notebooks: list[dict] = []
+        self.secrets: list[dict] = []
+        self.unsupported: list[dict] = []
+        self._not_translatable: list[dict] = []
+
+    def record_workflow(self, job_settings: dict) -> None:
+        workflow_copy = {"settings": deepcopy(job_settings)}
+        self.workflows.append(workflow_copy)
+        not_translatable = workflow_copy["settings"].get("not_translatable") or []
+        self._not_translatable.extend(not_translatable)
+
+    def add_notebook(self, databricks_path: str, content: str, language: str) -> None:
+        file_name = databricks_path.split("/")[-1] or "notebook"
+        notebook_entry = {
+            "name": file_name,
+            "path": databricks_path,
+            "language": language,
+            "content": content,
+        }
+        if self.output_dir is not None:
+            notebooks_dir = os.path.join(self.output_dir, "notebooks")
+            os.makedirs(notebooks_dir, exist_ok=True)
+            file_name_with_ext = file_name if file_name.endswith(".py") else f"{file_name}.py"
+            local_path = os.path.join(notebooks_dir, file_name_with_ext)
+            with open(local_path, "w", encoding="utf-8") as notebook_file:
+                notebook_file.write(content)
+            notebook_entry["local_path"] = local_path
+        self.notebooks.append(notebook_entry)
+
+    def add_pipeline_reference(self, task_key: str | None, notebook_path: str) -> str:
+        pipeline_id = f"{(task_key or 'pipeline')}_pipeline"
+        return pipeline_id
+
+    def add_secret(
+        self,
+        scope: str,
+        key: str,
+        service_name: str | None,
+        service_type: str | None,
+        provided_value: str | None,
+        user_input_required: bool,
+    ) -> None:
+        self.secrets.append(
+            {
+                "scope": scope,
+                "key": key,
+                "linked_service_name": service_name,
+                "linked_service_type": service_type,
+                "provided_value": provided_value,
+                "user_input_required": user_input_required,
+            }
+        )
+
+    def build_result(self) -> dict:
+        return {
+            "workflows": self.workflows,
+            "notebooks": self.notebooks,
+            "secrets": self.secrets,
+            "unsupported": self.get_unsupported_with_warnings(),
+            "not_translatable": self._not_translatable,
+        }
+
+    def write_to_directory(self) -> None:
+        if self.output_dir is None:
+            return
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._write_workflows()
+        self._write_secrets()
+        self._write_unsupported()
+
+    def get_unsupported_with_warnings(self) -> list[dict]:
+        unsupported = list(self.unsupported)
+        for warning in self._not_translatable:
+            unsupported.append(
+                {
+                    "activity_name": warning.get("property", "pipeline"),
+                    "activity_type": "not_translatable",
+                    "reason": warning.get("message", "Property could not be translated"),
+                    "metadata": warning,
+                }
+            )
+        return unsupported
+
+    def _write_workflows(self) -> None:
+        workflows_dir = os.path.join(self.output_dir, "workflows")
+        os.makedirs(workflows_dir, exist_ok=True)
+        for index, workflow in enumerate(self.workflows):
+            workflow_name = workflow.get("settings", {}).get("name") or f"workflow_{index}"
+            file_path = os.path.join(workflows_dir, f"{workflow_name}.json")
+            with open(file_path, "w", encoding="utf-8") as workflow_file:
+                json.dump(workflow, workflow_file, indent=2, ensure_ascii=False)
+
+    def _write_secrets(self) -> None:
+        secrets_file = os.path.join(self.output_dir, "secrets.json")
+        with open(secrets_file, "w", encoding="utf-8") as secrets_handle:
+            json.dump(self.secrets, secrets_handle, indent=2, ensure_ascii=False)
+
+    def _write_unsupported(self) -> None:
+        unsupported_file = os.path.join(self.output_dir, "unsupported.json")
+        with open(unsupported_file, "w", encoding="utf-8") as unsupported_handle:
+            json.dump(self.get_unsupported_with_warnings(), unsupported_handle, indent=2, ensure_ascii=False)
