@@ -24,4 +24,4 @@ workspace_options = {
 workspace_definition_store = build_definition_store("workspace_definition_store", workspace_options)
 
 # Dump the translated pipeline to the local filesystem:
-workspace_definition_store.to_local_files(pipeline, local_directory="/Users/gregory.hansen/examples/sample_pipeline")
+workspace_definition_store.to_local_files(pipeline, local_directory="<YOUR LOCAL DIRECTORY>")
