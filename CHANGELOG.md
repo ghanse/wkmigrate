@@ -3,6 +3,12 @@
 ## Change History
 All notable changes to the Workflow Migrator will be documented in this file.
 
+### Version 0.0.2-post1
+
+#### Added
+* Added `to_local_files` to dump Databricks definitions to local files
+* Added output metadata for unsupported properties
+
 ### Version 0.0.2
 
 #### Added

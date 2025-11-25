@@ -15,11 +15,13 @@ pipeline = factory_definition_store.load('<YOUR ADF PIPELINE NAME>')
 # Print the ADF pipeline represented as a dictionary:
 print(pipeline)
 
-
+# Create the workspace definition store:
 workspace_options = {
     "host_name": "<YOUR DATABRICKS WORKSPACE URL>",
     "pat": "<YOUR DATABRICKS PERSONAL ACCESS TOKEN (PAT)>",
     "authentication_type": "pat",
 }
 workspace_definition_store = build_definition_store("workspace_definition_store", workspace_options)
-workspace_definition_store.dump(pipeline)
+
+# Dump the translated pipeline to the local filesystem:
+workspace_definition_store.to_local_files(pipeline, local_directory="/Users/gregory.hansen/examples/sample_pipeline")
