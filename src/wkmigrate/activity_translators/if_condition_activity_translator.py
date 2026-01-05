@@ -1,79 +1,93 @@
 """This module defines methods for translating If Condition activities."""
 
 import warnings
+from importlib import import_module
+
 from wkmigrate.activity_translators.parsers import parse_condition_expression
-from wkmigrate.utils import translate
+from wkmigrate.models.ir.activities import Activity, IfConditionActivity
 from wkmigrate.not_translatable import NotTranslatableWarning
 
-mapping = {
-    "op": {
-        "key": "expression",
-        "parser": lambda x: parse_condition_expression(x).get("op"),
-    },
-    "left": {
-        "key": "expression",
-        "parser": lambda x: parse_condition_expression(x).get("left"),
-    },
-    "right": {
-        "key": "expression",
-        "parser": lambda x: parse_condition_expression(x).get("right"),
-    },
-}
 
-
-def translate_if_condition_activity(activity: dict) -> dict | tuple[dict, list[dict]]:
-    """Translates an If Condition activity definition in Data Factory's object model to a Databricks if/else condition
-    task in the Databricks SDK object model.
-    :parameter activity: If Condition activity definition as a ``dict``
-    :return: Databricks if/else condition task properties as a ``dict``
+def translate_if_condition_activity(
+    activity: dict,
+    base_kwargs: dict,
+) -> IfConditionActivity | tuple[IfConditionActivity, list[Activity]]:
     """
-    # Parse the condition expression:
-    translated_activity = translate(activity, mapping)
-    if translated_activity is None:
-        raise ValueError('Translation failed')
-    if "if_false_activities" not in activity and "if_true_activities" not in activity:
+    Translates an ADF IfCondition activity into a ``IfConditionActivity`` object.
+
+    Args:
+        activity: IfCondition activity definition as a ``dict``.
+        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+
+    Returns:
+        ``IfConditionActivity`` representation of the IfCondition task and an optional list of nested activities (for child activities).
+    """
+    source_expression = activity.get("expression")
+    if source_expression is None:
+        raise ValueError("If Condition activity must include a valid conditional expression")
+    expression = parse_condition_expression(source_expression)
+    child_activities: list[Activity] = []
+    parent_task_name = activity.get("name")
+    if parent_task_name is None:
+        warnings.warn(
+            NotTranslatableWarning("if_condition.name", "If Condition activity missing name"),
+            stacklevel=2,
+        )
+        parent_task_name = "IF_CONDITION"
+    if_false = activity.get("if_false_activities")
+    if if_false:
+        child_activities.extend(
+            _parse_child_activities(if_false, parent_task_name, "false"),
+        )
+    if_true = activity.get("if_true_activities")
+    if if_true:
+        child_activities.extend(
+            _parse_child_activities(if_true, parent_task_name, "true"),
+        )
+    if not child_activities:
         warnings.warn(
             NotTranslatableWarning("if_condition.activities", "No child activities of if-else condition activity"),
             stacklevel=2,
         )
-        return translated_activity
-    child_activities = []
-    if "if_false_activities" in activity:
-        if_false_activities = activity.get("if_false_activities")
-        parent_task_name = activity.get("name")
-        if if_false_activities is not None and parent_task_name is not None:
-            child_activities.extend(
-                parse_child_activities(
-                    child_activities=if_false_activities,
-                    parent_task_name=parent_task_name,
-                    parent_task_outcome="false",
-                )
-            )
-    if "if_true_activities" in activity:
-        if_true_activities = activity.get("if_true_activities")
-        parent_task_name = activity.get("name")
-        if if_true_activities is not None and parent_task_name is not None:
-            child_activities.extend(
-                parse_child_activities(
-                    child_activities=if_true_activities,
-                    parent_task_name=parent_task_name,
-                    parent_task_outcome="true",
-                )
-            )
-    return translated_activity, child_activities
+    activity_ir = IfConditionActivity(
+        **base_kwargs,
+        op=expression.get("op"),
+        left=expression.get("left"),
+        right=expression.get("right"),
+        child_activities=child_activities,
+    )
+    if child_activities:
+        return activity_ir, child_activities
+    return activity_ir
 
 
-def parse_child_activities(child_activities: list[dict], parent_task_name: str, parent_task_outcome: str) -> list[dict]:
-    """Translates if-else condition dependencies from Data Factory's object model to
-    tasks in the Databricks SDK's object model.
-    :parameter child_activities: List of child tasks as ``dict``
-    :parameter parent_task_name: Name of the parent if-else condition task as a ``str``
-    :parameter parent_task_outcome: Outcome of the parent if-else condition (either `"true"` or `"false`")
-    :return: List of child tasks as ``dict``
+def _parse_child_activities(
+    child_activities: list[dict],
+    parent_task_name: str,
+    parent_task_outcome: str,
+) -> list[Activity]:
     """
-    translated_dependencies = []
+    Translates child activities referenced by IfCondition tasks.
+
+    Args:
+        child_activities: Child activity definitions attached to the IfCondition.
+        parent_task_name: Name of the parent IfCondition task.
+        parent_task_outcome: Expected outcome ('true'/'false').
+
+    Returns:
+        List of translated child activities with dependency wiring applied as a ``list[Activity]``.
+    """
+    translated: list[Activity] = []
+    translator = import_module("wkmigrate.activity_translators.activity_translator")
     for activity in child_activities:
-        if activity["depends_on"] is None or len(activity["depends_on"]) == 0:
-            activity["depends_on"].append({"activity": parent_task_name, "outcome": parent_task_outcome})
-        translated_dependencies.append(activity)
-    return translated_dependencies
+        depends_on = activity.setdefault("depends_on", [])
+        depends_on.append({"activity": parent_task_name, "outcome": parent_task_outcome})
+        result = getattr(translator, "translate_activity")(activity)
+        if result is None:
+            continue
+        if isinstance(result, tuple):
+            translated.append(result[0])
+            translated.extend(result[1])
+            continue
+        translated.append(result)
+    return translated

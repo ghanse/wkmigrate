@@ -6,9 +6,14 @@ from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def parse_cron_expression(recurrence: dict | None) -> str | None:
-    """Generates a cron expression from a set of schedule trigger parameters.
-    :parameter recurrence: Recurrence object as a ``IntervalType``
-    :return: Cron expression for the specified parameters as a ``str``
+    """
+    Generates a quartz cron expression from a set of schedule trigger parameters.
+
+    Args:
+        recurrence: Recurrence object containing the frequency and schedule details.
+
+    Returns:
+        Cron expression as a ``str`` or ``None`` when no recurrence is provided.
     """
     if recurrence is None:
         return None
@@ -24,9 +29,7 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
     if interval_type == IntervalType.HOUR:
         return _get_hourly_cron_expression(num_intervals)
     if interval_type == IntervalType.DAY:
-        if schedule is None:
-            return _get_daily_cron_expression(num_intervals, {})
-        return _get_daily_cron_expression(num_intervals, schedule)
+        return _get_daily_cron_expression(num_intervals, schedule or {})
     if interval_type == IntervalType.WEEK:
         if num_intervals > 1:
             warnings.warn(
@@ -36,9 +39,7 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
                 ),
                 stacklevel=2,
             )
-        if schedule is None:
-            return _get_weekly_cron_expression({})
-        return _get_weekly_cron_expression(schedule)
+        return _get_weekly_cron_expression(schedule or {})
     if interval_type == IntervalType.MONTH:
         if num_intervals > 1:
             warnings.warn(
@@ -48,17 +49,34 @@ def parse_cron_expression(recurrence: dict | None) -> str | None:
                 ),
                 stacklevel=2,
             )
-        if schedule is None:
-            return _get_monthly_cron_expression({})
-        return _get_monthly_cron_expression(schedule)
+        return _get_monthly_cron_expression(schedule or {})
     return None
 
 
 def _get_hourly_cron_expression(num_intervals: int) -> str:
+    """
+    Builds a cron expression for an hourly schedule.
+
+    Args:
+        num_intervals: Hour interval between runs.
+
+    Returns:
+        Cron expression as a ``str``.
+    """
     return f"0 0 */{num_intervals} * * ?"
 
 
-def _get_daily_cron_expression(num_intervals: int, schedule: dict) -> str:
+def _get_daily_cron_expression(num_intervals: int, schedule: dict | None) -> str:
+    """
+    Builds a cron expression for a daily schedule.
+
+    Args:
+        num_intervals: Day interval between runs.
+        schedule: Specific hours/minutes configuration.
+
+    Returns:
+        Cron expression as a ``str``.
+    """
     if schedule is None:
         return f"0 0 0 */{num_intervals} * ?"
     minutes = ",".join([str(e) for e in schedule.get("minutes", [0])])
@@ -66,7 +84,16 @@ def _get_daily_cron_expression(num_intervals: int, schedule: dict) -> str:
     return f"0 {minutes} {hours} */{num_intervals} * ?"
 
 
-def _get_weekly_cron_expression(schedule: dict) -> str:
+def _get_weekly_cron_expression(schedule: dict | None) -> str:
+    """
+    Builds a cron expression for a weekly schedule.
+
+    Args:
+        schedule: Dictionary containing minutes, hours, and week days.
+
+    Returns:
+        Cron expression as a ``str``.
+    """
     if schedule is None:
         return "0 0 0 ? * 1"
     minutes = ",".join([str(e) for e in schedule.get("minutes", [0])])
@@ -75,7 +102,16 @@ def _get_weekly_cron_expression(schedule: dict) -> str:
     return f"0 {minutes} {hours} ? * {week_days}"
 
 
-def _get_monthly_cron_expression(schedule: dict) -> str:
+def _get_monthly_cron_expression(schedule: dict | None) -> str:
+    """
+    Builds a cron expression for a monthly schedule.
+
+    Args:
+        schedule: Dictionary containing minutes, hours, and days.
+
+    Returns:
+        Cron expression as a ``str``.
+    """
     if schedule is None:
         return "0 0 0 0 * ?"
     minutes = ",".join([str(e) for e in schedule.get("minutes", [0])])
@@ -85,6 +121,18 @@ def _get_monthly_cron_expression(schedule: dict) -> str:
 
 
 def _get_week_day(week_day: str) -> str:
+    """
+    Converts a named weekday to the quartz cron numeric equivalent.
+
+    Args:
+        week_day: Weekday string (e.g., ``"Sunday"``).
+
+    Returns:
+        Cron weekday representation as a ``str``.
+
+    Raises:
+        ValueError: If the weekday string is not recognized.
+    """
     if week_day == "Sunday":
         return "1"
     if week_day == "Monday":

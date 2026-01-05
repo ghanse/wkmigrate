@@ -1,26 +1,23 @@
 """This module defines methods for translating For Each activities."""
 
-from wkmigrate.activity_translators.parsers import (
-    parse_for_each_items,
-    parse_for_each_tasks,
-)
-from wkmigrate.utils import identity, translate
+from wkmigrate.activity_translators.parsers import parse_for_each_items, parse_for_each_tasks
+from wkmigrate.models.ir.activities import ForEachActivity
 
 
-mapping = {
-    "inputs": {"key": "items", "parser": parse_for_each_items},
-    "concurrency": {"key": "batch_count", "parser": identity},
-    "task": {"key": "activities", "parser": parse_for_each_tasks},
-}
-
-
-def translate_for_each_activity(activity: dict) -> dict:
-    """Translates a For Each activity definition in Data Factory's object model to a Databricks for-each condition
-    task in the Databricks SDK object model.
-    :parameter activity: For Each activity definition as a ``dict``
-    :return: Databricks for-each condition task properties as a ``dict``
+def translate_for_each_activity(activity: dict, base_kwargs: dict) -> ForEachActivity:
     """
-    translated = translate(activity, mapping)
-    if translated is None:
-        raise ValueError('Translation failed')
-    return translated
+    Translates an ADF ForEach activity into a ``ForEachActivity`` object.
+
+    Args:
+        activity: ForEach activity definition as a ``dict``.
+        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+
+    Returns:
+        ``ForEachActivity`` representation of the ForEach task.
+    """
+    return ForEachActivity(
+        **base_kwargs,
+        items_string=parse_for_each_items(activity.get("items")),
+        inner_activities=parse_for_each_tasks(activity.get("activities")) or [],
+        concurrency=activity.get("batch_count"),
+    )

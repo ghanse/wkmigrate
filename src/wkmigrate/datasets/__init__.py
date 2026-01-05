@@ -1,3 +1,5 @@
+"""Dataset parser registries and metadata helpers."""
+
 from wkmigrate.datasets.parsers import (
     parse_avro_file_properties,
     parse_avro_file_dataset,

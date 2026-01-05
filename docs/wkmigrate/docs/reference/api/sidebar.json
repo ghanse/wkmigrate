@@ -1,0 +1,123 @@
+{
+  "items": [
+    {
+      "items": [
+        {
+          "items": [
+            "reference/api/wkmigrate/activity_translators/activity_translator",
+            "reference/api/wkmigrate/activity_translators/copy_activity_translator",
+            "reference/api/wkmigrate/activity_translators/for_each_activity_translator",
+            "reference/api/wkmigrate/activity_translators/if_condition_activity_translator",
+            "reference/api/wkmigrate/activity_translators/notebook_activity_translator",
+            "reference/api/wkmigrate/activity_translators/parsers",
+            "reference/api/wkmigrate/activity_translators/spark_jar_activity_translator",
+            "reference/api/wkmigrate/activity_translators/spark_python_activity_translator"
+          ],
+          "label": "wkmigrate.activity_translators",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/clients/factory_client"
+          ],
+          "label": "wkmigrate.clients",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/datasets/data_type_mapping",
+            "reference/api/wkmigrate/datasets/parsers"
+          ],
+          "label": "wkmigrate.datasets",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/definition_stores/definition_store",
+            "reference/api/wkmigrate/definition_stores/definition_store_builder",
+            "reference/api/wkmigrate/definition_stores/factory_definition_store",
+            "reference/api/wkmigrate/definition_stores/workspace_definition_store"
+          ],
+          "label": "wkmigrate.definition_stores",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/enums/compute_policy",
+            "reference/api/wkmigrate/enums/condition_operation_pattern",
+            "reference/api/wkmigrate/enums/init_script_type",
+            "reference/api/wkmigrate/enums/interval_type",
+            "reference/api/wkmigrate/enums/isolation_level",
+            "reference/api/wkmigrate/enums/json_source_type"
+          ],
+          "label": "wkmigrate.enums",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/linked_service_translators/abfs_linked_service_translator",
+            "reference/api/wkmigrate/linked_service_translators/databricks_linked_service_translator",
+            "reference/api/wkmigrate/linked_service_translators/parsers",
+            "reference/api/wkmigrate/linked_service_translators/sql_server_linked_service_translator"
+          ],
+          "label": "wkmigrate.linked_service_translators",
+          "type": "category"
+        },
+        {
+          "items": [
+            {
+              "items": [
+                "reference/api/wkmigrate/models/ir/activities",
+                "reference/api/wkmigrate/models/ir/datasets",
+                "reference/api/wkmigrate/models/ir/linked_services",
+                "reference/api/wkmigrate/models/ir/pipeline"
+              ],
+              "label": "wkmigrate.models.ir",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/api/wkmigrate/models/workflows/artifacts",
+                "reference/api/wkmigrate/models/workflows/instructions"
+              ],
+              "label": "wkmigrate.models.workflows",
+              "type": "category"
+            }
+          ],
+          "label": "wkmigrate.models",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/pipeline_translators/parameter_translator",
+            "reference/api/wkmigrate/pipeline_translators/parsers",
+            "reference/api/wkmigrate/pipeline_translators/pipeline_translator"
+          ],
+          "label": "wkmigrate.pipeline_translators",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/trigger_translators/parsers",
+            "reference/api/wkmigrate/trigger_translators/schedule_trigger_translator"
+          ],
+          "label": "wkmigrate.trigger_translators",
+          "type": "category"
+        },
+        {
+          "items": [
+            "reference/api/wkmigrate/workflows/preparer"
+          ],
+          "label": "wkmigrate.workflows",
+          "type": "category"
+        },
+        "reference/api/wkmigrate/not_translatable",
+        "reference/api/wkmigrate/utils"
+      ],
+      "label": "wkmigrate",
+      "type": "category"
+    }
+  ],
+  "label": "Reference",
+  "type": "category"
+}

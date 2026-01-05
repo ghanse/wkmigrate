@@ -1,13 +1,24 @@
 """This module defines shared utilities for translating data pipelines."""
 
-from typing import Any, Optional
+from typing import Any
 
 
 def identity(item: Any) -> Any:
+    """Returns the provided value unchanged."""
     return item
 
 
-def translate(items: Optional[dict], mapping: dict) -> Optional[dict]:
+def translate(items: dict | None, mapping: dict) -> dict | None:
+    """
+    Maps dictionary values using a translation specification.
+
+    Args:
+        items: Source dictionary.
+        mapping: Translation specification; Each key defines a ``key`` to look up and a ``parser`` callable.
+
+    Returns:
+        Translated dictionary as a ``dict`` or ``None`` when no input is provided.
+    """
     if items is None:
         return None
     output = {}
@@ -20,10 +31,15 @@ def translate(items: Optional[dict], mapping: dict) -> Optional[dict]:
     return output
 
 
-def append_system_tags(tags: Optional[dict]) -> dict:
-    """Appends system tags for attributing clusters to the Tributary library.
-    :parameter tags: Optional set of user-defined tags as a ``dict``
-    :return: Set of tags with 'CREATED_BY_WKMIGRATE' appended.
+def append_system_tags(tags: dict | None) -> dict:
+    """
+    Appends the ``CREATED_BY_WKMIGRATE`` system tag to a set of job tags.
+
+    Args:
+        tags: Existing job tags.
+
+    Returns:
+        dict: Updated tag dictionary.
     """
     if tags is None:
         return {"CREATED_BY_WKMIGRATE": ""}
@@ -33,9 +49,14 @@ def append_system_tags(tags: Optional[dict]) -> dict:
 
 
 def parse_expression(expression: str) -> str:
-    """Parses a variable or parameter expression to a Workflows-compatible parameter value.
-    :parameter expression: Variable or parameter expression as a ``str``
-    :return: Workflows-compatible parameter value as a ``str``
+    """
+    Parses a variable or parameter expression to a Workflows-compatible parameter value.
+
+    Args:
+        expression: Variable or parameter expression as a ``str``.
+
+    Returns:
+        Workflows-compatible parameter value as a ``str``.
     """
     # TODO: ADD DIFFERENT FUNCTIONS TO BE PARSED INTO {{}} OPERATORS
     return expression

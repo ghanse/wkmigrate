@@ -8,9 +8,14 @@ mapping = {"default": {"key": "default_value", "parser": parse_parameter_value}}
 
 
 def translate_parameters(parameters: dict | None) -> list[dict] | None:
-    """Translates a set of parameter definitions in the Data Factory object model to the Databricks SDK object model.
-    :parameter parameters: List of parameter definitions as a nested ``dict``
-    :return: List of translated parameter definitions as ``dict`` objects
+    """
+    Translates parameter definitions in the Data Factory object model to the Databricks SDK object model.
+
+    Args:
+        parameters: Nested dictionary of parameter definitions.
+
+    Returns:
+        List of translated parameter definitions as ``list[dict]`` objects, or ``None`` if no parameters are provided.
     """
     if parameters is None:
         return None
@@ -18,10 +23,15 @@ def translate_parameters(parameters: dict | None) -> list[dict] | None:
 
 
 def translate_parameter(parameter_name: str, parameter: dict) -> dict:
-    """Translates a parameter definition in the Data Factory object model to the Databricks SDK object model.
-    :parameter parameter_name: Parameter name as a ``str``
-    :parameter parameter: Parameter definition as a ``dict``
-    :return: Translated parameter definition as a ``dict``
+    """
+    Translates a single parameter definition from the Data Factory object model to the Databricks SDK object model.
+
+    Args:
+        parameter_name: Parameter name.
+        parameter: Parameter definition as a ``dict``.
+
+    Returns:
+        Translated parameter definition as a ``dict``.
     """
     translated_parameter = translate(parameter, mapping)
     result = {"name": parameter_name}

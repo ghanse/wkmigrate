@@ -1,0 +1,77 @@
+---
+sidebar_position: 3
+---
+
+import Admonition from '@theme/Admonition';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Translation Capabilities
+
+This page describes the Azure Data Factory (ADF) constructs that can be translated to Databricks jobs using `wkmigrate`.
+
+<Admonition type="info" title="Scope of translation">
+`wkmigrate` focuses on the subset of ADF features that can be expressed cleanly in Databricks using Lakeflow connect, Lakeflow declarative pipelines, and Lakeflow jobs.
+
+Unsupported activity types, dataset types, or properties are captured as not-translatable metadata and surfaced in the translation artifacts. These can be manually reviewed during large-scale migrations.
+</Admonition>
+
+## Activities
+
+The activity translator currently recognizes the following ADF activity types:
+
+| Activity type                             | Internal mapping              | Key details                                                                                                                                                               |
+|-------------------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Databricks Notebook activity              | `DatabricksNotebookActivity`  | Uses `notebook_path`, `base_parameters`, and linked-service derived cluster configuration.                                                                                |
+| Databricks Spark Jar activity             | `SparkJarActivity`            | Captures `main_class_name`, JAR `parameters`, and additional `libraries`.                                                                                                 |
+| Databricks Spark Python activity          | `SparkPythonActivity`         | Captures the `python_file` entry point and its `parameters`.                                                                                                              |
+| If-Else Conditions                        | `IfConditionActivity`         | Supports `equals`, `greaterThan`, `greaterThanOrEquals`, `lessThan`, `lessThanOrEquals`, and negated `equals`; stores parsed `op`, `left`, `right`, and child activities. |
+| For Each Loops                            | `ForEachActivity`             | Supports simple `@array('value')` and `@createArray(...)` constructs; stores items expression, nested activities, and optional concurrency.                               |
+| Copy Data activities                      | `CopyActivity`                | Combines source dataset + properties, sink dataset + properties, and column-level mappings.                                                                               |
+
+<Admonition type="warning" title="Unsupported activities">
+When calling `to_pipeline` or `to_local_files`, unsupported activities are translated into placeholder notebook tasks 
+with `/UNSUPPORTED_ADF_ACTIVITY` as the notebook path. The original ADF definition and prescriptive messages are attached 
+to the pipeline’s `not_translatable` metadata.
+</Admonition>
+
+## Datasets
+
+Datasets are translated from the ADF dataset properties and linked service definition. The following dataset types are supported:
+
+| Dataset type                              | Internal mapping        | Key details                                                                                                     |
+|-------------------------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Avro files                                | `FileDataset`           | Uses ABFS/ADLS linked services to resolve storage account, container, and folder path; captures compression.    |
+| Delimited Text files (e.g. CSV)           | `FileDataset`           | Captures delimiter, header configuration, encoding, null handling, and file layout options.                     |
+| Json files                                | `FileDataset`           | Captures JSON-specific options such as encoding and compression, along with container and folder path.          |
+| Orc files                                 | `FileDataset`           | Captures ORC compression and storage layout using ABFS/ADLS linked services.                                    |
+| Parquet files                             | `FileDataset`           | Captures Parquet compression and storage layout using ABFS/ADLS linked services.                                |
+| Azure Databricks Delta Lake tables        | `DeltaTableDataset`     | Captures database/schema, table, and optional catalog information for Delta tables.                             |
+| Azure SQL Database tables                 | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.       |
+
+<Admonition type="warning" title="Unsupported dataset types">
+When calling `to_pipeline` or `to_local_files`, unsupported datasets will not generate valid code or job configuration. A
+`NotTranslatableWarning` will be raised and a prescriptive message will be added to the pipeline's `not_translatable` metadata.
+</Admonition>
+
+## Linked services
+
+Linked services are translated from the ADF linked service properties. Linked service properties (e.g. credentials) stored in secret stores 
+(e.g. Azure Key Vault) cannot be parsed from the linked service properties and will be added to the pipeline's `secrets` metadata.
+
+The following linked services are supported:
+
+| Linked-service type               | Internal mapping                 | Key details                                                                                                                                                            |
+|-----------------------------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Azure Databricks workspace        | `DatabricksClusterLinkedService` | Captures host name and workspace URL, node types and autoscaling, Spark configuration and environment variables, and init scripts (DBFS, Volumes, or workspace paths). |
+| Azure Blob/File storage           | `AbfsLinkedService`              | Uses ABFS/ADLS connection information to resolve storage account name and ABFS URL for the container; used when translating file-based datasets.                       |
+| Azure SQL Server                  | `SqlLinkedService`               | Captures host name, database, and authentication details (for example user name and authentication type); used when translating Azure SQL datasets.                    |
+
+<Admonition type="warning" title="Unsupported linked services">
+When calling `to_pipeline` or `to_local_files`, unsupported datasets will not generate valid code or job configuration. A
+`NotTranslatableWarning` will be raised and a prescriptive message will be added to the pipeline's `not_translatable` metadata.
+</Admonition>
+
+## Triggers
+
+Schedule triggers are currently supported. Schedule definitions are converted into cron schedules in UTC.

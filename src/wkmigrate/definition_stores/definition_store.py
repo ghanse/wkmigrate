@@ -1,20 +1,31 @@
 """This module defines the abstract ``DefinitionStore`` class."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class DefinitionStore(ABC):
-    """A source or sink for data pipeline definitions. Used to get or set
-    data pipelines during migration.
-    """
+    """Abstract source or sink for pipeline definitions."""
 
     @abstractmethod
-    def load(self, *args: Any, **kwargs: Any) -> dict:
-        """Loads the data pipeline into a dictionary object."""
+    def load(self, pipeline_name: str) -> dict:
+        """
+        Loads a pipeline definition.
+
+        Args:
+            pipeline_name: Pipeline identifier as a ``str``.
+
+        Returns:
+            Dictionary representation of the pipeline as a ``dict``.
+        """
 
     @abstractmethod
-    def dump(self, *args: Any, **kwargs: Any) -> int | None:
-        """Pushes the data pipeline definition into the definition store. This could
-        create a file (e.g. JSON or YAML) or a Workflow definition in a Databricks
-        workspace."""
+    def dump(self, pipeline_definition: dict) -> int | None:
+        """
+        Persists a pipeline definition.
+
+        Args:
+            pipeline_definition: Pipeline definition emitted by the translators as a ``dict``.
+
+        Returns:
+            Optional identifier for the stored workflow.
+        """
