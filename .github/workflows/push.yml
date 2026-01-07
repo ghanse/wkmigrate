@@ -38,7 +38,7 @@ jobs:
       - name: Run unit tests
         run: |
           pip install poetry==2.2.1
-          make test
+          make dev test
 
   fmt:
     runs-on: ubuntu-latest
@@ -48,7 +48,7 @@ jobs:
 
       - name: Format all files
         run: |
-          pip install poetry=2.2.1
+          pip install poetry==2.2.1
           make dev fmt
 
       - name: Fail on differences
@@ -83,4 +83,4 @@ jobs:
         run: poetry install
 
       - name: Build website
-        run: make docs-build
+        run: make docs
