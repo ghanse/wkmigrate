@@ -37,7 +37,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pip install hatch==1.15.0
+          pip install poetry==2.2.1
           make test
 
   fmt:
@@ -47,7 +47,9 @@ jobs:
         uses: actions/checkout@v4.2.2
 
       - name: Format all files
-        run: make dev fmt
+        run: |
+          pip install poetry=2.2.1
+          make dev fmt
 
       - name: Fail on differences
         run: git diff --exit-code
@@ -75,7 +77,7 @@ jobs:
         with:
           node-version: 20
           cache: yarn
-          cache-dependency-path: docs/dqx/yarn.lock # need to put the lockfile path explicitly
+          cache-dependency-path: docs/wkmigrate/yarn.lock # need to put the lockfile path explicitly
 
       - name: Install dependencies
         run: poetry install
