@@ -9,7 +9,13 @@ _WARNING_CONTEXT: ContextVar[dict | None] = ContextVar("_WARNING_CONTEXT", defau
 
 @contextmanager
 def not_translatable_context(activity_name: str | None, activity_type: str | None):
-    """Captures activity metadata so warnings raised within the context can reference it."""
+    """
+    Captures activity metadata for warnings raised inside the context.
+
+    Args:
+        activity_name: Logical name of the activity being translated.
+        activity_type: Activity type string emitted by ADF.
+    """
     token = _WARNING_CONTEXT.set({"activity_name": activity_name, "activity_type": activity_type})
     try:
         yield
@@ -20,7 +26,14 @@ def not_translatable_context(activity_name: str | None, activity_type: str | Non
 class NotTranslatableWarning(UserWarning):
     """Custom warning for properties that cannot be translated."""
 
-    def __init__(self, property_name: str, message: str):
+    def __init__(self, property_name: str, message: str) -> None:
+        """
+        Initializes the warning and attaches contextual metadata.
+
+        Args:
+            property_name: Pipeline property that could not be translated.
+            message: Human-readable warning message.
+        """
         super().__init__(message)
         self.property_name = property_name
         context = _WARNING_CONTEXT.get()

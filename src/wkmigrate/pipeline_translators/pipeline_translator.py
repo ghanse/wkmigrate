@@ -1,19 +1,25 @@
 """This module defines methods for translating data pipelines."""
 
 import warnings
+
 from wkmigrate.activity_translators.activity_translator import translate_activities
-from wkmigrate.pipeline_translators.parameter_translator import translate_parameters
-from wkmigrate.trigger_translators.schedule_trigger_translator import (
-    translate_schedule_trigger,
-)
-from wkmigrate.utils import append_system_tags
+from wkmigrate.models.ir.pipeline import Pipeline, PipelineTask
 from wkmigrate.not_translatable import NotTranslatableWarning
+from wkmigrate.pipeline_translators.parameter_translator import translate_parameters
+from wkmigrate.trigger_translators.schedule_trigger_translator import translate_schedule_trigger
+from wkmigrate.utils import append_system_tags
 
 
-def translate_pipeline(pipeline: dict) -> dict:
-    """Translates a data pipeline to a common object model.
-    :parameter pipeline: Dictionary definition of the source pipeline
-    :return: Dictionary definition of the target workflows"""
+def translate_pipeline(pipeline: dict) -> Pipeline:
+    """
+    Translates an ADF pipeline dictionary into a ``Pipeline``.
+
+    Args:
+        pipeline: Raw pipeline payload exported from ADF.
+
+    Returns:
+        Dataclass representation including tasks, schedule, and tags.
+    """
     with warnings.catch_warnings(record=True) as caught_warnings:
         warnings.simplefilter("always", UserWarning)
         if "name" not in pipeline:
@@ -23,13 +29,14 @@ def translate_pipeline(pipeline: dict) -> dict:
                 ),
                 stacklevel=2,
             )
-        translated_pipeline = {
-            "name": pipeline.get("name", "UNNAMED_WORKFLOW"),
-            "parameters": translate_parameters(pipeline.get("parameters")),
-            "schedule": translate_schedule_trigger(pipeline["trigger"]) if pipeline.get("trigger") is not None else None,
-            "tasks": translate_activities(pipeline.get("activities")),
-            "tags": append_system_tags(pipeline.get("tags")),
-        }
+        translated_tasks = translate_activities(pipeline.get("activities"))
+        pipeline_ir = Pipeline(
+            name=pipeline.get("name", "UNNAMED_WORKFLOW"),
+            parameters=translate_parameters(pipeline.get("parameters")),
+            schedule=translate_schedule_trigger(pipeline["trigger"]) if pipeline.get("trigger") is not None else None,
+            tasks=[PipelineTask(activity=task) for task in translated_tasks or []],
+            tags=append_system_tags(pipeline.get("tags")),
+        )
 
     not_translatable = []
     for warning in caught_warnings:
@@ -48,7 +55,5 @@ def translate_pipeline(pipeline: dict) -> dict:
         if activity_type is not None:
             entry["activity_type"] = activity_type
         not_translatable.append(entry)
-    if not_translatable:
-        translated_pipeline["not_translatable"] = not_translatable
-
-    return translated_pipeline
+    pipeline_ir.not_translatable = not_translatable
+    return pipeline_ir

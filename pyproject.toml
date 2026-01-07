@@ -44,15 +44,43 @@ ruff = "^0.14.0"
 pylint = "^3.3.9"
 mypy = "^1.18.2"
 types-pyyaml = "^6.0.12.20250915"
-
+pydoc-markdown = ">=4.8.2"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.pydoc-markdown]
+loaders = [
+    { type = "python", search_path = [
+        "./src",
+    ], packages = [
+        "wkmigrate",
+    ] },
+]
+processors = [
+    { type = "smart" },
+    { type = "crossref" },
+    { type = "filter", skip_empty_modules = true },
+]
+hooks = { post-render = [
+    "cp -r docs/wkmigrate/docs/reference/api/wkmigrate/* docs/wkmigrate/docs/reference/api",
+    "rm -rf docs/wkmigrate/docs/reference/api/wkmigrate",
+] }
+
+[tool.pydoc-markdown.renderer]
+type = "docusaurus"
+docs_base_path = "docs/wkmigrate/docs"
+relative_output_path = "reference/api"
+relative_sidebar_path = "sidebar.json"
+
+# by default method and function are on level 4 which is too deep for docusaurus
+# we want to move them to level 3
+markdown = { header_level_by_type = { Method = 3, Function = 3, Class = 2, Module = 1 } }
+
 [tool.mypy]
 mypy_path = "src"
-exclude = ['venv', '.venv', 'tests/*']
+exclude = ['venv', '.venv', 'tests/*', 'examples/*']
 
 [[tool.mypy.overrides]]
 module = ["google", "google.*"]  # Google libraries are not type annotated
@@ -113,7 +141,7 @@ fail-under = 10.0
 # ignore-list. The regex matches against paths and can be in Posix or Windows
 # format. Because '\\' represents the directory delimiter on Windows systems, it
 # can't be used as an escape character.
-# ignore-paths =
+ignore-paths = ["tests/.*"]
 
 # Files or directories matching the regular expression patterns are skipped. The
 # regex matches against base names, not paths. The default value ignores Emacs
@@ -143,8 +171,6 @@ limit-inference-results = 100
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
 load-plugins = [
-    "databricks.labs.pylint.all",
-    "pylint_pytest",
     "pylint.extensions.bad_builtin",
     "pylint.extensions.broad_try_clause",
     "pylint.extensions.check_elif",
@@ -162,7 +188,6 @@ load-plugins = [
     "pylint.extensions.redefined_variable_type",
     "pylint.extensions.set_membership",
     "pylint.extensions.typing",
-    "pylint_per_file_ignores",
 ]
 
 # Pickle collected data for later comparisons.
@@ -346,7 +371,7 @@ valid-metaclass-classmethod-first-arg = ["mcs"]
 
 [tool.pylint.deprecated_builtins]
 # List of builtins function names that should not be used, separated by a comma
-bad-functions = ["map", "input"]
+bad-functions = ["map"]
 
 [tool.pylint.design]
 # List of regular expressions of class ancestor names to ignore when counting
@@ -495,9 +520,7 @@ disable = [
     "logging-fstring-interpolation",
     "consider-using-any-or-all",
     "unnecessary-default-type-args",
-    "mock-no-usage",
     "broad-exception-caught",
-    "rewrite-as-for-loop",
     "redundant-returns-doc",
 ]
 

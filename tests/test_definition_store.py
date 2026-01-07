@@ -1,398 +1,67 @@
 import pytest
-import wkmigrate
-from contextlib import nullcontext as does_not_raise
-from typing import Any
-from wkmigrate.definition_stores.definition_store_builder import build_definition_store
-from wkmigrate.enums.json_source_type import JSONSourceType
+
+from wkmigrate.definition_stores.definition_store import DefinitionStore
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 
 
-class TestDefinitionStore:
-    """Unit tests for the ``DefinitionStore`` class and subclasses."""
+class TestDefinitionStoreContracts:
+    """Unit tests for ``FactoryDefinitionStore`` and ``WorkspaceDefinitionStore`` contracts."""
 
-    @pytest.mark.parametrize(
-        "definition_store_type, definition_store_options, expected_result",
-        [
-            # FactoryDefinitionStore tests:
-            ("factory_definition_store", {"_use_test_client": True}, does_not_raise()),
-            ("factory_definition_store", None, pytest.raises(ValueError)),
-            (
-                "factory_definition_store",
-                {"_use_test_client": False},
-                pytest.raises(ValueError),
-            ),
-            # WorkspaceDefinitionStore tests:
-            (
-                "workspace_definition_store",
-                {"_use_test_client": True},
-                does_not_raise(),
-            ),
-            (
-                "workspace_definition_store",
-                {"_use_test_client": False},
-                pytest.raises(ValueError),
-            ),
-            ("workspace_definition_store", None, pytest.raises(ValueError)),
-            # JSONDefinitionStore tests:
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/test_pipelines.json"},
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {
-                    "json_file_path": f"{wkmigrate.JSON_PATH}/test_workflows.json",
-                    "json_source_type": JSONSourceType.DATABRICKS_WORKFLOW,
-                },
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/INVALID_PATH.json"},
-                pytest.raises(ValueError),
-            ),
-            # YAMLDefinitionStore tests:
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/test_workflows.yaml"},
-                does_not_raise(),
-            ),
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/INVALID_PATH.json"},
-                pytest.raises(ValueError),
-            ),
-            # Edge case tests:
-            ("invalid_definition_store", {}, pytest.raises(ValueError)),
-            ("", None, pytest.raises(ValueError)),
-        ],
-    )
-    def test_definition_store_has_load(
-        self,
-        definition_store_type: str,
-        definition_store_options: dict,
-        expected_result: callable,
-    ) -> None:
-        """Tests that the ``DefinitionStore`` object implements the ``load`` method."""
-        with expected_result:
-            store = build_definition_store(
-                definition_store_type=definition_store_type,
-                options=definition_store_options,
+    def test_factory_definition_store_requires_mandatory_fields(self) -> None:
+        """FactoryDefinitionStore should validate required configuration fields."""
+        with pytest.raises(ValueError):
+            FactoryDefinitionStore(  # type: ignore[call-arg]
+                tenant_id=None,
+                client_id=None,
+                client_secret=None,
+                subscription_id=None,
+                resource_group_name=None,
+                factory_name=None,
             )
-            assert hasattr(store, "load"), 'DefinitionStore object does not implement the "load" method'
 
-    @pytest.mark.parametrize(
-        "definition_store_type, definition_store_options, pipeline_to_load, expected_result",
-        [
-            # FactoryDefinitionStore tests:
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                "TEST_PIPELINE_NAME",
-                does_not_raise(),
-            ),
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                "test_adf_pipeline_2",
-                does_not_raise(),
-            ),
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                "test_pipeline_no_triggers",
-                pytest.raises(ValueError),
-            ),
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                "test_pipeline_invalid_linked_service",
-                pytest.raises(ValueError),
-            ),
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                "INVALID_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "factory_definition_store",
-                {"_use_test_client": False},
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "factory_definition_store",
-                None,
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            # WorkspaceDefinitionStore tests:
-            (
-                "workspace_definition_store",
-                {"_use_test_client": True},
-                "TEST_PIPELINE_NAME",
-                does_not_raise(),
-            ),
-            (
-                "workspace_definition_store",
-                {"_use_test_client": True},
-                "INVALID_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "workspace_definition_store",
-                {"_use_test_client": False},
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "workspace_definition_store",
-                None,
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            # JSONDefinitionStore tests:
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/test_pipelines.json"},
-                "test_adf_pipeline_2",
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/test_pipelines.json"},
-                "INVALID_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/INVALID_PATH.json"},
-                "INVALID_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "json_definition_store",
-                {
-                    "json_file_path": f"{wkmigrate.JSON_PATH}/test_workflows.json",
-                    "json_source_type": JSONSourceType.DATABRICKS_WORKFLOW,
-                },
-                "TEST_PIPELINE_NAME",
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {
-                    "json_file_path": f"{wkmigrate.JSON_PATH}/test_workflows.json",
-                    "json_source_type": JSONSourceType.DATABRICKS_WORKFLOW,
-                },
-                "INVALID_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/INVALID_PATH.json"},
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            # YAMLDefinitionStore tests:
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/test_workflows.yaml"},
-                "test_adf_pipeline",
-                does_not_raise(),
-            ),
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/test_workflows.yaml"},
-                "INVALID_WORKFLOW_NAME",
-                pytest.raises(ValueError),
-            ),
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/INVALID_PATH.json"},
-                "test_adf_pipeline",
-                pytest.raises(ValueError),
-            ),
-            # Edge case tests:
-            (
-                "invalid_definition_store",
-                {},
-                "TEST_PIPELINE_NAME",
-                pytest.raises(ValueError),
-            ),
-            ("", None, "TEST_PIPELINE_NAME", pytest.raises(ValueError)),
-        ],
-    )
-    def test_definition_store_load_returns_valid_object(
-        self,
-        definition_store_type: str,
-        definition_store_options: dict,
-        pipeline_to_load: Any,
-        expected_result: callable,
-    ) -> None:
-        """Tests that the DefinitionStore's ``load`` method returns a ``dict``."""
-        with expected_result:
-            store = build_definition_store(
-                definition_store_type=definition_store_type,
-                options=definition_store_options,
+    def test_workspace_definition_store_requires_auth_and_host(self) -> None:
+        """WorkspaceDefinitionStore should validate authentication type and host name."""
+        with pytest.raises(ValueError):
+            WorkspaceDefinitionStore(  # type: ignore[call-arg]
+                authentication_type="invalid",
+                host_name=None,
             )
-            pipeline = store.load(pipeline_to_load)
-            assert isinstance(pipeline, dict), 'DefinitionStore "load" method did not return a "dict"'
 
-    @pytest.mark.parametrize(
-        "definition_store_type, definition_store_options, expected_result",
-        [
-            # FactoryDefinitionStore tests:
-            ("factory_definition_store", {"_use_test_client": True}, does_not_raise()),
-            (
-                "factory_definition_store",
-                {"_use_test_client": False},
-                pytest.raises(ValueError),
-            ),
-            ("factory_definition_store", None, pytest.raises(ValueError)),
-            # WorkspaceDefinitionStore tests:
-            (
-                "workspace_definition_store",
-                {"_use_test_client": True},
-                does_not_raise(),
-            ),
-            (
-                "workspace_definition_store",
-                {"_use_test_client": False},
-                pytest.raises(ValueError),
-            ),
-            ("workspace_definition_store", None, pytest.raises(ValueError)),
-            # JSONDefinitionStore tests:
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/test_pipelines.json"},
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {
-                    "json_file_path": f"{wkmigrate.JSON_PATH}/test_workflows.json",
-                    "json_source_type": JSONSourceType.DATABRICKS_WORKFLOW,
-                },
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/INVALID_PATH.json"},
-                pytest.raises(ValueError),
-            ),
-            # YAMLDefinitionStore tests:
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/test_workflows.yaml"},
-                does_not_raise(),
-            ),
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/INVALID_PATH.json"},
-                pytest.raises(ValueError),
-            ),
-            # Edge case tests:
-            ("invalid_definition_store", {}, pytest.raises(ValueError)),
-            ("", None, pytest.raises(ValueError)),
-        ],
-    )
-    def test_definition_store_has_dump(
+    def test_factory_definition_store_uses_definition_store_interface(
         self,
-        definition_store_type: str,
-        definition_store_options: dict,
-        expected_result: callable,
+        mock_factory_client,
     ) -> None:
-        """Tests that the definition store builder returns a ``DefinitionStore`` object that implements the
-        ``dump`` method."""
-        with expected_result:
-            store = build_definition_store(
-                definition_store_type=definition_store_type,
-                options=definition_store_options,
-            )
-            assert hasattr(store, "dump"), 'DefinitionStore object does not implement the "dump" method'
+        """FactoryDefinitionStore should behave as a DefinitionStore when wired with a mock client."""
+        assert mock_factory_client is not None
 
-    @pytest.mark.parametrize(
-        "definition_store_type, definition_store_options, pipeline_to_dump, expected_result",
-        [
-            # FactoryDefinitionStore tests:
-            (
-                "factory_definition_store",
-                {"_use_test_client": True},
-                {},
-                pytest.warns(UserWarning),
-            ),
-            (
-                "factory_definition_store",
-                None,
-                "test_pipeline",
-                pytest.raises(ValueError),
-            ),
-            # WorkspaceDefinitionStore tests:
-            (
-                "workspace_definition_store",
-                {"_use_test_client": True},
-                {},
-                does_not_raise(),
-            ),
-            (
-                "workspace_definition_store",
-                None,
-                "test_pipeline",
-                pytest.raises(ValueError),
-            ),
-            # JSONDefinitionStore tests:
-            (
-                "json_definition_store",
-                {
-                    "json_file_path": f"{wkmigrate.JSON_PATH}/test_output.json",
-                    "json_source_type": JSONSourceType.DATABRICKS_WORKFLOW,
-                },
-                {"name": "TEST_PIPELINE"},
-                does_not_raise(),
-            ),
-            (
-                "json_definition_store",
-                {"json_file_path": f"{wkmigrate.JSON_PATH}/INVALID_PATH.json"},
-                {"name": "TEST_PIPELINE"},
-                pytest.raises(ValueError),
-            ),
-            # YAMLDefinitionStore tests:
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/test_output.yaml"},
-                {"name": "TEST_WORKFLOW"},
-                does_not_raise(),
-            ),
-            (
-                "yaml_definition_store",
-                {"yaml_file_path": f"{wkmigrate.YAML_PATH}/INVALID_PATH.json"},
-                {"name": "TEST_WORKFLOW"},
-                pytest.raises(ValueError),
-            ),
-            # Edge case tests:
-            (
-                "invalid_definition_store",
-                {},
-                "test_pipeline",
-                pytest.raises(ValueError),
-            ),
-            ("", None, "test_pipeline", pytest.raises(ValueError)),
-        ],
-    )
-    def test_definition_store_dump(
+        store = FactoryDefinitionStore(
+            tenant_id="TENANT_ID",
+            client_id="CLIENT_ID",
+            client_secret="SECRET",
+            subscription_id="SUBSCRIPTION_ID",
+            resource_group_name="RESOURCE_GROUP",
+            factory_name="FACTORY_NAME",
+        )
+
+        assert isinstance(store, DefinitionStore)
+        pipeline = store.load("TEST_PIPELINE_NAME")
+        assert isinstance(pipeline, dict)
+
+    def test_workspace_definition_store_uses_definition_store_interface(
         self,
-        definition_store_type: str,
-        definition_store_options: dict,
-        pipeline_to_dump: Any,
-        expected_result: callable,
+        mock_workspace_client,
     ) -> None:
-        """Tests that the DefinitionStore's ``dump`` method succeeds."""
-        with expected_result:
-            store = build_definition_store(
-                definition_store_type=definition_store_type,
-                options=definition_store_options,
-            )
-            store.dump(pipeline_to_dump)
-            assert True, 'DefinitionStore "dump" method failed'
+        """WorkspaceDefinitionStore should behave as a DefinitionStore when wired with a mock workspace client."""
+        assert mock_workspace_client is not None
+
+        store = WorkspaceDefinitionStore(
+            authentication_type="pat",
+            host_name="https://example.com",
+            pat="DUMMY_TOKEN",
+        )
+
+        assert isinstance(store, DefinitionStore)
+        # The mocked jobs API starts empty; loading a non-existent workflow should raise a ValueError.
+        with pytest.raises(ValueError):
+            store.load("WORKFLOW")

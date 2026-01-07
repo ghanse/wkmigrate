@@ -1,0 +1,132 @@
+---
+sidebar_position: 2
+---
+
+import Admonition from '@theme/Admonition';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Usage Guide
+
+wkmigrate is a Python library which automates migrations from Azure Data Factory pipelines to Databricks Lakeflow jobs. This guide walks through an end-to-end pipeline migration using wkmigrate.
+
+<Admonition type="info" title="Prerequisites">
+You must have the following to run this guide:
+
+- A working Python environment with wkmigrate installed (e.g. using `pip install wkmigrate`).
+- Network access from where you run this code to Azure Data Factory and Databricks.
+- An Azure Service Principal with Data Factory Contributor permissions in Azure Data Factory
+- A Databricks Service Principal or personal access token
+</Admonition>
+
+## Configure a Factory Definition Store
+
+Create a `FactoryDefinitionStore` to load pipeline definitions from Azure Data Factory. Instantiate the
+definition store using your credentials, resource group name, and Azure Data Factory resource name.
+
+```python
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+
+# Specify credentials and service details of the Azure Data Factory resource
+factory_options = {
+    "tenant_id": "<YOUR AZURE TENANT ID>",
+    "client_id": "<YOUR SERVICE PRINCIPAL CLIENT ID>",
+    "client_secret": "<YOUR SERVICE PRINCIPAL CLIENT SECRET>",
+    "subscription_id": "<YOUR AZURE SUBSCRIPTION ID>",
+    "resource_group_name": "<RESOURCE GROUP WITH YOUR ADF INSTANCE>",
+    "factory_name": "<YOUR ADF FACTORY NAME>",
+}
+
+# Create the definition store
+factory_definition_store = FactoryDefinitionStore(**factory_options)
+```
+
+<Admonition type="warning" title="Data Factory permissions">
+Your service principal must have permissions to read your Data Factory resource. The Data Factory Contributor role provides adequate permissions.
+</Admonition>
+
+## Load and translate an ADF pipeline
+
+Use the `FactoryDefinitionStore` to load an ADF pipeline by name. This will invoke client methods to:
+
+- Fetch the pipeline definition.
+- Fetch any required dataset, linked service, or trigger definitions.
+- Translate the pipeline definition into an *internal representation* which can be used to create Databricks jobs.
+
+```python
+# Load and translate the ADF pipeline into wkmigrate's internal representation
+pipeline_name = "<YOUR ADF PIPELINE NAME>"
+pipeline_ir = factory_definition_store.load(pipeline_name)
+print(pipeline_ir)
+```
+
+## Configure a Workspace Definition Store
+
+Use a `WorkspaceDefinitionStore` to materialize the translated pipeline as a Databricks Lakeflow job. The `WorkspaceDefinitionStore` handles several migration steps:
+
+- Emitting files detailing the job configuration, any required notebooks to be generated, and any untranslated activities.
+- Uploading notebooks and supporting artifacts.
+- Creating or updating Databricks Jobs (workflows).
+
+Authentication is supported using a personal access token (PAT), username and password, or Azure client secret.
+
+```python
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+# Specify credentials and service details of the Databricks workspace
+workspace_options = {
+    "host_name": "https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    "pat": "<DATABRICKS PAT>",
+    "authentication_type": "pat",
+}
+
+# Create the definition store
+workspace_definition_store = WorkspaceDefinitionStore(**workspace_options)
+```
+
+<Admonition type="warning" title="Workspace permissions">
+The credentials you provide must have permission to create jobs, upload notebooks, and manage secrets in the target Databricks workspace.
+</Admonition>
+
+## Translate pipelines to Databricks jobs
+
+The `WorkspaceDefinitionStore` materializes Databricks jobs either by creating job artifacts (e.g. job definitions in JSON files) or directly calling Databricks APIs to create jobs. 
+
+### Create job artifacts
+If you want to inspect or customize the translated workflow before deploying it to Databricks, use ``to_local_files`` to write all artifacts to a local directory. This will:
+
+- Generate Databricks notebooks for Copy Data and other activities.
+- Emit workflow JSON and helper files that mirror what would be created via the API.
+- Emit any untranslated activities, linked services, or properties for manual follow-up.
+
+```python
+from pathlib import Path
+from wkmigrate.models.ir.pipeline import Pipeline
+
+# Directory where generated notebooks, job definitions, and other metadata will be written
+local_dir = Path("out/wkmigrate_pipeline")
+local_dir.mkdir(parents=True, exist_ok=True)
+
+# Create job artifacts from the pipeline's internal representation
+pipeline_model = Pipeline(**pipeline_ir)
+workspace_definition_store.to_local_files(pipeline_model, local_directory=str(local_dir))
+```
+
+### Create Databricks jobs directly
+
+Once you're ready to deploy, use `to_pipeline` to create a Databricks workflow directly from the translated pipeline. This will:
+
+1. Upload any required notebooks into your workspace.
+2. Create any required Delta Live Table pipelines.
+3. Calls `WorkspaceClient.jobs.create(...)` to register the job using properties translated from Azure Data Factory.
+
+```python
+# Create a Databricks job (workflow) from the translated pipeline
+job_id = workspace_definition_store.to_pipeline(pipeline_ir)
+
+print(f"Created Databricks job with ID: {job_id}")
+```
+
+<Admonition type="warning" title="Idempotency and naming">
+Repeatedly calling `to_pipeline` may create multiple identical jobs unless you implement your own idempotency strategy. Consider cleaning up test jobs manually while you iterate.
+</Admonition>

@@ -4,16 +4,22 @@ from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.definition_stores import types
 
 
-getters = types
-
-
 def build_definition_store(definition_store_type: str, options: dict | None = None) -> DefinitionStore:
-    """Gets a ``DefinitionStore`` object with the given options.
-    :parameter definition_store_type: Definition store type
-    :parameter options: A set of options for the specified definition store type
-    :return: ``DefinitionStore``: A ``DefinitionStore`` of the specified type
     """
-    getter = getters.get(definition_store_type, None)
+    Builds a ``DefinitionStore`` instance for the provided type.
+
+    Args:
+        definition_store_type: Unique key for the registered definition store.
+        options: Initialization keyword arguments for the definition store constructor.
+
+    Returns:
+        Instantiated ``DefinitionStore`` object of the specified type.
+
+    Raises:
+        ValueError: If the definition store type is unknown.
+        ValueError: If required options are missing for the specified definition store type.
+    """
+    getter = types.get(definition_store_type, None)
     if getter is None:
         raise ValueError(f"No definition store registered with type {definition_store_type}")
     if options is None:

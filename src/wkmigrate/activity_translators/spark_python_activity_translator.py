@@ -1,21 +1,21 @@
 """This module defines methods for translating Databricks Spark Python activities."""
 
-from wkmigrate.utils import identity, translate
+from wkmigrate.models.ir.activities import SparkPythonActivity
 
 
-mapping = {
-    "python_file": {"key": "python_file", "parser": identity},
-    "parameters": {"key": "parameters", "parser": identity},
-}
-
-
-def translate_spark_python_activity(activity: dict) -> dict:
-    """Translates a Databricks Spark Python activity definition in Data Factory's object model to a Databricks Spark
-    Python task in the Databricks SDK object model.
-    :parameter activity: Databricks Spark Python activity definition as a ``dict``
-    :return: Databricks Spark Python task properties as a ``dict``
+def translate_spark_python_activity(activity: dict, base_kwargs: dict) -> SparkPythonActivity:
     """
-    translated = translate(activity, mapping)
-    if translated is None:
-        raise ValueError('Translation failed')
-    return translated
+    Translates an ADF Databricks Spark Python activity into a ``SparkPythonActivity`` object.
+
+    Args:
+        activity: Spark Python activity definition as a ``dict``.
+        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+
+    Returns:
+        ``SparkPythonActivity`` representation of the Spark Python task.
+    """
+    return SparkPythonActivity(
+        **base_kwargs,
+        python_file=activity.get("python_file"),
+        parameters=activity.get("parameters"),
+    )

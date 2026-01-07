@@ -67,8 +67,8 @@ from wkmigrate import pipeline_translator
 translated_pipeline = pipeline_translator.translate(pipeline)
 ```
 
-Use the ``dump`` method to **sync workflows** into a target.
+Use the ``to_pipeline`` method to **sync workflows** into a target.
 
 ```buildoutcfg
-workspace_store.dump(translated_pipeline)
+workspace_store.to_pipeline(translated_pipeline)
 ```

@@ -4,8 +4,13 @@ from typing import Any
 
 
 def parse_parameter_value(parameter_value: Any) -> Any:
-    """Parses a value from a JSON string.
-    :parameter parameter_value: Parameter value as a ``str``
-    :return: Parsed parameter value with inferred data type
+    """
+    Parses a parameter value and normalizes it to JSON-friendly formatting.
+
+    Args:
+        parameter_value: Raw parameter value.
+
+    Returns:
+        Parsed parameter value with inferred data type.
     """
     return str(parameter_value).replace("'", '"')

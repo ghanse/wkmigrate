@@ -17,7 +17,7 @@ print(pipeline)
 
 # Create the workspace definition store:
 workspace_options = {
-    "host_name": "<YOUR DATABRICKS WORKSPACE URL>",
+    "host_name": "<YOUR DATABRICKS WORKSPACE HOSTNAME>",
     "pat": "<YOUR DATABRICKS PERSONAL ACCESS TOKEN (PAT)>",
     "authentication_type": "pat",
 }

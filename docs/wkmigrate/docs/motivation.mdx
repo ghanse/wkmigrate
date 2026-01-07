@@ -1,0 +1,29 @@
+---
+sidebar_position: 1
+---
+
+import Admonition from '@theme/Admonition';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Motivation
+
+We believe that orchestration should be treated as a first class citizen during migrations. Because orchestrators drive the execution of data 
+pipelines, their configuration can impact data processing results as much as the logic being orchestrated. While significant tooling exists for 
+code conversion and data reconciliation, migrating from legacy orchestration systems is often manual, time-consuming, and prone to risk.
+
+wkmigrate was created to automate the migration of data pipeline configuration in various orchestrators. It provides a robust, tested set of capabilities
+to parse existing data pipeline definitions, create migration artifacts, and convert data pipeline definitions to Databricks' [Lakeflow jobs framework](https://docs.databricks.com/aws/en/jobs/).
+
+## How wkmigrate works
+
+wkmigrate is a Python library which can be executed in any Python environment. It uses a set of management clients, parsers, and internal objects to load 
+data pipeline definitions from a source system, translate pipeline configuration, and create Lakeflow jobs.
+
+## Common use cases
+
+wkmigrate is a well-tested framework for migrating data pipelines. Consider using wkmigrate to:
+
+- Convert data pipelines in non-Databricks orchestration frameworks to Lakeflow jobs
+- Automate configuration changes for existing Lakeflow jobs (e.g. when migrating to serverless compute or upgrading Databricks runtime versions)
+- Estimate the complexity of a migration to Lakeflow jobs

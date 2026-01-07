@@ -1,21 +1,22 @@
 """This module defines methods for translating Databricks Spark jar activities."""
 
-from wkmigrate.utils import identity, translate
+from wkmigrate.models.ir.activities import SparkJarActivity
 
 
-mapping = {
-    "main_class_name": {"key": "main_class_name", "parser": identity},
-    "parameters": {"key": "parameters", "parser": identity},
-}
-
-
-def translate_spark_jar_activity(activity: dict) -> dict:
-    """Translates a Databricks Spark jar activity definition in Data Factory's object model to a Databricks Spark jar
-    task in the Databricks SDK object model.
-    :parameter activity: Databricks Spark jar activity definition as a ``dict``
-    :return: Databricks Spark jar task properties as a ``dict``
+def translate_spark_jar_activity(activity: dict, base_kwargs: dict) -> SparkJarActivity:
     """
-    translated = translate(activity, mapping)
-    if translated is None:
-        raise ValueError('Translation failed')
-    return translated
+    Translates an ADF Databricks Spark JAR activity into a ``SparkJarActivity`` object.
+
+    Args:
+        activity: Spark JAR activity definition as a ``dict``.
+        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+
+    Returns:
+        ``SparkJarActivity`` representation of the Spark JAR task.
+    """
+    return SparkJarActivity(
+        **base_kwargs,
+        main_class_name=activity.get("main_class_name"),
+        parameters=activity.get("parameters"),
+        libraries=activity.get("libraries"),
+    )

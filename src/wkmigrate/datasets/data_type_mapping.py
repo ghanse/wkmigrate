@@ -1,37 +1,36 @@
 """This module defines methods for mapping data types from target systems to Spark."""
 
+sql_server_type_mapping = {
+    "Boolean": "boolean",
+    "Int16": "short",
+    "Int32": "int",
+    "Int64": "long",
+    "Single": "float",
+    "Double": "double",
+    "Decimal": "decimal(38, 38)",
+}
+
 
 def parse_spark_data_type(sink_type: str, sink_system: str) -> str:
-    """Parses a Spark data type DDL string from a data type DDL string in the target system.
+    """
+    Converts a source-system data type to the Spark equivalent.
 
-    :param sink_type: Source type as a ``str``
-    :param sink_system: Source system as a ``str``
-    :returns: Data type in the target system as a ``str``
+    Args:
+        sink_type: Data type string defined in the source system.
+        sink_system: Identifier for the source system (e.g., ``"sqlserver"``).
+
+    Returns:
+        Spark-compatible data type string.
+
+    Raises:
+        ValueError: If the sink system is unsupported.
+        ValueError: If the sink type is not supported for the given system.
     """
     if sink_system == "delta":
         return sink_type
     if sink_system == "sqlserver":
-        if sink_type == "Boolean":
-            return "boolean"
-        if sink_type == "Int16":
-            return "short"
-        if sink_type == "Int32":
-            return "int"
-        if sink_type == "Int64":
-            return "long"
-        if sink_type == "Single":
-            return "float"
-        if sink_type == "Double":
-            return "double"
-        if sink_type == "Decimal":
-            return "decimal(38, 38)"
-        if sink_type == "DateTime":
-            return "timestamp"
-        if sink_type == "String":
-            return "string"
-        if sink_type.startswith("Byte"):
-            return "binary"
-        if sink_type == "Guid":
-            return "string"
-
-    raise ValueError(f"No data type mapping available for source system '{sink_type}'")
+        mapped_type = sql_server_type_mapping.get(sink_type)
+        if mapped_type is None:
+            raise ValueError(f"No data type mapping available for SQL Server type '{sink_type}'")
+        return mapped_type
+    raise ValueError(f"No data type mapping available for target system '{sink_system}'")
