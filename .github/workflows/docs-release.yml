@@ -20,6 +20,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: |
+          pip install poetry==2.2.1
 
       - name: Setup Node
         uses: actions/setup-node@v4
