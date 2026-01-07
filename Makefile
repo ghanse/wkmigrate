@@ -15,6 +15,8 @@ fmt:
 docs:
 	# Regenerate API reference under docs/wkmigrate/docs using pydoc-markdown
 	poetry run pydoc-markdown
+	# Install yarn dependencies
+	yarn --cwd docs/wkmigrate install
 	# Build the static Docusaurus site
 	yarn --cwd docs/wkmigrate build
 
