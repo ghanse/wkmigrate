@@ -1,5 +1,4 @@
-from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
-from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+from wkmigrate.definition_stores.definition_store_builder import build_definition_store
 
 # Create the factory store and get the ADF pipeline:
 factory_options = {
@@ -10,7 +9,7 @@ factory_options = {
     'resource_group_name': "<YOUR AZURE RESOURCE GROUP NAME>",  # NOTE: Should contain your ADF resource
     'factory_name': "<YOUR ADF RESOURCE NAME>",
 }
-factory_definition_store = FactoryDefinitionStore(**factory_options)
+factory_definition_store = build_definition_store('factory_definition_store', factory_options)
 pipeline = factory_definition_store.load('<YOUR ADF PIPELINE NAME>')
 
 # Print the ADF pipeline represented as a dictionary:
@@ -18,11 +17,11 @@ print(pipeline)
 
 # Create the workspace definition store:
 workspace_options = {
-    "host_name": "<YOUR DATABRICKS WORKSPACE URL>",
+    "host_name": "<YOUR DATABRICKS WORKSPACE HOSTNAME>",
     "pat": "<YOUR DATABRICKS PERSONAL ACCESS TOKEN (PAT)>",
     "authentication_type": "pat",
 }
-workspace_definition_store = WorkspaceDefinitionStore(**workspace_options)
+workspace_definition_store = build_definition_store("workspace_definition_store", workspace_options)
 
 # Dump the translated pipeline to the local filesystem:
 workspace_definition_store.to_local_files(pipeline, local_directory="<YOUR LOCAL DIRECTORY>")

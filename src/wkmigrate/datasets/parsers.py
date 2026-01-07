@@ -698,8 +698,8 @@ def _get_linked_service_definition(dataset: dict) -> dict:
         ValueError: If the linked service definition is not found or is not a dictionary.
     """
     linked_service_definition = dataset.get("linked_service_definition")
-    if linked_service_definition is None:
-        raise ValueError("Linked service definition not found")
+    if not linked_service_definition:
+        raise ValueError("Missing linked service definition")
     if not isinstance(linked_service_definition, dict):
         raise ValueError("Linked service definition must be a dictionary")
     return linked_service_definition

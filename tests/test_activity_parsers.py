@@ -1,18 +1,16 @@
-import pytest
 from contextlib import nullcontext as does_not_raise
+import pytest
 from wkmigrate.activity_translators.parsers import (
-    parse_column_mappings,
-    parse_query_timeout_seconds,
-    parse_query_isolation_level,
+    parse_dataset_mapping,
     parse_for_each_items,
     parse_policy,
     parse_dependencies,
     parse_notebook_parameters,
     parse_condition_expression,
-    _parse_timeout_string,
+    _parse_activity_timeout_string,
     _parse_array_string,
 )
-from wkmigrate.enums.isolation_level import IsolationLevel
+from wkmigrate.models.ir.activities import ColumnMapping, Dependency
 
 
 class TestActivityParsers:
@@ -21,58 +19,28 @@ class TestActivityParsers:
     @pytest.mark.parametrize(
         "column_mapping, expected_result, context",
         [
-            (None, None, does_not_raise()),
-            ({}, None, does_not_raise()),
+            (None, None, pytest.raises(AttributeError, match="'NoneType' object has no attribute 'get'")),
+            ({}, [], does_not_raise()),
             (
-                {"mappings": [{"source": "col1", "sink": "col1"}]},
-                [{"source": "col1", "sink": "col1"}],
+                {
+                    "mappings": [
+                        {"source": {"name": "col1", "type": "string"}, "sink": {"name": "col1", "type": "string"}}
+                    ]
+                },
+                [ColumnMapping(source_column_name="col1", sink_column_name="col1", sink_column_type="string")],
                 does_not_raise(),
             ),
         ],
     )
     def test_parse_column_mappings(self, column_mapping, expected_result, context):
         with context:
-            assert parse_column_mappings(column_mapping) == expected_result
-
-    @pytest.mark.parametrize(
-        "query_timeout_definition, expected_result, context",
-        [
-            (None, 0, does_not_raise()),
-            ({}, 0, does_not_raise()),
-            ({"query_timeout": "0.00:05:00"}, 300, does_not_raise()),
-            ({"query_timeout": "1.02:30:00"}, 95400, does_not_raise()),
-        ],
-    )
-    def test_parse_query_timeout_seconds(self, query_timeout_definition, expected_result, context):
-        with context:
-            assert parse_query_timeout_seconds(query_timeout_definition) == expected_result
-
-    @pytest.mark.parametrize(
-        "query_isolation_level, expected_result, context",
-        [
-            (None, "READ_COMMITTED", does_not_raise()),
-            ({}, "READ_COMMITTED", does_not_raise()),
-            (
-                {"isolation_level": "ReadCommitted"},
-                IsolationLevel.ReadCommitted.value,
-                does_not_raise(),
-            ),
-            (
-                {"isolation_level": "Serializable"},
-                IsolationLevel.Serializable.value,
-                does_not_raise(),
-            ),
-        ],
-    )
-    def test_parse_query_isolation_level(self, query_isolation_level, expected_result, context):
-        with context:
-            assert parse_query_isolation_level(query_isolation_level) == expected_result
+            assert parse_dataset_mapping(column_mapping) == expected_result
 
     @pytest.mark.parametrize(
         "for_each_items, expected_result, context",
         [
-            ({"value": "@array(1,2,3)"}, '["1","2","3"]', does_not_raise()),
-            ({"value": '@array("a","b","c")'}, '["a","b","c"]', does_not_raise()),
+            ({"value": "@array('1,2,3')"}, '["1","2","3"]', does_not_raise()),
+            ({"value": '@array(\'"a","b","c"\')'}, '["a","b","c"]', does_not_raise()),
             ({"value": "not_an_array"}, None, does_not_raise()),
         ],
     )
@@ -105,7 +73,7 @@ class TestActivityParsers:
             (None, None, does_not_raise()),
             (
                 [{"activity": "Task1", "dependencyConditions": ["Succeeded"]}],
-                [{"task_key": "Task1", "outcome": None}],
+                [Dependency(task_key="Task1", outcome=None)],
                 does_not_raise(),
             ),
             (
@@ -144,7 +112,7 @@ class TestActivityParsers:
     @pytest.mark.parametrize(
         "condition_expression, expected_result, context",
         [
-            ({"expression": "@equals(1, 1)"}, None, pytest.raises(ValueError)),
+            ({"expression": "@equals(1, 1)"}, {"expression": "@equals(1, 1)"}, pytest.warns(UserWarning)),
             (
                 {"value": "@equals(1, 1)"},
                 {"op": "EQUAL_TO", "left": "1", "right": "1"},
@@ -169,7 +137,7 @@ class TestActivityParsers:
         ],
     )
     def test_parse_timeout_string(self, timeout_string, expected_result):
-        assert _parse_timeout_string(timeout_string) == expected_result
+        assert _parse_activity_timeout_string(timeout_string) == expected_result
 
     @pytest.mark.parametrize(
         "array_string, expected_result",
@@ -198,5 +166,5 @@ class TestActivityParsers:
         ],
     )
     def test_parse_condition_expression_error(self, condition):
-        with pytest.raises(ValueError):
-            parse_condition_expression(condition)
+        with pytest.warns(UserWarning):
+            assert parse_condition_expression(condition) == condition

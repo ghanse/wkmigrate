@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from wkmigrate.definition_stores import factory_definition_store, workspace_definition_store
 
 JSON_PATH = os.path.join(os.path.dirname(__file__), "resources", "json")
 YAML_PATH = os.path.join(os.path.dirname(__file__), "resources", "yaml")
@@ -116,9 +117,32 @@ class MockFactoryClient:
 
 
 @pytest.fixture
-def mock_factory_client() -> MockFactoryClient:
-    """Provides a FactoryClient double backed by JSON fixtures."""
-    return MockFactoryClient()
+def mock_factory_client(monkeypatch: pytest.MonkeyPatch) -> MockFactoryClient:
+    """
+    Provides a FactoryClient double backed by JSON fixtures and patches the concrete client
+    used by ``FactoryDefinitionStore`` so tests never talk to real Azure resources.
+    """
+
+    delegate = MockFactoryClient()
+
+    class _FakeFactoryClient:
+        def __init__(self, **_: Any) -> None:
+            self._delegate = delegate
+
+        def get_pipeline(self, pipeline_name: str) -> dict:
+            return self._delegate.get_pipeline(pipeline_name)
+
+        def get_trigger(self, pipeline_name: str) -> dict:
+            return self._delegate.get_trigger(pipeline_name)
+
+        def get_dataset(self, dataset_name: str) -> dict:
+            return self._delegate.get_dataset(dataset_name)
+
+        def get_linked_service(self, linked_service_name: str) -> dict:
+            return self._delegate.get_linked_service(linked_service_name)
+
+    monkeypatch.setattr(factory_definition_store, "FactoryClient", _FakeFactoryClient)
+    return delegate
 
 
 @dataclass
@@ -224,5 +248,15 @@ class MockWorkspaceClient:
 
 @pytest.fixture
 def mock_workspace_client() -> MockWorkspaceClient:
-    """Provides a WorkspaceClient double for testing that materializes workflows."""
-    return MockWorkspaceClient()
+    """
+    Provides a WorkspaceClient double for testing and patches the workspace login helper
+    so ``WorkspaceDefinitionStore`` instances use this mock instead of a real workspace client.
+    """
+
+    delegate = MockWorkspaceClient()
+
+    def _fake_login(_: workspace_definition_store.WorkspaceDefinitionStore) -> MockWorkspaceClient:
+        return delegate
+
+    workspace_definition_store.WorkspaceDefinitionStore._login_workspace_client = _fake_login  # type: ignore[assignment]
+    return delegate

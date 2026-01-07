@@ -1,5 +1,6 @@
-import pytest
 from contextlib import nullcontext as does_not_raise
+import pytest
+from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.pipeline_translators.pipeline_translator import translate_pipeline
 
 
@@ -19,16 +20,14 @@ class TestPipelineTranslator:
                     },
                     "tags": {"env": "test"},
                 },
-                {
-                    "name": "TestPipeline",
-                    "parameters": [{"name": "param1", "default": "None"}],
-                    "schedule": {
-                        "quartz_cron_expression": "0 0 0 */1 * ?",
-                        "timezone_id": "UTC",
-                    },
-                    "tags": {"env": "test", "CREATED_BY_WKMIGRATE": ""},
-                    "tasks": None,
-                },
+                Pipeline(
+                    name="TestPipeline",
+                    parameters=[{"name": "param1", "default": "None"}],
+                    schedule={"quartz_cron_expression": "0 0 0 */1 * ?", "timezone_id": "UTC"},
+                    tags={"env": "test", "CREATED_BY_WKMIGRATE": ""},
+                    tasks=[],
+                    not_translatable=[],
+                ),
                 does_not_raise(),
             ),
             (
@@ -40,17 +39,20 @@ class TestPipelineTranslator:
                     },
                     "tags": {"env": "test"},
                 },
-                {
-                    "name": "UNNAMED_WORKFLOW",
-                    "parameters": [{"name": "param1", "default": "None"}],
-                    "schedule": {
-                        "quartz_cron_expression": "0 0 0 */1 * ?",
-                        "timezone_id": "UTC",
-                    },
-                    "tags": {"env": "test", "CREATED_BY_WKMIGRATE": ""},
-                    "tasks": None,
-                },
-                pytest.warns(UserWarning),
+                Pipeline(
+                    name="UNNAMED_WORKFLOW",
+                    parameters=[{"name": "param1", "default": "None"}],
+                    schedule={"quartz_cron_expression": "0 0 0 */1 * ?", "timezone_id": "UTC"},
+                    tags={"env": "test", "CREATED_BY_WKMIGRATE": ""},
+                    tasks=[],
+                    not_translatable=[
+                        {
+                            "property": "pipeline.name",
+                            "message": "No pipeline name in source definition, setting to UNNAMED_WORKFLOW",
+                        }
+                    ],
+                ),
+                does_not_raise(),
             ),
         ],
     )

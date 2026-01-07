@@ -1,0 +1,84 @@
+name: build
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  merge_group:
+    types: [checks_requested]
+  push:
+    # Always run on push to main. The build cache can only be reused
+    # if it was saved by a run from the repository's default branch.
+    # The run result will be identical to that from the merge queue
+    # because the commit is identical, yet we need to perform it to
+    # seed the build cache.
+    branches:
+      - main
+
+permissions:
+  id-token: write
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        pyVersion: [ '3.10', '3.11', '3.12' ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: ${{ matrix.pyVersion }}
+
+      - name: Run unit tests
+        run: |
+          pip install hatch==1.15.0
+          make test
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Format all files
+        run: make dev fmt
+
+      - name: Fail on differences
+        run: git diff --exit-code
+
+  docs:
+    name: Build Docusaurus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: |
+          pip install poetry==2.2.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: docs/dqx/yarn.lock # need to put the lockfile path explicitly
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Build website
+        run: make docs-build

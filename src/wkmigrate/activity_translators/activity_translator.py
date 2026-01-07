@@ -80,7 +80,8 @@ def _build_base_activity_kwargs(activity: dict, activity_type: str) -> dict:
     """
     policy = parse_policy(activity.get("policy"))
     depends_on = parse_dependencies(activity.get("depends_on"))
-    new_cluster = translate_cluster_spec(activity.get("linked_service_definition", {}))
+    cluster_spec = activity.get("linked_service_definition")
+    new_cluster = translate_cluster_spec(cluster_spec) if cluster_spec else None
     name = activity.get("name") or "UNNAMED_TASK"
     task_key = name or "TASK_NAME_NOT_PROVIDED"
     return {

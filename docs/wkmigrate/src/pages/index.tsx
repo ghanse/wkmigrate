@@ -32,11 +32,19 @@ const Hero = () => {
         wkmigrate - Automated workflow migration
       </h1>
       <p className="text-lg text-center text-balance">
-        The wkmigrate library allows you to programmatically list and translate pipelines in ADF to equivalent jobs in Databricks.
+        Programmatically translate Azure Data Factory pipelines to Databricks jobs.
       </p>
 
       {/* Call to Action Buttons */}
       <div className="mt-12 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+      <Button
+          variant="secondary"
+          outline={true}
+          link="/docs/motivation"
+          size="large"
+          label={"Motivation"}
+          className="w-64"
+        />
         <Button
           variant="secondary"
           outline={true}
@@ -56,9 +64,9 @@ const Hero = () => {
         <Button
           variant="secondary"
           outline={true}
-          link="/docs/reference/api"
+          link="/docs/reference"
           size="large"
-          label={"API Reference"}
+          label={"Reference"}
           className="w-64"
         />
       </div>

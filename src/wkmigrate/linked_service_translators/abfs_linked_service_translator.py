@@ -1,5 +1,6 @@
 """Translate Azure Blob/File Storage linked services into IR."""
 
+from uuid import uuid4
 from wkmigrate.linked_service_translators.parsers import (
     parse_storage_account_name,
     parse_storage_account_connection_string,
@@ -17,10 +18,12 @@ def translate_abfs_spec(abfs_spec: dict) -> AbfsLinkedService:
     Returns:
         ABFS linked-service metadata as a ``AbfsLinkedService`` object.
     """
+    if not abfs_spec:
+        raise ValueError("Missing ABFS linked service definition")
     properties = abfs_spec.get("properties", {})
     return AbfsLinkedService(
-        service_name=abfs_spec.get("name", ""),
+        service_name=abfs_spec.get("name", str(uuid4())),
         service_type="abfs",
-        url=parse_storage_account_connection_string(properties.get("url", "")),
-        storage_account_name=parse_storage_account_name(properties.get("storage_account_name", "")),
+        url=parse_storage_account_connection_string(properties.get("url")),
+        storage_account_name=parse_storage_account_name(properties.get("storage_account_name")),
     )

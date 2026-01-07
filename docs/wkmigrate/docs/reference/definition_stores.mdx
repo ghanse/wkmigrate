@@ -1,0 +1,253 @@
+---
+sidebar_position: 12
+title: Definition stores
+---
+
+import Admonition from '@theme/Admonition';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Overview
+
+Definition stores are the entry points that wkmigrate uses to load pipeline definitions from a source system and materialize Lakeflow jobs in Databricks. You can construct 
+these classes directly or use the `build_definition_store` method to flexibly create definition stores of various types.
+
+The following definition stores are supported:
+
+| Definition store           | Source/target         | Description                                                          |
+|----------------------------|-----------------------|----------------------------------------------------------------------|
+| `FactoryDefinitionStore`   | Azure Data Factory    | Loads and translates Data Factory (ADF) pipelines.                   |
+| `WorkspaceDefinitionStore` | Databricks workspace  | Loads, describes, and creates Databricks Lakeflow jobs (workflows).  |
+
+## FactoryDefinitionStore
+
+The `FactoryDefinitionStore` loads and translates Azure Data Factory pipelines.
+
+### Authentication and configuration
+
+`FactoryDefinitionStore` authenticates using a service principal with access to the Data Factory resource.
+
+Instantiating a `FactoryDefinitionStore` validates that all required fields are present and creates a Data Factory management client.
+
+```python
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+
+factory_options = {
+    "tenant_id": "<AZURE TENANT ID>",
+    "client_id": "<SERVICE PRINCIPAL CLIENT ID>",
+    "client_secret": "<SERVICE PRINCIPAL CLIENT SECRET>",
+    "subscription_id": "<AZURE SUBSCRIPTION ID>",
+    "resource_group_name": "<RESOURCE GROUP CONTAINING THE DATA FACTORY RESOURCE>",
+    "factory_name": "<DATA FACTORY RESOURCE NAME>",
+}
+
+factory_store = FactoryDefinitionStore(**factory_options)
+```
+
+<Admonition type="warning" title="Data Factory permissions">
+The service principal used when creating the `FactoryDefinitionStore` must have permissions to read pipeline configuration.
+</Admonition>
+
+### Loading and translating ADF pipelines
+
+Use the `load` method to retrieve a pipeline from ADF by name and translate the pipeline definition to wkmigrate's internal representation.
+
+```python
+# Specify the pipeline by name
+pipeline_name = "my_adf_pipeline"
+
+# Load and translate the pipeline definition
+pipeline_ir = factory_store.load(pipeline_name)
+print(pipeline_ir)
+```
+
+## WorkspaceDefinitionStore
+
+The `WorkspaceDefinitionStore` interacts with a Databricks workspace to:
+
+- Load existing job definitions.
+- Create new Databricks jobs from a translated pipeline.
+- Generate local artifacts (notebooks, job JSON, secret definitions) for inspection or GitOps workflows.
+
+### Authentication and configuration
+
+`WorkspaceDefinitionStore` supports authentication using a personal access token (PAT), username and password, or Azure client secret.
+
+Instantiating a `WorkspaceDefinitionStore` validates that all required fields are present and creates a Databricks workspace client.
+
+<Tabs>
+  <TabItem value="pat" label="Personal Access Token (PAT)" default>
+
+```python
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+workspace_store = WorkspaceDefinitionStore(
+    authentication_type="pat",
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS PAT>",
+)
+```
+
+  </TabItem>
+  <TabItem value="username-and-password" label="Username & Password">
+
+```python
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+workspace_store = WorkspaceDefinitionStore(
+    authentication_type="basic",
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    username="user@example.com",
+    password="<DATABRICKS PASSWORD>",
+)
+```
+
+  </TabItem>
+  <TabItem value="azure-client-secret" label="Azure Client Secret">
+
+```python
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+workspace_store = WorkspaceDefinitionStore(
+    authentication_type="azure-client-secret",
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    resource_id="/subscriptions/<SUBSCRIPTION>/resourceGroups/<RG>/providers/Microsoft.Databricks/workspaces/<WORKSPACE>",
+    tenant_id="<AZURE TENANT ID>",
+    client_id="<SERVICE PRINCIPAL CLIENT ID>",
+    client_secret="<SERVICE PRINCIPAL CLIENT SECRET>",
+)
+```
+
+  </TabItem>
+</Tabs>
+
+<Admonition type="warning" title="Workspace permissions">
+The identity used when creating the `WorkspaceDefinitionStore` must have permissions to create and edit jobs, upload notebooks, and manage secret scopes and secrets.
+</Admonition>
+
+### Loading an existing Databricks job
+
+Use `load` to fetch an existing Databricks job by name.
+
+```python
+# Specify the job by name
+job_name = "my_etl_job"
+
+# Load the job definition from the workspace
+job_settings = workspace_store.load(job_name)
+print(job_settings)
+```
+
+### Creating Databricks jobs from a pipeline
+
+Pass the internal representation returned by `FactoryDefinitionStore.load(...)` to `WorkspaceDefinitionStore.to_pipeline(...)` to create an equivalent job in the target workspace.
+
+```python
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+# Create the `FactoryDefinitionStore`
+factory_options = {
+    "tenant_id": "<AZURE TENANT ID>",
+    "client_id": "<SERVICE PRINCIPAL CLIENT ID>",
+    "client_secret": "<SERVICE PRINCIPAL CLIENT SECRET>",
+    "subscription_id": "<AZURE SUBSCRIPTION ID>",
+    "resource_group_name": "<RESOURCE GROUP CONTAINING THE DATA FACTORY RESOURCE>",
+    "factory_name": "<DATA FACTORY RESOURCE NAME>",
+}
+factory_store = FactoryDefinitionStore(**factory_options)
+
+# Load and translate the pipeline definition
+pipeline_name = "my_adf_pipeline"
+pipeline_ir = factory_store.load(pipeline_name)
+
+# Create the `WorkspaceDefinitionStore`
+workspace_store = WorkspaceDefinitionStore(
+    authentication_type="pat",
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS PAT>",
+)
+
+# Create the equivalent job in the workspace
+job_id = workspace_store.to_pipeline(pipeline_ir)
+print(f"Created Databricks job with ID: {job_id}")
+```
+
+### Generating translation artifacts
+
+Use `to_local_files` to generate translation artifacts without calling Databricks APIs to create jobs, pipelines, or notebooks. Calling `to_local_files` creates 
+code and configuration files in the local filesystem. This includes the job definitions, required secrets, and any untranslatable properties in JSON files and 
+any generated notebooks.
+
+```python
+from pathlib import Path
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+# Create the `FactoryDefinitionStore`
+factory_options = {
+    "tenant_id": "<AZURE TENANT ID>",
+    "client_id": "<SERVICE PRINCIPAL CLIENT ID>",
+    "client_secret": "<SERVICE PRINCIPAL CLIENT SECRET>",
+    "subscription_id": "<AZURE SUBSCRIPTION ID>",
+    "resource_group_name": "<RESOURCE GROUP CONTAINING THE DATA FACTORY RESOURCE>",
+    "factory_name": "<DATA FACTORY RESOURCE NAME>",
+}
+factory_store = FactoryDefinitionStore(**factory_options)
+
+# Load and translate the pipeline definition
+pipeline_name = "my_adf_pipeline"
+pipeline_ir = factory_store.load(pipeline_name)
+
+# Create the `WorkspaceDefinitionStore`
+workspace_store = WorkspaceDefinitionStore(
+    authentication_type="pat",
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS PAT>",
+)
+
+# Write the translation artifacts to a local directory
+output_path = Path("out/wkmigrate_artifacts")
+output_path.mkdir(parents=True, exist_ok=True)
+workspace_store.to_local_files(
+    pipeline_definition=pipeline_model,
+    local_directory=str(output_path),
+)
+print(f"Translation artifacts written to {output_path}")
+```
+
+## Creating definition stores with `build_definition_store`
+
+Use the `build_definition_store` method to build a definition store from a string key and an options dictionary. This pattern can be used to 
+store and load definition store properties in configuration files (e.g. JSON or YAML).
+
+```python
+from wkmigrate.definition_stores.definition_store_builder import build_definition_store
+
+# FactoryDefinitionStore
+factory_store = build_definition_store(
+    definition_store_type="factory_definition_store",
+    options={
+        "tenant_id": "<AZURE TENANT ID>",
+        "client_id": "<SERVICE PRINCIPAL CLIENT ID>",
+        "client_secret": "<SERVICE PRINCIPAL CLIENT SECRET>",
+        "subscription_id": "<AZURE SUBSCRIPTION ID>",
+        "resource_group_name": "<RESOURCE GROUP NAME>",
+        "factory_name": "<DATA FACTORY NAME>",
+    },
+)
+
+# WorkspaceDefinitionStore
+workspace_store = build_definition_store(
+    definition_store_type="workspace_definition_store",
+    options={
+        "authentication_type": "pat",
+        "host_name": "<DATABRICKS HOST URL>",
+        "pat": "<DATABRICKS PAT>",
+    },
+)
+```
+
+<Admonition type="warning" title="Required options">
+Each definition store has a set of required options. If any required option is missing, `build_definition_store` will raise a `ValueError` with more details.
+</Admonition>

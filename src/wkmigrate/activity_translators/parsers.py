@@ -132,7 +132,7 @@ def parse_for_each_items(items: dict | None) -> str | None:
     match = re.match(string=value, pattern=array_pattern)
     if match:
         matched_item = match.group(1)
-        return f'["{matched_item}"]'
+        return _parse_array_string(matched_item)
 
     create_array_pattern = r"@createArray\((.+)\)"
     match = re.match(string=value, pattern=create_array_pattern)
@@ -140,7 +140,7 @@ def parse_for_each_items(items: dict | None) -> str | None:
         matched_item = match.group(1)
         list_items = ast.literal_eval(matched_item)
         quoted_items = ",".join([f'"{item}"' for item in list_items])
-        return f"[{quoted_items}]"
+        return _parse_array_string(quoted_items)
     return None
 
 
@@ -221,8 +221,8 @@ def parse_dependencies(dependencies: list[dict] | None) -> list[Dependency] | No
         # Append the dependency:
         parsed_dependencies.append(
             Dependency(
-                task_key=dependency.get("activity", None),
-                outcome=dependency.get("outcome", None),
+                task_key=dependency.get("activity"),
+                outcome=dependency.get("dependency_conditions"),
             )
         )
     return parsed_dependencies

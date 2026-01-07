@@ -1,10 +1,7 @@
-import pytest
 from contextlib import nullcontext as does_not_raise
-from wkmigrate.activity_translators.activity_translator import (
-    translate_activities,
-    translate_activity,
-    parse_activity_properties,
-)
+import pytest
+from wkmigrate.activity_translators.activity_translator import translate_activities, translate_activity
+from wkmigrate.models.ir.activities import DatabricksNotebookActivity, Dependency, IfConditionActivity
 
 
 class TestActivityTranslator:
@@ -22,7 +19,7 @@ class TestActivityTranslator:
                         "name": "Activity1",
                         "description": "Test activity",
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.01:00:00",
                             "retry": 3,
                             "retry_interval_in_seconds": 30,
                         },
@@ -31,18 +28,17 @@ class TestActivityTranslator:
                     }
                 ],
                 [
-                    {
-                        "type": "DatabricksNotebook",
-                        "task_key": "Activity1",
-                        "description": "Test activity",
-                        "timeout_seconds": 604800,
-                        "max_retries": 3,
-                        "min_retry_interval_millis": 30000,
-                        "notebook_task": {
-                            "notebook_path": "/path/to/notebook",
-                            "base_parameters": {"param": "val"},
-                        },
-                    }
+                    DatabricksNotebookActivity(
+                        name="Activity1",
+                        task_key="Activity1",
+                        activity_type="DatabricksNotebook",
+                        description="Test activity",
+                        timeout_seconds=3600,
+                        max_retries=3,
+                        min_retry_interval_millis=30000,
+                        notebook_path="/path/to/notebook",
+                        base_parameters={"param": "val"},
+                    )
                 ],
             ),
             (
@@ -52,7 +48,7 @@ class TestActivityTranslator:
                         "name": "Activity1",
                         "description": "Test activity",
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:30:00",
                             "retry": 3,
                             "retry_interval_in_seconds": 30,
                         },
@@ -61,16 +57,18 @@ class TestActivityTranslator:
                     }
                 ],
                 [
-                    {
-                        "type": "DatabricksNotebook",
-                        "task_key": "Activity1",
-                        "description": "Test activity",
-                        "timeout_seconds": 604800,
-                        "max_retries": 3,
-                        "min_retry_interval_millis": 30000,
-                        "depends_on": [{"task_key": "PreviousActivity", "outcome": None}],
-                        "notebook_task": {"notebook_path": "/path/to/notebook"},
-                    }
+                    DatabricksNotebookActivity(
+                        name="Activity1",
+                        task_key="Activity1",
+                        activity_type="DatabricksNotebook",
+                        description="Test activity",
+                        timeout_seconds=1800,
+                        max_retries=3,
+                        min_retry_interval_millis=30000,
+                        notebook_path="/path/to/notebook",
+                        base_parameters=None,
+                        depends_on=[Dependency(task_key="PreviousActivity", outcome=None)],
+                    )
                 ],
             ),
             (
@@ -109,33 +107,35 @@ class TestActivityTranslator:
                     },
                 ],
                 [
-                    {
-                        "type": "DatabricksNotebook",
-                        "task_key": "TASK_NAME_NOT_PROVIDED",
-                        "description": "Test activity",
-                        "timeout_seconds": 604800,
-                        "max_retries": 3,
-                        "min_retry_interval_millis": 30000,
-                        "depends_on": [{"task_key": "PreviousActivity", "outcome": None}],
-                        "notebook_task": {"notebook_path": "/path/to/notebook"},
-                    },
-                    {
-                        "type": "DatabricksNotebook",
-                        "task_key": "TASK_NAME_NOT_PROVIDED",
-                        "description": "Test activity",
-                        "timeout_seconds": 604800,
-                        "max_retries": 3,
-                        "min_retry_interval_millis": 30000,
-                        "depends_on": [{"task_key": "PreviousActivity", "outcome": None}],
-                        "notebook_task": {"notebook_path": "/path/to/notebook"},
-                    },
+                    DatabricksNotebookActivity(
+                        name="UNNAMED_TASK",
+                        task_key="UNNAMED_TASK",
+                        activity_type="DatabricksNotebook",
+                        description="Test activity",
+                        timeout_seconds=604800,
+                        max_retries=3,
+                        min_retry_interval_millis=30000,
+                        depends_on=[Dependency(task_key="PreviousActivity", outcome=["Succeeded"])],
+                        notebook_path="/path/to/notebook",
+                    ),
+                    DatabricksNotebookActivity(
+                        name="UNNAMED_TASK",
+                        task_key="UNNAMED_TASK",
+                        activity_type="DatabricksNotebook",
+                        description="Test activity",
+                        timeout_seconds=604800,
+                        max_retries=3,
+                        min_retry_interval_millis=30000,
+                        depends_on=[Dependency(task_key="PreviousActivity", outcome=["Succeeded"])],
+                        notebook_path="/path/to/notebook",
+                    ),
                 ],
             ),
         ],
     )
     def test_translate_activities_parses_results(self, activity_definition, expected_result):
-        result = translate_activities(activity_definition)
-        assert result == expected_result
+        activities = translate_activities(activity_definition)
+        assert activities == expected_result
 
     @pytest.mark.parametrize(
         "activity_definition, expected_result, context",
@@ -153,16 +153,17 @@ class TestActivityTranslator:
                     "depends_on": [],
                     "notebook_path": "/path/to/notebook",
                 },
-                {
-                    "type": "DatabricksNotebook",
-                    "task_key": "Activity1",
-                    "description": "Test activity",
-                    "timeout_seconds": 604800,
-                    "max_retries": 3,
-                    "min_retry_interval_millis": 30000,
-                    "depends_on": [],
-                    "notebook_task": {"notebook_path": "/path/to/notebook"},
-                },
+                DatabricksNotebookActivity(
+                    name="Activity1",
+                    task_key="Activity1",
+                    activity_type="DatabricksNotebook",
+                    description="Test activity",
+                    timeout_seconds=604800,
+                    max_retries=3,
+                    min_retry_interval_millis=30000,
+                    depends_on=[],
+                    notebook_path="/path/to/notebook",
+                ),
                 does_not_raise(),
             ),
             (
@@ -175,48 +176,41 @@ class TestActivityTranslator:
                         "value": '@equals("true", "true")',
                     },
                 },
-                {
-                    "type": "IfCondition",
-                    "task_key": "IfConditionActivity",
-                    "description": "Test if-else condition activity",
-                    "condition_task": {
-                        "op": "EQUAL_TO",
-                        "left": '"true"',
-                        "right": '"true"',
-                    },
-                },
+                IfConditionActivity(
+                    name="IfConditionActivity",
+                    task_key="IfConditionActivity",
+                    activity_type="IfCondition",
+                    description="Test if-else condition activity",
+                    op="EQUAL_TO",
+                    left="true",
+                    right="true",
+                    child_activities=[],
+                ),
                 pytest.warns(UserWarning),
             ),
         ],
     )
     def test_translate_activity_parses_result(self, activity_definition, expected_result, context):
         with context:
-            result = translate_activity(activity_definition)
-            assert result == expected_result
+            result_ir = translate_activity(activity_definition)
+            # ``translate_activity`` may return a single Activity or (Activity, [Activity])
+            if isinstance(result_ir, tuple):
+                activity = result_ir[0]
+            else:
+                activity = result_ir
+            assert activity == expected_result
 
-    @pytest.mark.parametrize(
-        "activity_properties, expected_result",
-        [
-            (
-                {"type": "DatabricksNotebook", "notebook_path": "/path/to/notebook"},
-                {"notebook_task": {"notebook_path": "/path/to/notebook"}},
-            ),
-            (
-                {
-                    "type": "DatabricksNotebook",
-                    "notebook_path": "/path/to/notebook",
-                    "base_parameters": {"param_name": "param_value"},
-                },
-                {
-                    "notebook_task": {
-                        "notebook_path": "/path/to/notebook",
-                        "base_parameters": {"param_name": "param_value"},
-                    }
-                },
-            ),
-        ],
-    )
-    def test_parse_activity_properties_parses_result(self, activity_properties, expected_result):
-        print(activity_properties)
-        result = parse_activity_properties(activity_properties)
-        assert result == expected_result
+    def test_translate_unsupported_activity_creates_placeholder(self):
+        """Unknown activity types should be translated into a placeholder notebook activity."""
+        unsupported_definition = {
+            "type": "CustomUnsupportedType",
+            "name": "UnsupportedActivity",
+            "description": "Should fall back to placeholder",
+            "policy": {"timeout": "0.00:10:00"},
+        }
+        result_ir = translate_activity(unsupported_definition)
+        activity = result_ir if not isinstance(result_ir, tuple) else result_ir[0]
+        assert activity.activity_type == "CustomUnsupportedType"
+        assert activity.task_key == "UnsupportedActivity"
+        assert activity.timeout_seconds == 600
+        assert activity.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
