@@ -46,10 +46,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Format all files
+      - name: Install Poetry
         run: |
           pip install poetry==2.2.1
-          make dev fmt
+          poetry config virtualenvs.create true --local
+          poetry config virtualenvs.in-project true --local
+
+      - name: Cache the virtual env
+        uses: actions/cache@v4
+        with:
+            path: .venv
+            key: venv-${{ hashFiles('poetry.lock') }}
+
+      - name: Format modules
+        run: make dev fmt
 
       - name: Fail on differences
         run: git diff --exit-code
