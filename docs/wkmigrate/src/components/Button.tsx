@@ -1,4 +1,4 @@
-import React, { ReactNode, CSSProperties } from 'react';
+import React, { CSSProperties } from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 

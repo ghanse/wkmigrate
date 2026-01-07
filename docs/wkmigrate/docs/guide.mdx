@@ -80,13 +80,13 @@ workspace_options = {
     "authentication_type": "pat",
 }
 
-<Admonition type="warning" title="Workspace permissions">
-The credentials you provide must have permission to create jobs, upload notebooks, and manage secrets in the target Databricks workspace.
-</Admonition>
-
 # Create the definition store
 workspace_definition_store = WorkspaceDefinitionStore(**workspace_options)
 ```
+
+<Admonition type="warning" title="Workspace permissions">
+The credentials you provide must have permission to create jobs, upload notebooks, and manage secrets in the target Databricks workspace.
+</Admonition>
 
 ## Translate pipelines to Databricks jobs
 

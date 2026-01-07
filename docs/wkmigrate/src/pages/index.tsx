@@ -2,7 +2,6 @@ import Layout from '@theme/Layout';
 import Footer from '@theme/Footer';
 import { JSX } from 'react';
 import Button from '../components/Button';
-import { Info, FileText, Activity, AlertTriangle, CheckCircle, Grid, BarChart2, Code, PieChart } from 'lucide-react';
 
 const Hero = () => {
   return (
