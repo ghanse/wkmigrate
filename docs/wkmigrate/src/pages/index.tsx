@@ -1,27 +1,8 @@
 import Layout from '@theme/Layout';
+import Footer from '@theme/Footer';
 import { JSX } from 'react';
 import Button from '../components/Button';
 import { Info, FileText, Activity, AlertTriangle, CheckCircle, Grid, BarChart2, Code, PieChart } from 'lucide-react';
-
-const CallToAction = () => {
-  return (
-    <div className="flex flex-col items-center py-12">
-      <h2 className="text-3xl md:text-4xl font-semibold text-center mb-6">
-        Migrate your data pipelines today 🚀
-      </h2>
-      <p className="text-center mb-6 text-pretty">
-        Follow our examples to get started with wkmigrate.
-      </p>
-      <Button
-        variant="primary"
-        link="https://github.com/ghanse/wkmigrate/tree/main/examples"
-        size="large"
-        label="Start using wkmigrate ✨"
-        className="w-full md:w-auto p-4 font-mono bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-all duration-300"
-      />
-    </div>
-  )
-};
 
 const Hero = () => {
   return (
@@ -77,14 +58,17 @@ const Hero = () => {
 
 export default function Home(): JSX.Element {
   return (
-    <Layout>
-      <main>
-        <div className='flex justify-center items-center min-h-screen mx-auto'>
-          <div className='max-w-screen-lg'>
+    <Layout noFooter>
+      <main
+        className="flex flex-col"
+        style={{ minHeight: 'calc(100vh - var(--ifm-navbar-height))' }}
+      >
+        <div className="flex justify-center items-center mx-auto flex-1">
+          <div className="max-w-screen-lg">
             <Hero />
-            <CallToAction />
           </div>
         </div>
+        <Footer />
       </main>
     </Layout>
   );

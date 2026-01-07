@@ -95,7 +95,7 @@ const config: Config = {
     footer: {
       links: [
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Databricks. Docs built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Gregory Hansen. All rights reserved.`,
     },
     prism: {
       theme: prismThemes.oneLight,
