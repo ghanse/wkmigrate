@@ -4,9 +4,6 @@
  * work well for content-centric websites.
  */
 
-/* import fonts: DM Mono and DM Sans */
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
-
 
 /* configure tailwindcss */
 @tailwind base;
@@ -16,9 +13,7 @@
 
 
 :root {
-  --ifm-font-family-base: 'DM Sans';
-  --ifm-heading-font-family: 'DM Sans';
-  --ifm-font-family-monospace: 'DM Mono', monospace;
+  --ifm-font-family-monospace: monospace;
   
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1); 
@@ -27,12 +22,12 @@
 
 
 .font-mono {
-  font-family: "DM Mono", monospace;
+  font-family: monospace;
   font-style: normal;
 }
 
 .font-sans {
-  font-family: "DM Sans", sans-serif;
+  font-family: sans-serif;
   font-style: normal;
 }
 
