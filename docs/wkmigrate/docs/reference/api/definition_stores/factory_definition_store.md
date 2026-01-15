@@ -3,7 +3,28 @@ sidebar_label: factory_definition_store
 title: wkmigrate.definition_stores.factory_definition_store
 ---
 
-This module defines the ``FactoryDefinitionStore`` class.
+This module defines a `FactoryDefinitionStore` class used to load pipeline definitions from Azure Data Factory.
+
+``FactoryDefinitionStore`` connects to an ADF instance, loads pipeline JSON via
+the ADF management client, and returns a translated internal representation with
+embedded linked services and datasets. It is typically used as the source store
+when migrating from ADF to Databricks Workflows.
+
+**Example**:
+
+    ```python
+    from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+
+    store = FactoryDefinitionStore(
+        tenant_id="TENANT",
+        client_id="CLIENT_ID",
+        client_secret="SECRET",
+        subscription_id="SUBSCRIPTION",
+        resource_group_name="RESOURCE_GROUP",
+        factory_name="ADF_NAME",
+    )
+    pipeline_dict = store.load("my_pipeline")
+    ```
 
 ## FactoryDefinitionStore Objects
 
@@ -24,7 +45,7 @@ Definition store implementation backed by an Azure Data Factory instance.
 - `factory_name` - Name of the Azure Data Factory instance.
 - `factory_client` - Concrete ``FactoryClient`` used to load pipelines and child resources. Automatically created using the provided credentials.
 
-### \_\_post\_init\_\_
+#### \_\_post\_init\_\_
 
 ```python
 def __post_init__() -> None
@@ -41,7 +62,7 @@ Validates configuration and initializes the Factory client.
 - `ValueError` - If the resource group name is not provided.
 - `ValueError` - If the factory name is not provided.
 
-### load
+#### load
 
 ```python
 def load(pipeline_name: str) -> dict
@@ -63,7 +84,7 @@ Returns a dictionary representation of a Data Factory pipeline.
 
 - `ValueError` - If the factory client is not initialized.
 
-### dump
+#### dump
 
 ```python
 def dump(pipeline_definition: dict) -> None

@@ -1,11 +1,11 @@
 ---
 sidebar_label: parameter_translator
-title: wkmigrate.pipeline_translators.parameter_translator
+title: wkmigrate.translators.pipeline_translators.parameter_translator
 ---
 
 This module defines methods for translating Databricks parameter values from data pipelines.
 
-### translate\_parameters
+#### translate\_parameters
 
 ```python
 def translate_parameters(parameters: dict | None) -> list[dict] | None
@@ -22,7 +22,7 @@ Translates parameter definitions in the Data Factory object model to the Databri
 
   List of translated parameter definitions as ``list[dict]`` objects, or ``None`` if no parameters are provided.
 
-### translate\_parameter
+#### translate\_parameter
 
 ```python
 def translate_parameter(parameter_name: str, parameter: dict) -> dict

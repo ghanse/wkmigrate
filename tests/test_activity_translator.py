@@ -1,6 +1,6 @@
 from contextlib import nullcontext as does_not_raise
 import pytest
-from wkmigrate.activity_translators.activity_translator import translate_activities, translate_activity
+from wkmigrate.translators.activity_translators.activity_translator import translate_activities, translate_activity
 from wkmigrate.models.ir.activities import DatabricksNotebookActivity, Dependency, IfConditionActivity
 
 
@@ -192,12 +192,7 @@ class TestActivityTranslator:
     )
     def test_translate_activity_parses_result(self, activity_definition, expected_result, context):
         with context:
-            result_ir = translate_activity(activity_definition)
-            # ``translate_activity`` may return a single Activity or (Activity, [Activity])
-            if isinstance(result_ir, tuple):
-                activity = result_ir[0]
-            else:
-                activity = result_ir
+            activity = translate_activity(activity_definition)
             assert activity == expected_result
 
     def test_translate_unsupported_activity_creates_placeholder(self):
@@ -208,8 +203,7 @@ class TestActivityTranslator:
             "description": "Should fall back to placeholder",
             "policy": {"timeout": "0.00:10:00"},
         }
-        result_ir = translate_activity(unsupported_definition)
-        activity = result_ir if not isinstance(result_ir, tuple) else result_ir[0]
+        activity = translate_activity(unsupported_definition)
         assert activity.activity_type == "CustomUnsupportedType"
         assert activity.task_key == "UnsupportedActivity"
         assert activity.timeout_seconds == 600

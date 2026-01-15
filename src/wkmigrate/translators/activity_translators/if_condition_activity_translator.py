@@ -1,4 +1,9 @@
-"""This module defines methods for translating If Condition activities."""
+"""This module defines a translator for translating If Condition activities.
+
+Translators in this module normalize If Condition activity payloads into internal representations.
+Each translator must validate required fields, parse the activity's condition expression, and emit
+``UnsupportedValue`` objects for any unparsable inputs.
+"""
 
 import importlib
 import re

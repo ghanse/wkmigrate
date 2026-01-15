@@ -4,20 +4,6 @@
       "items": [
         {
           "items": [
-            "reference/api/wkmigrate/activity_translators/activity_translator",
-            "reference/api/wkmigrate/activity_translators/copy_activity_translator",
-            "reference/api/wkmigrate/activity_translators/for_each_activity_translator",
-            "reference/api/wkmigrate/activity_translators/if_condition_activity_translator",
-            "reference/api/wkmigrate/activity_translators/notebook_activity_translator",
-            "reference/api/wkmigrate/activity_translators/parsers",
-            "reference/api/wkmigrate/activity_translators/spark_jar_activity_translator",
-            "reference/api/wkmigrate/activity_translators/spark_python_activity_translator"
-          ],
-          "label": "wkmigrate.activity_translators",
-          "type": "category"
-        },
-        {
-          "items": [
             "reference/api/wkmigrate/clients/factory_client"
           ],
           "label": "wkmigrate.clients",
@@ -25,8 +11,7 @@
         },
         {
           "items": [
-            "reference/api/wkmigrate/datasets/data_type_mapping",
-            "reference/api/wkmigrate/datasets/parsers"
+            "reference/api/wkmigrate/datasets/data_type_mapping"
           ],
           "label": "wkmigrate.datasets",
           "type": "category"
@@ -55,22 +40,13 @@
         },
         {
           "items": [
-            "reference/api/wkmigrate/linked_service_translators/abfs_linked_service_translator",
-            "reference/api/wkmigrate/linked_service_translators/databricks_linked_service_translator",
-            "reference/api/wkmigrate/linked_service_translators/parsers",
-            "reference/api/wkmigrate/linked_service_translators/sql_server_linked_service_translator"
-          ],
-          "label": "wkmigrate.linked_service_translators",
-          "type": "category"
-        },
-        {
-          "items": [
             {
               "items": [
                 "reference/api/wkmigrate/models/ir/activities",
                 "reference/api/wkmigrate/models/ir/datasets",
                 "reference/api/wkmigrate/models/ir/linked_services",
-                "reference/api/wkmigrate/models/ir/pipeline"
+                "reference/api/wkmigrate/models/ir/pipeline",
+                "reference/api/wkmigrate/models/ir/unsupported"
               ],
               "label": "wkmigrate.models.ir",
               "type": "category"
@@ -89,19 +65,47 @@
         },
         {
           "items": [
-            "reference/api/wkmigrate/pipeline_translators/parameter_translator",
-            "reference/api/wkmigrate/pipeline_translators/parsers",
-            "reference/api/wkmigrate/pipeline_translators/pipeline_translator"
+            "reference/api/wkmigrate/parsers/dataset_parsers"
           ],
-          "label": "wkmigrate.pipeline_translators",
+          "label": "wkmigrate.parsers",
           "type": "category"
         },
         {
           "items": [
-            "reference/api/wkmigrate/trigger_translators/parsers",
-            "reference/api/wkmigrate/trigger_translators/schedule_trigger_translator"
+            {
+              "items": [
+                "reference/api/wkmigrate/translators/activity_translators/activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/copy_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/for_each_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/if_condition_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/notebook_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/spark_jar_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/spark_python_activity_translator"
+              ],
+              "label": "wkmigrate.translators.activity_translators",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/api/wkmigrate/translators/pipeline_translators/parameter_translator",
+                "reference/api/wkmigrate/translators/pipeline_translators/parsers",
+                "reference/api/wkmigrate/translators/pipeline_translators/pipeline_translator"
+              ],
+              "label": "wkmigrate.translators.pipeline_translators",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/api/wkmigrate/translators/trigger_translators/parsers",
+                "reference/api/wkmigrate/translators/trigger_translators/schedule_trigger_translator"
+              ],
+              "label": "wkmigrate.translators.trigger_translators",
+              "type": "category"
+            },
+            "reference/api/wkmigrate/translators/dataset_translators",
+            "reference/api/wkmigrate/translators/linked_service_translators"
           ],
-          "label": "wkmigrate.trigger_translators",
+          "label": "wkmigrate.translators",
           "type": "category"
         },
         {

@@ -1,4 +1,9 @@
-"""This module defines methods for translating Databricks Notebook activities."""
+"""This module defines a translator for translating Databricks Notebook activities.
+
+Translators in this module normalize Databricks Notebook activity payloads into internal
+representations. Each translator must validate required fields, parse the activity's parameters,
+and emit ``UnsupportedValue`` objects for any unparsable inputs.
+"""
 
 import warnings
 from wkmigrate.models.ir.activities import DatabricksNotebookActivity

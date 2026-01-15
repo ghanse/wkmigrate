@@ -1,6 +1,15 @@
-"""This module defines shared utilities for translating data pipelines."""
+"""This module defines shared utilities for translating data pipelines.
 
+Utilities in this module cover common translation patterns such as mapping
+dictionaries with parser specifications, normalizing expressions, and enriching
+metadata (e.g. appending system tags).
+"""
+
+import re
 from typing import Any
+
+from wkmigrate.models.ir.activities import Activity, DatabricksNotebookActivity
+from wkmigrate.models.ir.unsupported import UnsupportedValue
 
 
 def identity(item: Any) -> Any:
@@ -60,3 +69,86 @@ def parse_expression(expression: str) -> str:
     """
     # TODO: ADD DIFFERENT FUNCTIONS TO BE PARSED INTO {{}} OPERATORS
     return expression
+
+
+def extract_group(input_string: str, regex: str) -> str | UnsupportedValue:
+    """
+    Extracts a regex group from an input string.
+
+    Args:
+        input_string: Input string to search.
+        regex: Regex pattern to match.
+
+    Returns:
+        Extracted group as a ``str``.
+    """
+    match = re.search(pattern=regex, string=input_string)
+    if match is None:
+        return UnsupportedValue(
+            value=input_string, message=f"No match for regex '{regex}' found in input string '{input_string}'"
+        )
+    return match.group(1)
+
+
+def get_value_or_unsupported(items: dict, key: str) -> Any | UnsupportedValue:
+    """
+    Gets a value from a dictionary or returns an ``UnsupportedValue`` object if the key is not found.
+
+    Args:
+        items: Dictionary to search.
+        key: Key to look up.
+
+    Returns:
+        Value as a ``Any`` or ``UnsupportedValue`` object if the key is not found.
+    """
+    value = items.get(key)
+    if value is None:
+        return UnsupportedValue(value=items, message=f"Missing value for key '{key}' in dictionary")
+    return value
+
+
+def merge_unsupported_values(values: list[Any]) -> UnsupportedValue:
+    """
+    Merges a list of unsupported values into a single ``UnsupportedValue`` object.
+
+    Args:
+        values: List of translated values.
+
+    Returns:
+        Single ``UnsupportedValue`` object.
+    """
+    unsupported = [value for value in values if isinstance(value, UnsupportedValue)]
+    if unsupported:
+        return UnsupportedValue(value=values, message=";".join([value.message for value in unsupported]))
+    raise ValueError("No unsupported values in input list")
+
+
+def get_placeholder_activity(base_kwargs: dict) -> DatabricksNotebookActivity:
+    """
+    Creates a placeholder notebook task for unsupported activities.
+
+    Args:
+        base_kwargs: Common task metadata.
+
+    Returns:
+        Databricks ``NotebookActivity`` object as a placeholder task.
+    """
+    return DatabricksNotebookActivity(
+        **base_kwargs,
+        notebook_path="/UNSUPPORTED_ADF_ACTIVITY",
+    )
+
+
+def normalize_translated_result(result: Activity | UnsupportedValue, base_kwargs: dict) -> Activity:
+    """
+    Normalizes translator results so callers always receive Activities.
+
+    Translators may return an ``UnsupportedValue`` to signal that an activity could not
+    be translated. In those cases, this helper converts the unsupported value into a
+    placeholder notebook activity so downstream components (such as the workflow
+    preparer) continue to operate on ``Activity`` instances only.
+    """
+    if isinstance(result, UnsupportedValue):
+        return get_placeholder_activity(base_kwargs)
+
+    return result

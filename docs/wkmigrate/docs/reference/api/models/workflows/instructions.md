@@ -17,10 +17,10 @@ Represents a workflow pipeline that must be created.
 **Attributes**:
 
 - `task_ref` - Reference to the Databricks task dictionary that will consume the pipeline.
-- `file_path` - Workspace path where the pipeline&#x27;s notebook or script is stored.
+- `file_path` - Workspace path where the pipeline's notebook or script is stored.
 - `name` - Name to assign to the Databricks pipeline.
 
-### local\_identifier
+#### local\_identifier
 
 ```python
 @property

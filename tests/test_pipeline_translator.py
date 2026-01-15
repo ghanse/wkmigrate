@@ -1,7 +1,7 @@
 from contextlib import nullcontext as does_not_raise
 import pytest
 from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.pipeline_translators.pipeline_translator import translate_pipeline
+from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
 
 
 class TestPipelineTranslator:

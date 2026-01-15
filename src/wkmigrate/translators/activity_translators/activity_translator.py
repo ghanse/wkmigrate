@@ -1,4 +1,10 @@
-"""This module defines methods for translating activities from data pipelines."""
+"""This module defines an activity translator from ADF payloads to internal IR.
+
+The activity translator routes each ADF activity to its corresponding translator, stitches in
+shared metadata (policy, dependencies, cluster specs), and flattens nested control-flow
+constructs. It also captures non-translatable warnings so that callers receive structured
+diagnostics with the translated activities.
+"""
 
 from __future__ import annotations
 from collections.abc import Callable
@@ -8,12 +14,12 @@ import warnings
 from wkmigrate.translators.linked_service_translators import (
     translate_databricks_cluster_spec,
 )
-from wkmigrate.activity_translators.notebook_activity_translator import translate_notebook_activity
-from wkmigrate.activity_translators.spark_jar_activity_translator import translate_spark_jar_activity
-from wkmigrate.activity_translators.spark_python_activity_translator import translate_spark_python_activity
-from wkmigrate.activity_translators.if_condition_activity_translator import translate_if_condition_activity
-from wkmigrate.activity_translators.for_each_activity_translator import translate_for_each_activity
-from wkmigrate.activity_translators.copy_activity_translator import translate_copy_activity
+from wkmigrate.translators.activity_translators.notebook_activity_translator import translate_notebook_activity
+from wkmigrate.translators.activity_translators.spark_jar_activity_translator import translate_spark_jar_activity
+from wkmigrate.translators.activity_translators.spark_python_activity_translator import translate_spark_python_activity
+from wkmigrate.translators.activity_translators.if_condition_activity_translator import translate_if_condition_activity
+from wkmigrate.translators.activity_translators.for_each_activity_translator import translate_for_each_activity
+from wkmigrate.translators.activity_translators.copy_activity_translator import translate_copy_activity
 from wkmigrate.models.ir.activities import Activity, Dependency, ForEachActivity, IfConditionActivity
 from wkmigrate.models.ir.translator_result import ActivityTranslatorResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue

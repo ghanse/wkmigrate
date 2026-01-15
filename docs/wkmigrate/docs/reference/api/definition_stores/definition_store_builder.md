@@ -3,9 +3,26 @@ sidebar_label: definition_store_builder
 title: wkmigrate.definition_stores.definition_store_builder
 ---
 
-This module defines methods for building ``DefinitionStore`` objects.
+This module provides a factory function for constructing `DefinitionStore` instances.
 
-### build\_definition\_store
+The builder resolves a store key (for example ``"factory_definition_store"``)
+into a concrete class registered in ``wkmigrate.definition_stores.types`` and
+instantiates it with user-provided options. Use this when wiring stores from
+configuration files or CLIs to avoid coupling to specific implementations.
+
+**Example**:
+
+    ```python
+    from wkmigrate.definition_stores.definition_store_builder import build_definition_store
+
+    options = {
+        "tenant_id": "...", "client_id": "...", "client_secret": "...",
+        "subscription_id": "...", "resource_group_name": "...", "factory_name": "..."
+    }
+    store = build_definition_store("factory_definition_store", options)
+    ```
+
+#### build\_definition\_store
 
 ```python
 def build_definition_store(definition_store_type: str,

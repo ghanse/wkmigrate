@@ -1,11 +1,15 @@
 ---
 sidebar_label: parsers
-title: wkmigrate.trigger_translators.parsers
+title: wkmigrate.translators.trigger_translators.parsers
 ---
 
-This module defines methods for parsing trigger objects to the Databricks SDK&#x27;s object model.
+This module defines parsers for translating ADF schedules.
 
-### parse\_cron\_expression
+Parsers in this module convert ADF trigger recurrence definitions into quartz cron
+expressions used in Databricks Lakeflow jobs. They enforce reasonable defaults and
+emit warnings for partially supported configurations.
+
+#### parse\_cron\_expression
 
 ```python
 def parse_cron_expression(recurrence: dict | None) -> str | None

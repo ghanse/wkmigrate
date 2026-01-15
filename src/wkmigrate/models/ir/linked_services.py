@@ -1,4 +1,10 @@
-"""Linked service IR models."""
+"""This module defines internal representations for linked services.
+
+Linked services in this module represent connections to external services and systems used by
+various pipeline activities (e.g. Copy Data, Lookup Value). Each linked service contains metadata
+specific to the associated service. Linked services are translated from ADF payloads into internal
+representations that can be used to connect to services from Databricks.
+"""
 
 from __future__ import annotations
 
@@ -84,17 +90,3 @@ class DatabricksClusterLinkedService(LinkedService):
     autoscale: dict[str, int] | None = None
     num_workers: int | None = None
     pat: str | None = None
-
-
-@dataclass
-class UnsupportedLinkedService(LinkedService):
-    """
-    IR representation for a linked service that cannot be translated.
-
-    Attributes:
-        message: Description of why the linked service is unsupported.
-        adf_definition: Raw ADF linked-service payload that could not be parsed.
-    """
-
-    message: str | None = None
-    adf_definition: dict[str, Any] | None = None

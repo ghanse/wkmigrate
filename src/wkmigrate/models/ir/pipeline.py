@@ -1,4 +1,9 @@
-"""Pipeline IR models."""
+"""This module defines internal representations for pipelines.
+
+Pipelines in this module represent the top-level container for a pipeline. Each pipeline contains
+metadata, parameters, schedules, and tasks. Pipelines are translated from ADF payloads into internal
+representations that can be used to generate Databricks Lakeflow jobs.
+"""
 
 from __future__ import annotations
 

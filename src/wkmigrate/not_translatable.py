@@ -1,4 +1,9 @@
-"""Helpers for tracking non-translatable pipeline properties."""
+"""Helpers for tracking non-translatable pipeline properties.
+
+These utilities capture contextual metadata (activity name/type) for any warnings
+raised during translation. They centralize warning creation to ensure a consistent
+schema across all translators and definition stores.
+"""
 
 from contextlib import contextmanager
 from contextvars import ContextVar

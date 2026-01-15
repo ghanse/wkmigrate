@@ -5,7 +5,11 @@ title: wkmigrate.not_translatable
 
 Helpers for tracking non-translatable pipeline properties.
 
-### not\_translatable\_context
+These utilities capture contextual metadata (activity name/type) for any warnings
+raised during translation. They centralize warning creation to ensure a consistent 
+schema across all translators and definition stores.
+
+#### not\_translatable\_context
 
 ```python
 @contextmanager
@@ -28,7 +32,7 @@ class NotTranslatableWarning(UserWarning)
 
 Custom warning for properties that cannot be translated.
 
-### \_\_init\_\_
+#### \_\_init\_\_
 
 ```python
 def __init__(property_name: str, message: str) -> None

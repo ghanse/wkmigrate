@@ -1,4 +1,9 @@
-"""This module defines methods for translating Databricks Spark jar activities."""
+"""This module defines a translator for translating Databricks Spark jar activities.
+
+Translators in this module normalize Databricks Spark JAR activity payloads into internal
+representations. Each translator must validate required fields, parse the activity's parameters,
+and emit ``UnsupportedValue`` objects for any unparsable inputs.
+"""
 
 from wkmigrate.models.ir.activities import SparkJarActivity
 

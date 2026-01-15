@@ -1,4 +1,19 @@
-"""This module defines the ``WorkspaceDefinitionStore`` class."""
+"""This module defines the `WorkspaceDefinitionStore` class used to load and persist pipeline definitions in a Databricks workspace.
+
+``WorkspaceDefinitionStore`` materializes translated pipelines into Databricks
+Lakeflow Jobs, generates notebooks and Spark Declarative Pipelines for copying
+data, and can list or update workspace assets. It is commonly used as the sink
+when migrating from ADF definitions to Databricks.
+
+Example:
+    ```python
+    from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+    store = WorkspaceDefinitionStore(authentication_type=\"pat\", host_name=\"https://adb-123.azuredatabricks.net\", pat=\"TOKEN\")
+    workflow = store.load(\"existing_job_name\")  # raises ValueError if missing
+    store.dump(translated_pipeline_ir)
+    ```
+"""
 
 from __future__ import annotations
 

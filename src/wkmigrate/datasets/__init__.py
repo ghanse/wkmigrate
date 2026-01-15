@@ -1,22 +1,6 @@
-"""Dataset parser registries and metadata helpers."""
-
-from wkmigrate.datasets.parsers import (
-    parse_avro_file_properties,
-    parse_avro_file_dataset,
-    parse_delimited_file_dataset,
-    parse_delimited_file_properties,
-    parse_delta_properties,
-    parse_delta_table_dataset,
-    parse_json_file_dataset,
-    parse_json_file_properties,
-    parse_orc_file_properties,
-    parse_orc_file_dataset,
-    parse_parquet_file_properties,
-    parse_parquet_file_dataset,
-    parse_sql_server_properties,
-    parse_sql_server_dataset,
-)
-
+FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
+SQL_DATASET_TYPES = {"AzureSqlTable"}
+DELTA_DATASET_TYPES = {"AzureDatabricksDeltaLakeDataset"}
 
 secrets = {
     "avro": ["storage_account_key"],
@@ -45,33 +29,4 @@ options = {
     "orc": ["compression"],
     "parquet": ["compression"],
     "sqlserver": ["mode", "dbtable", "numPartitions", "batchsize", "sessionInitStatement"],
-}
-
-
-dataset_parsers = {
-    "Avro": parse_avro_file_dataset,
-    "AzureDatabricksDeltaLakeDataset": parse_delta_table_dataset,
-    "AzureSqlTable": parse_sql_server_dataset,
-    "DelimitedText": parse_delimited_file_dataset,
-    "Json": parse_json_file_dataset,
-    "Orc": parse_orc_file_dataset,
-    "Parquet": parse_parquet_file_dataset,
-}
-
-
-property_parsers = {
-    "AvroSource": parse_avro_file_properties,
-    "AvroSink": parse_avro_file_properties,
-    "AzureDatabricksDeltaLakeSource": parse_delta_properties,
-    "AzureDatabricksDeltaLakeSink": parse_delta_properties,
-    "AzureSqlSource": parse_sql_server_properties,
-    "AzureSqlSink": parse_sql_server_properties,
-    "DelimitedTextSource": parse_delimited_file_properties,
-    "DelimitedTextSink": parse_delimited_file_properties,
-    "JsonSource": parse_json_file_properties,
-    "JsonSink": parse_json_file_properties,
-    "OrcSource": parse_orc_file_properties,
-    "OrcSink": parse_orc_file_properties,
-    "ParquetSource": parse_parquet_file_properties,
-    "ParquetSink": parse_parquet_file_properties,
 }

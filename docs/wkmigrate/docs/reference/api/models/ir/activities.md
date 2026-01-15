@@ -3,7 +3,11 @@ sidebar_label: activities
 title: wkmigrate.models.ir.activities
 ---
 
-Activity IR models.
+This module defines internal representations for pipeline activities.
+
+Activities in this module represent the core components of a pipeline. Each activity contains 
+metadata about the activity's type, name, and parameters. Activities are translated from ADF 
+payloads into internal representations that can be used to generate Databricks Lakeflow jobs.
 
 ## Activity Objects
 
@@ -24,7 +28,7 @@ Base class for translated pipeline activities.
 - `max_retries` - Maximum number of retry attempts on failure.
 - `min_retry_interval_millis` - Minimum delay between retry attempts in milliseconds.
 - `depends_on` - List of upstream task dependencies that must complete before this task runs.
-- `task_key`0 - Cluster configuration dictionary for tasks that provision a new cluster.
+- `new_cluster` - Cluster configuration dictionary for tasks that provision a new cluster.
 
 ## DatabricksNotebookActivity Objects
 
@@ -117,20 +121,6 @@ If Condition activity metadata.
 - `left` - Left-hand operand used in the conditional expression.
 - `right` - Right-hand operand used in the conditional expression.
 - `child_activities` - Activities that form the body of the conditional branch.
-
-## UnsupportedActivity Objects
-
-```python
-@dataclass
-class UnsupportedActivity(Activity)
-```
-
-IR representation for an activity that cannot be translated.
-
-**Attributes**:
-
-- `message` - Description of why the activity is unsupported.
-- `adf_definition` - Raw ADF activity payload that could not be parsed.
 
 ## ColumnMapping Objects
 

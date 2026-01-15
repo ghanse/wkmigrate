@@ -1,11 +1,11 @@
 ---
 sidebar_label: parsers
-title: wkmigrate.pipeline_translators.parsers
+title: wkmigrate.translators.pipeline_translators.parsers
 ---
 
-This module defines methods for parsing pipeline objects to the Databricks SDK&#x27;s object model.
+This module defines methods for parsing pipeline objects to the Databricks SDK's object model.
 
-### parse\_parameter\_value
+#### parse\_parameter\_value
 
 ```python
 def parse_parameter_value(parameter_value: Any) -> Any

@@ -1,10 +1,31 @@
-"""This module defines the ``FactoryDefinitionStore`` class."""
+"""This module defines a `FactoryDefinitionStore` class used to load pipeline definitions from Azure Data Factory.
+
+``FactoryDefinitionStore`` connects to an ADF instance, loads pipeline JSON via
+the ADF management client, and returns a translated internal representation with
+embedded linked services and datasets. It is typically used as the source store
+when migrating from ADF to Databricks Workflows.
+
+Example:
+    ```python
+    from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+
+    store = FactoryDefinitionStore(
+        tenant_id=\"TENANT\",
+        client_id=\"CLIENT_ID\",
+        client_secret=\"SECRET\",
+        subscription_id=\"SUBSCRIPTION\",
+        resource_group_name=\"RESOURCE_GROUP\",
+        factory_name=\"ADF_NAME\",
+    )
+    pipeline_dict = store.load(\"my_pipeline\")
+    ```
+"""
 
 from dataclasses import asdict, dataclass, field
 from collections.abc import Callable
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
-from wkmigrate.pipeline_translators.pipeline_translator import translate_pipeline
+from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
 
 
 @dataclass

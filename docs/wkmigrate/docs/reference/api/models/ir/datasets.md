@@ -3,7 +3,12 @@ sidebar_label: datasets
 title: wkmigrate.models.ir.datasets
 ---
 
-Dataset IR models.
+This module defines internal representations for datasets.
+
+Datasets in this module represent the source and sink datasets used by various pipeline activities
+(e.g. Copy Data, Lookup Value). Each dataset contains metadata about the dataset's type, name, and 
+parameters. Datasets are translated from ADF payloads into internal representations that can be used 
+to generate Databricks Lakeflow jobs.
 
 ## Dataset Objects
 
@@ -86,18 +91,4 @@ Container for dataset property metadata produced during parsing.
 
 - `dataset_type` - Normalized dataset type string matching the associated ``Dataset``.
 - `options` - Dictionary of format- or connection-specific options derived from ADF properties.
-
-## UnsupportedDataset Objects
-
-```python
-@dataclass
-class UnsupportedDataset(Dataset)
-```
-
-IR representation for a dataset that cannot be translated.
-
-**Attributes**:
-
-- `message` - Description of why the dataset is unsupported.
-- `adf_definition` - Raw ADF dataset payload that could not be parsed.
 

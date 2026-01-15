@@ -1,12 +1,17 @@
-"""This module defines methods for translating data pipelines."""
+"""This module defines a pipeline-level translator from Azure Data Factory to internal IR.
+
+Pipeline translators in this module call activity, parameter, and trigger translators to produce
+an internal representation from an input ADF pipeline. They collect ``UnsupportedValue`` objects
+and warnings so that callers can surface translation diagnostics alongside the generated payload.
+"""
 
 import warnings
 
-from wkmigrate.activity_translators.activity_translator import translate_activities
+from wkmigrate.translators.activity_translators.activity_translator import translate_activities
 from wkmigrate.models.ir.pipeline import Pipeline, PipelineTask
 from wkmigrate.not_translatable import NotTranslatableWarning
-from wkmigrate.pipeline_translators.parameter_translator import translate_parameters
-from wkmigrate.trigger_translators.schedule_trigger_translator import translate_schedule_trigger
+from wkmigrate.translators.pipeline_translators.parameter_translator import translate_parameters
+from wkmigrate.translators.trigger_translators.schedule_trigger_translator import translate_schedule_trigger
 from wkmigrate.utils import append_system_tags
 
 

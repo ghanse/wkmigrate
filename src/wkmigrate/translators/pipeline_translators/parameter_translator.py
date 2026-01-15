@@ -1,6 +1,6 @@
 """This module defines methods for translating Databricks parameter values from data pipelines."""
 
-from wkmigrate.pipeline_translators.parsers import parse_parameter_value
+from wkmigrate.translators.pipeline_translators.parsers import parse_parameter_value
 from wkmigrate.utils import translate
 
 

@@ -1,11 +1,16 @@
-"""Activity IR models."""
+"""This module defines internal representations for pipeline activities.
+
+Activities in this module represent the core components of a pipeline. Each activity contains
+metadata about the activity's type, name, and parameters. Activities are translated from ADF
+payloads into internal representations that can be used to generate Databricks Lakeflow jobs.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
-from wkmigrate.models.ir.datasets import Dataset, DatasetProperties
+from wkmigrate.models.ir.datasets import Dataset
 
 
 @dataclass
@@ -67,9 +72,9 @@ class CopyActivity(Activity):
 
     source_dataset: Dataset | None = None
     sink_dataset: Dataset | None = None
-    source_properties: DatasetProperties | None = None
-    sink_properties: DatasetProperties | None = None
-    column_mapping: list["ColumnMapping"] | None = None
+    source_properties: dict[str, Any] | None = None
+    sink_properties: dict[str, Any] | None = None
+    column_mapping: list[ColumnMapping] | None = None
 
 
 @dataclass
@@ -134,20 +139,6 @@ class IfConditionActivity(Activity):
     left: str | None = None
     right: str | None = None
     child_activities: list[Activity] = field(default_factory=list)
-
-
-@dataclass
-class UnsupportedActivity(Activity):
-    """
-    IR representation for an activity that cannot be translated.
-
-    Attributes:
-        message: Description of why the activity is unsupported.
-        adf_definition: Raw ADF activity payload that could not be parsed.
-    """
-
-    message: str | None = None
-    adf_definition: dict[str, Any] | None = None
 
 
 @dataclass

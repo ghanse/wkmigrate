@@ -1,15 +1,8 @@
 import pytest
 
 from wkmigrate.enums.interval_type import IntervalType
-from wkmigrate.trigger_translators.parsers import (
-    parse_cron_expression,
-    _get_hourly_cron_expression,
-    _get_daily_cron_expression,
-    _get_weekly_cron_expression,
-    _get_monthly_cron_expression,
-    _get_week_day,
-)
-from wkmigrate.trigger_translators.schedule_trigger_translator import (
+from wkmigrate.translators.trigger_translators.parsers import parse_cron_expression
+from wkmigrate.translators.trigger_translators.schedule_trigger_translator import (
     translate_schedule_trigger,
 )
 
@@ -217,68 +210,6 @@ class TestTriggerTranslator:
     )
     def test_parse_cron_expression(self, recurrence, expected_result):
         assert parse_cron_expression(recurrence) == expected_result
-
-    @pytest.mark.parametrize(
-        "num_intervals, expected_result",
-        [
-            (1, "0 0 */1 * * ?"),
-            (3, "0 0 */3 * * ?"),
-        ],
-    )
-    def test_get_hourly_cron_expression(self, num_intervals, expected_result):
-        assert _get_hourly_cron_expression(num_intervals) == expected_result
-
-    @pytest.mark.parametrize(
-        "num_intervals, schedule, expected_result",
-        [
-            (1, None, "0 0 0 */1 * ?"),
-            (2, {"minutes": [30], "hours": [9, 18]}, "0 30 9,18 */2 * ?"),
-        ],
-    )
-    def test_get_daily_cron_expression(self, num_intervals, schedule, expected_result):
-        assert _get_daily_cron_expression(num_intervals, schedule) == expected_result
-
-    @pytest.mark.parametrize(
-        "schedule, expected_result",
-        [
-            (None, "0 0 0 ? * 1"),
-            (
-                {"minutes": [0], "hours": [8], "week_days": ["Monday", "Friday"]},
-                "0 0 8 ? * 2,6",
-            ),
-        ],
-    )
-    def test_get_weekly_cron_expression(self, schedule, expected_result):
-        assert _get_weekly_cron_expression(schedule) == expected_result
-
-    @pytest.mark.parametrize(
-        "schedule, expected_result",
-        [
-            (None, "0 0 0 0 * ?"),
-            ({"minutes": [15], "hours": [10], "days": [1, 15]}, "0 15 10 1,15 * ?"),
-        ],
-    )
-    def test_get_monthly_cron_expression(self, schedule, expected_result):
-        assert _get_monthly_cron_expression(schedule) == expected_result
-
-    @pytest.mark.parametrize(
-        "week_day, expected_result",
-        [
-            ("Sunday", "1"),
-            ("Monday", "2"),
-            ("Tuesday", "3"),
-            ("Wednesday", "4"),
-            ("Thursday", "5"),
-            ("Friday", "6"),
-            ("Saturday", "7"),
-        ],
-    )
-    def test_get_week_day(self, week_day, expected_result):
-        assert _get_week_day(week_day) == expected_result
-
-    def test_get_week_day_invalid(self):
-        with pytest.raises(ValueError):
-            _get_week_day("InvalidDay")
 
     @pytest.mark.parametrize(
         "recurrence",

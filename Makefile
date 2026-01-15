@@ -1,6 +1,9 @@
 .PHONY: dev test fmt docs docs-serve docs-clean
 
 dev:
+	pip install poetry==2.2.1
+	poetry config virtualenvs.create true --local
+	poetry config virtualenvs.in-project true --local
 	poetry install
 
 test:

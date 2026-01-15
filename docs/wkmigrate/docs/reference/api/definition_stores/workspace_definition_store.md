@@ -3,7 +3,22 @@ sidebar_label: workspace_definition_store
 title: wkmigrate.definition_stores.workspace_definition_store
 ---
 
-This module defines the ``WorkspaceDefinitionStore`` class.
+This module defines the `WorkspaceDefinitionStore` class used to load and persist pipeline definitions in a Databricks workspace.
+
+``WorkspaceDefinitionStore`` materializes translated pipelines into Databricks
+Lakeflow Jobs, generates notebooks and Spark Declarative Pipelines for copying
+data, and can list or update workspace assets. It is commonly used as the sink
+when migrating from ADF definitions to Databricks.
+
+**Example**:
+
+    ```python
+    from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+    store = WorkspaceDefinitionStore(authentication_type="pat", host_name="https://adb-123.azuredatabricks.net", pat="TOKEN")
+    workflow = store.load("existing_job_name")  # raises ValueError if missing
+    store.dump(translated_pipeline_ir)
+    ```
 
 ## WorkspaceDefinitionStore Objects
 
@@ -16,19 +31,19 @@ Definition store implementation that lists, describes, and updates objects in a 
 
 **Attributes**:
 
-- `authentication_type` - Authentication mode. Can be &quot;pat&quot;, &quot;basic&quot;, or &quot;azure-client-secret&quot;.
+- `authentication_type` - Authentication mode. Can be "pat", "basic", or "azure-client-secret".
 - `host_name` - Workspace hostname for Databricks.
-- `pat` - Personal access token used for &quot;pat&quot; authentication.
-- `username` - Username used for &quot;basic&quot; authentication.
-- `password` - Password used for &quot;basic&quot; authentication.
+- `pat` - Personal access token used for "pat" authentication.
+- `username` - Username used for "basic" authentication.
+- `password` - Password used for "basic" authentication.
 - `resource_id` - Azure resource ID for workspace-scoped authentication flows.
 - `tenant_id` - Azure AD tenant identifier used for client-secret authentication.
 - `client_id` - Application (client) ID used for client-secret authentication.
 - `client_secret` - Secret associated with the client ID for client-secret authentication.
 - `files_to_delta_sinks` - Overrides default behavior when generating DLT sinks from copy tasks.
-- `host_name`0 - Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
+- `workspace_client` - Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
 
-### \_\_post\_init\_\_
+#### \_\_post\_init\_\_
 
 ```python
 def __post_init__() -> None
@@ -40,7 +55,7 @@ Validates credentials and initializes the Databricks workspace client.
 
 - `ValueError` - If the authentication type is invalid or the host name is not provided.
 
-### load
+#### load
 
 ```python
 def load(pipeline_name: str) -> dict
@@ -57,7 +72,7 @@ Fetches a Databricks job definition by name.
 
 - `dict` - Job settings returned by the Jobs API.
 
-### to\_pipeline
+#### to\_pipeline
 
 ```python
 def to_pipeline(pipeline_definition: dict) -> int | None
@@ -79,7 +94,7 @@ Uploads artifacts and creates a Databricks job.
 
 - `ValueError` - If the job cannot be created.
 
-### dump
+#### dump
 
 ```python
 @deprecated("Use 'to_pipeline' as of wkmigrate 0.0.3")
@@ -102,7 +117,7 @@ This method is deprecated. Use ``to_pipeline`` instead. Uploads artifacts and cr
 
 - `ValueError` - If the job cannot be created.
 
-### to\_local\_files
+#### to\_local\_files
 
 ```python
 def to_local_files(pipeline_definition: Pipeline,

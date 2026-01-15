@@ -1,4 +1,10 @@
-"""This module defines methods for translating Copy activities."""
+"""This module defines a translator for translating Copy activities.
+
+Translators in this module normalize Copy Data activity payloads into internal representations.
+Each translator must validate required fields, coerce connection settings, source and sink dataset
+properties, and column mappings.Translators should emit ``UnsupportedValue`` objects for any unparsable
+inputs.
+"""
 
 from wkmigrate.models.ir.activities import ColumnMapping, CopyActivity
 from wkmigrate.models.ir.datasets import Dataset

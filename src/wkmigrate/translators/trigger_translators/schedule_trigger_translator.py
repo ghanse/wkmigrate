@@ -1,6 +1,6 @@
 """This module defines methods for translating Databricks schedule triggers from data pipelines."""
 
-from wkmigrate.trigger_translators.parsers import parse_cron_expression
+from wkmigrate.translators.trigger_translators.parsers import parse_cron_expression
 
 
 _DEFAULT_TIMEZONE = "UTC"

@@ -1,4 +1,9 @@
-"""This module defines methods for parsing trigger objects to the Databricks SDK's object model."""
+"""This module defines parsers for translating ADF schedules.
+
+Parsers in this module convert ADF trigger recurrence definitions into quartz cron
+expressions used in Databricks Lakeflow jobs. They enforce reasonable defaults and
+emit warnings for partially supported configurations.
+"""
 
 import warnings
 from wkmigrate.enums.interval_type import IntervalType

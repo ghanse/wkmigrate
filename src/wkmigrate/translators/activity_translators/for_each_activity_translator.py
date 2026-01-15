@@ -1,4 +1,9 @@
-"""This module defines methods for translating For Each activities."""
+"""This module defines a translator for translating For Each activities.
+
+Translators in this module normalize For Each activity payloads into internal representations.
+Each translator must validate required fields, parse the activity's items expression, and emit
+``UnsupportedValue`` objects for any unparsable inputs.
+"""
 
 import ast
 import importlib

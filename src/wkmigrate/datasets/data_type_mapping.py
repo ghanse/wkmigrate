@@ -1,4 +1,9 @@
-"""This module defines methods for mapping data types from target systems to Spark."""
+"""This module defines methods for mapping data types from target systems to Spark.
+
+The helpers in this module normalize upstream sink types (for example SQL Server column types)
+into the canonical Spark SQL types used by generated DataFrame operations. Extend the mapping
+dictionaries to support additional systems without touching dataset translators.
+"""
 
 sql_server_type_mapping = {
     "Boolean": "boolean",

@@ -3,7 +3,12 @@ sidebar_label: linked_services
 title: wkmigrate.models.ir.linked_services
 ---
 
-Linked service IR models.
+This module defines internal representations for linked services.
+
+Linked services in this module represent connections to external services and systems used by 
+various pipeline activities (e.g. Copy Data, Lookup Value). Each linked service contains metadata
+specific to the associated service. Linked services are translated from ADF payloads into internal 
+representations that can be used to connect to services from Databricks.
 
 ## LinkedService Objects
 
@@ -60,7 +65,7 @@ Linked-service metadata describing a Databricks workspace/cluster.
 
 **Attributes**:
 
-- `host_name` - Databricks workspace hostname (for example ``adb-&lt;id&gt;.&lt;region&gt;.azuredatabricks.net``).
+- `host_name` - Databricks workspace hostname (for example ``adb-<id>.<region>.azuredatabricks.net``).
 - `node_type_id` - Default worker node type identifier.
 - `spark_version` - Runtime version string for the cluster.
 - `custom_tags` - Custom cluster tags applied at creation time.
@@ -68,22 +73,8 @@ Linked-service metadata describing a Databricks workspace/cluster.
 - `spark_conf` - Spark configuration dictionary applied to the cluster.
 - `spark_env_vars` - Environment variables made available to Spark.
 - `init_scripts` - List of init script descriptors attached to the cluster.
-- ``0 - Cluster log configuration dictionary.
-- ``1 - Autoscaling configuration specifying ``min_workers`` and ``max_workers``.
-- ``6 - Fixed number of workers when autoscaling is disabled.
-- ``7 - Personal access token used for workspace authentication, when applicable.
-
-## UnsupportedLinkedService Objects
-
-```python
-@dataclass
-class UnsupportedLinkedService(LinkedService)
-```
-
-IR representation for a linked service that cannot be translated.
-
-**Attributes**:
-
-- `message` - Description of why the linked service is unsupported.
-- `adf_definition` - Raw ADF linked-service payload that could not be parsed.
+- `cluster_log_conf` - Cluster log configuration dictionary.
+- `autoscale` - Autoscaling configuration specifying ``min_workers`` and ``max_workers``.
+- `num_workers` - Fixed number of workers when autoscaling is disabled.
+- `pat` - Personal access token used for workspace authentication, when applicable.
 

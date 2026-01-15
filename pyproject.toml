@@ -74,6 +74,9 @@ docs_base_path = "docs/wkmigrate/docs"
 relative_output_path = "reference/api"
 relative_sidebar_path = "sidebar.json"
 
+[tool.pydoc-markdown.renderer.markdown]
+escape_html_in_docstring = false
+
 # by default method and function are on level 4 which is too deep for docusaurus
 # we want to move them to level 3
 markdown = { header_level_by_type = { Method = 3, Function = 3, Class = 2, Module = 1 } }

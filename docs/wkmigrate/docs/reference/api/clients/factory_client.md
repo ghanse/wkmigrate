@@ -3,7 +3,12 @@ sidebar_label: factory_client
 title: wkmigrate.clients.factory_client
 ---
 
-Defines the ``FactoryClient`` class.
+This module defines a client for interacting with Azure Data Factory.
+
+Clients in this module interact with Azure Data Factory to retrieve pipeline, dataset, 
+linked service, and trigger definitions. Clients validate required fields, authenticate 
+using the provided credentials, and make API calls to the Data Factory resource using
+the Azure Data Factory management client.
 
 ## FactoryClient Objects
 
@@ -24,7 +29,7 @@ Data Factory management client for retrieving pipelines, datasets, linked servic
 - `factory_name` - Name of the Azure Data Factory instance.
 - `management_client` - ``DataFactoryManagementClient`` used to make API calls. Automatically created using the provided credentials.
 
-### \_\_post\_init\_\_
+#### \_\_post\_init\_\_
 
 ```python
 def __post_init__() -> None
@@ -32,7 +37,7 @@ def __post_init__() -> None
 
 Sets up the Data Factory management client for the provided credentials.
 
-### get\_pipeline
+#### get\_pipeline
 
 ```python
 def get_pipeline(pipeline_name: str) -> dict
@@ -49,7 +54,7 @@ Gets a pipeline definition with the specified name.
 
   Pipeline definition as a ``dict``.
 
-### get\_linked\_service
+#### get\_linked\_service
 
 ```python
 def get_linked_service(linked_service_name: str) -> dict
@@ -66,7 +71,7 @@ Gets a linked-service definition with the specified name.
 
   Linked-service definition as a ``dict``.
 
-### get\_trigger
+#### get\_trigger
 
 ```python
 def get_trigger(pipeline_name: str) -> dict
@@ -83,7 +88,7 @@ Gets the trigger associated with a pipeline.
 
   Trigger definition as a ``dict``.
 
-### get\_dataset
+#### get\_dataset
 
 ```python
 def get_dataset(dataset_name: str) -> dict

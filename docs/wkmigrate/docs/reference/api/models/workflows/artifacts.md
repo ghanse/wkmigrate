@@ -18,7 +18,7 @@ Represents a notebook that needs to be materialized.
 
 - `file_path` - Workspace path where the notebook will be created or updated.
 - `content` - Notebook source content as a single string.
-- `language` - Notebook language (for example ``python`` or ``sql``). Defaults to ``&quot;python&quot;``.
+- `language` - Notebook language (for example ``python`` or ``sql``). Defaults to ``"python"``.
 
 ## PreparedWorkflow Objects
 
@@ -35,5 +35,5 @@ Artifacts generated while preparing a workflow.
 - `notebooks` - List of ``NotebookArtifact`` objects to upload.
 - `pipelines` - List of ``PipelineInstruction`` objects describing DLT pipelines to create.
 - `secrets` - List of ``SecretInstruction`` objects describing secrets to materialize.
-- `notebooks`0 - Collection of entries describing properties or nodes that could not be translated.
+- `unsupported` - Collection of entries describing properties or nodes that could not be translated.
 

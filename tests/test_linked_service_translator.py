@@ -1,12 +1,12 @@
 from contextlib import nullcontext as does_not_raise
 import pytest
-from wkmigrate.linked_service_translators.databricks_linked_service_translator import (
-    translate_cluster_spec,
-)
-from wkmigrate.linked_service_translators.sql_server_linked_service_translator import (
+
+from wkmigrate.translators.linked_service_translators import (
+    translate_databricks_cluster_spec,
     translate_sql_server_spec,
 )
 from wkmigrate.models.ir.linked_services import DatabricksClusterLinkedService, SqlLinkedService
+from wkmigrate.models.ir.unsupported import UnsupportedValue
 
 
 class TestLinkedServiceTranslator:
@@ -15,8 +15,16 @@ class TestLinkedServiceTranslator:
     @pytest.mark.parametrize(
         "linked_service_definition, expected_result, context",
         [
-            (None, None, pytest.raises(ValueError, match="Missing Databricks linked service definition")),
-            ({}, None, pytest.raises(ValueError, match="Missing Databricks linked service definition")),
+            (
+                None,
+                UnsupportedValue(value=None, message="Missing Databricks linked service definition"),
+                does_not_raise(),
+            ),
+            (
+                {},
+                UnsupportedValue(value={}, message="Missing Databricks linked service definition"),
+                does_not_raise(),
+            ),
             (
                 {
                     "name": "databricks-linked-service",
@@ -103,14 +111,22 @@ class TestLinkedServiceTranslator:
     )
     def test_translate_cluster_spec_parses_result(self, linked_service_definition, expected_result, context):
         with context:
-            result = translate_cluster_spec(linked_service_definition)
+            result = translate_databricks_cluster_spec(linked_service_definition)
             assert result == expected_result
 
     @pytest.mark.parametrize(
         "linked_service_definition, expected_result, context",
         [
-            (None, None, pytest.raises(ValueError, match="Missing SQL Server linked service definition")),
-            ({}, None, pytest.raises(ValueError, match="Missing SQL Server linked service definition")),
+            (
+                None,
+                UnsupportedValue(value=None, message="Missing SQL Server linked service definition"),
+                does_not_raise(),
+            ),
+            (
+                {},
+                UnsupportedValue(value={}, message="Missing SQL Server linked service definition"),
+                does_not_raise(),
+            ),
             (
                 {
                     "name": "sql-linked-service",
