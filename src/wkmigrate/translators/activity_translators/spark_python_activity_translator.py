@@ -9,7 +9,7 @@ def translate_spark_python_activity(activity: dict, base_kwargs: dict) -> SparkP
 
     Args:
         activity: Spark Python activity definition as a ``dict``.
-        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+        base_kwargs: Common activity metadata.
 
     Returns:
         ``SparkPythonActivity`` representation of the Spark Python task.

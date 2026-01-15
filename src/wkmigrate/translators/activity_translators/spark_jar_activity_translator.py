@@ -9,7 +9,7 @@ def translate_spark_jar_activity(activity: dict, base_kwargs: dict) -> SparkJarA
 
     Args:
         activity: Spark JAR activity definition as a ``dict``.
-        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+        base_kwargs: Common activity metadata.
 
     Returns:
         ``SparkJarActivity`` representation of the Spark JAR task.
