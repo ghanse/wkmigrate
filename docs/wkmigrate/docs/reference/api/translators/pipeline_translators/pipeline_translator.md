@@ -17,6 +17,10 @@ def translate_pipeline(pipeline: dict) -> Pipeline
 
 Translates an ADF pipeline dictionary into a ``Pipeline``.
 
+Calls ``translate_activities`` which returns both the translated task list and the
+final ``TranslationContext``.  The context is currently unused after pipeline
+construction but is available for future inspection or chaining.
+
 **Arguments**:
 
 - `pipeline` - Raw pipeline payload exported from ADF.

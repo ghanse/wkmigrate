@@ -113,6 +113,7 @@ Run Job activity metadata.
 - `name` - Name of the job to run.
 - `pipeline` - Pipeline to run, if no existing job ID is provided.
 - `existing_job_id` - ID of the existing job to run.
+- `job_parameters` - Key-value pairs passed to the job at runtime, overriding job defaults.
 
 ## SparkJarActivity Objects
 

@@ -13,23 +13,27 @@ Each translator must validate required fields, parse the activity's items expres
 
 ```python
 def translate_for_each_activity(
-        activity: dict,
-        base_kwargs: dict) -> ForEachActivity | UnsupportedValue
+    activity: dict,
+    base_kwargs: dict,
+    context: TranslationContext | None = None
+) -> tuple[TranslationResult, TranslationContext]
 ```
 
-Translates an ADF ForEach activity into a ``ForEachActivity`` object. ForEach activities are translated into For Each tasks in Databricks Lakeflow Jobs.
+Translates an ADF ForEach activity into a ``ForEachActivity`` object.
 
-This method returns an ``UnsupportedValue`` if the activity cannot be translated. This can be due to:
-* Missing or invalid items expression
-* Unparseable items expression
+ForEach activities are translated into For Each tasks in Databricks Lakeflow Jobs.
+
+This method returns an ``UnsupportedValue`` as the first element if the activity
+cannot be translated due to missing items or inner activities.
 
 **Arguments**:
 
 - `activity` - ForEach activity definition as a ``dict``.
-- `base_kwargs` - Common activity metadata from ``_build_base_activity_kwargs``.
+- `base_kwargs` - Common activity metadata.
+- `context` - Translation context.  When ``None`` a fresh default context is created.
   
 
 **Returns**:
 
-  ``ForEachActivity`` representation of the ForEach task.
+  A tuple with the translated result and the updated context.
 

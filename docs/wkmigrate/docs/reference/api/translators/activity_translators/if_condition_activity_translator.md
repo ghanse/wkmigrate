@@ -13,23 +13,28 @@ Each translator must validate required fields, parse the activity's condition ex
 
 ```python
 def translate_if_condition_activity(
-        activity: dict,
-        base_kwargs: dict) -> IfConditionActivity | UnsupportedValue
+    activity: dict,
+    base_kwargs: dict,
+    context: TranslationContext | None = None
+) -> tuple[TranslationResult, TranslationContext]
 ```
 
-Translates an ADF IfCondition activity into a ``IfConditionActivity`` object. IfCondition activities are translated into If-Else tasks in Databricks Lakeflow Jobs.
+Translates an ADF IfCondition activity into a ``IfConditionActivity`` object.
 
-This method returns an ``UnsuportedValue`` if the activity cannot be translated. This can be due to:
-* Missing conditional expression
-* Unparseable conditional expression
+The context is threaded through each child activity translation so that the
+activity cache accumulates across branches.
+
+This method returns an ``UnsupportedValue`` as the first element if the activity
+cannot be translated due to a missing or unparseable conditional expression.
 
 **Arguments**:
 
 - `activity` - IfCondition activity definition as a ``dict``.
-- `base_kwargs` - Common activity metadata from ``_build_base_activity_kwargs``.
+- `base_kwargs` - Common activity metadata.
+- `context` - Translation context.  When ``None`` a fresh default context is created.
   
 
 **Returns**:
 
-  ``IfConditionActivity`` representation of the IfCondition task and an optional list of nested activities (for child activities).
+  A tuple with the translated result and the updated context.
 
