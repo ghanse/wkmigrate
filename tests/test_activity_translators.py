@@ -26,8 +26,11 @@ from wkmigrate.translators.activity_translators.databricks_job_activity_translat
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.activity_translators.activity_translator import (
+    default_context,
     translate_activities,
+    translate_activities_with_context,
     translate_activity,
+    visit_activity,
 )
 from wkmigrate.translators.activity_translators.for_each_activity_translator import (
     translate_for_each_activity,
@@ -265,7 +268,7 @@ def test_foreach_missing_items_returns_unsupported(for_each_activity_fixtures: l
     """Test that missing items returns UnsupportedValue."""
     fixture = next(f for f in for_each_activity_fixtures if "missing items" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
-    result = translate_for_each_activity(fixture["input"], base_kwargs)
+    result, _ctx = translate_for_each_activity(fixture["input"], base_kwargs)
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
@@ -275,7 +278,7 @@ def test_foreach_empty_activities_returns_unsupported(for_each_activity_fixtures
     """Test that empty activities array returns UnsupportedValue."""
     fixture = next(f for f in for_each_activity_fixtures if "empty activities" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
-    result = translate_for_each_activity(fixture["input"], base_kwargs)
+    result, _ctx = translate_for_each_activity(fixture["input"], base_kwargs)
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
@@ -285,7 +288,7 @@ def test_foreach_unsupported_items_expression_returns_unsupported(for_each_activ
     """Test that unsupported items expression returns UnsupportedValue."""
     fixture = next(f for f in for_each_activity_fixtures if "unsupported items expression" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
-    result = translate_for_each_activity(fixture["input"], base_kwargs)
+    result, _ctx = translate_for_each_activity(fixture["input"], base_kwargs)
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
@@ -352,7 +355,7 @@ def test_if_condition_missing_expression_returns_unsupported(if_condition_activi
     """Test that missing expression returns UnsupportedValue."""
     fixture = next(f for f in if_condition_activity_fixtures if "missing expression" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
-    result = translate_if_condition_activity(fixture["input"], base_kwargs)
+    result, _ctx = translate_if_condition_activity(fixture["input"], base_kwargs)
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
@@ -362,7 +365,7 @@ def test_if_condition_unsupported_expression_returns_unsupported(if_condition_ac
     """Test that unsupported expression type returns UnsupportedValue."""
     fixture = next(f for f in if_condition_activity_fixtures if "unsupported expression" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
-    result = translate_if_condition_activity(fixture["input"], base_kwargs)
+    result, _ctx = translate_if_condition_activity(fixture["input"], base_kwargs)
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
@@ -679,3 +682,238 @@ def test_databricks_job_missing_job_id_returns_unsupported(databricks_job_activi
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
+
+
+# ---------------------------------------------------------------------------
+# Context-aware cache tests
+# ---------------------------------------------------------------------------
+
+
+class TestTranslationContextCache:
+    """Tests verifying that the TranslationContext activity cache behaves correctly."""
+
+    NOTEBOOK_ACTIVITY: dict = {
+        "name": "nb_task",
+        "type": "DatabricksNotebook",
+        "depends_on": [],
+        "policy": {"timeout": "0.01:00:00"},
+        "notebook_path": "/notebooks/etl",
+    }
+
+    SPARK_JAR_ACTIVITY: dict = {
+        "name": "jar_task",
+        "type": "DatabricksSparkJar",
+        "depends_on": [{"activity": "nb_task", "dependency_conditions": ["Succeeded"]}],
+        "policy": {"timeout": "0.02:00:00"},
+        "main_class_name": "com.example.Main",
+    }
+
+    def test_visit_activity_populates_cache(self) -> None:
+        """Visiting a named activity stores it in the returned context."""
+        ctx = default_context()
+        translated, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+
+        assert ctx.get_activity("nb_task") is translated
+        assert isinstance(translated, DatabricksNotebookActivity)
+
+    def test_visit_activity_returns_cached_on_second_call(self) -> None:
+        """A second visit for the same name returns the identical cached object."""
+        ctx = default_context()
+        first, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+        second, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+
+        assert first is second
+
+    def test_cache_does_not_grow_on_duplicate_visit(self) -> None:
+        """Visiting the same activity twice does not add a second cache entry."""
+        ctx = default_context()
+        _, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+        cache_size_after_first = len(ctx.activity_cache)
+        _, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+
+        assert len(ctx.activity_cache) == cache_size_after_first
+
+    def test_translate_activities_with_context_populates_all(self) -> None:
+        """All translated activities appear in the final context cache."""
+        activities = [self.NOTEBOOK_ACTIVITY, self.SPARK_JAR_ACTIVITY]
+        result, ctx = translate_activities_with_context(activities)
+
+        assert result is not None
+        assert len(result) == 2
+        assert "nb_task" in ctx.activity_cache
+        assert "jar_task" in ctx.activity_cache
+        assert isinstance(ctx.get_activity("nb_task"), DatabricksNotebookActivity)
+        assert isinstance(ctx.get_activity("jar_task"), SparkJarActivity)
+
+    def test_translate_activities_with_context_none_input(self) -> None:
+        """None input returns None result and the supplied context unchanged."""
+        ctx = default_context()
+        result, returned_ctx = translate_activities_with_context(None, ctx)
+
+        assert result is None
+        assert returned_ctx is ctx
+
+    def test_translate_activities_with_context_empty_input(self) -> None:
+        """Empty list returns empty result and the supplied context unchanged."""
+        ctx = default_context()
+        result, returned_ctx = translate_activities_with_context([], ctx)
+
+        assert result == []
+        assert len(returned_ctx.activity_cache) == 0
+
+    def test_pre_populated_context_returns_cached_activity(self) -> None:
+        """When the context already contains an activity, visit_activity returns it."""
+        ctx = default_context()
+        first, ctx = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+
+        second, ctx2 = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx)
+
+        assert second is first
+        assert ctx2 is ctx
+
+    def test_context_threads_through_if_condition_branches(self) -> None:
+        """Child activities from both IfCondition branches appear in the final cache."""
+        if_activity = {
+            "name": "branching_check",
+            "type": "IfCondition",
+            "expression": {"type": "Expression", "value": "@equals('x', 'y')"},
+            "if_true_activities": [
+                {
+                    "name": "true_child",
+                    "type": "DatabricksNotebook",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "notebook_path": "/true_path",
+                }
+            ],
+            "if_false_activities": [
+                {
+                    "name": "false_child",
+                    "type": "DatabricksSparkJar",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "main_class_name": "com.example.False",
+                }
+            ],
+        }
+        result, ctx = translate_activities_with_context([if_activity])
+
+        assert result is not None
+        assert "branching_check" in ctx.activity_cache
+        assert "true_child" in ctx.activity_cache
+        assert "false_child" in ctx.activity_cache
+
+    def test_context_threads_through_dependency_chain(self) -> None:
+        """Upstream activities are cached before their dependents during topological visit."""
+        activities = [
+            self.SPARK_JAR_ACTIVITY,
+            self.NOTEBOOK_ACTIVITY,
+        ]
+        result, ctx = translate_activities_with_context(activities)
+
+        assert result is not None
+        nb = ctx.get_activity("nb_task")
+        jar = ctx.get_activity("jar_task")
+        assert nb is not None
+        assert jar is not None
+        assert isinstance(nb, DatabricksNotebookActivity)
+        assert isinstance(jar, SparkJarActivity)
+
+    def test_context_immutability(self) -> None:
+        """The original context is not mutated when a new activity is added."""
+        ctx_before = default_context()
+        _, ctx_after = visit_activity(self.NOTEBOOK_ACTIVITY, False, ctx_before)
+
+        assert len(ctx_before.activity_cache) == 0
+        assert len(ctx_after.activity_cache) == 1
+
+    def test_foreach_multi_inner_uses_fresh_cache(self) -> None:
+        """Multi-inner ForEach translates inner activities with a fresh cache.
+
+        A parent-cached SparkJar named ``inner_nb`` must not shadow the inner
+        pipeline's Notebook activity of the same name.
+        """
+        ctx = default_context()
+        cached_as_jar = {
+            "name": "inner_nb",
+            "type": "DatabricksSparkJar",
+            "depends_on": [],
+            "policy": {"timeout": "0.01:00:00"},
+            "main_class_name": "com.example.Cached",
+        }
+        _, ctx = visit_activity(cached_as_jar, False, ctx)
+        assert isinstance(ctx.get_activity("inner_nb"), SparkJarActivity)
+
+        for_each = {
+            "name": "loop",
+            "type": "ForEach",
+            "items": {"value": "@array(['a','b'])"},
+            "batch_count": 1,
+            "activities": [
+                {
+                    "name": "inner_nb",
+                    "type": "DatabricksNotebook",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "notebook_path": "/inner/path",
+                },
+                {
+                    "name": "inner_jar",
+                    "type": "DatabricksSparkJar",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "main_class_name": "com.example.Inner",
+                },
+            ],
+        }
+        result, _ = translate_activities_with_context([for_each], ctx)
+
+        assert result is not None
+        for_each_result = result[0]
+        assert isinstance(for_each_result, ForEachActivity)
+        assert isinstance(for_each_result.for_each_task, RunJobActivity)
+        inner_tasks = for_each_result.for_each_task.pipeline.tasks
+        inner_nb_task = next(t for t in inner_tasks if t.name == "inner_nb")
+        assert isinstance(inner_nb_task, DatabricksNotebookActivity)
+
+    def test_foreach_multi_inner_does_not_modify_parent_cache(self) -> None:
+        """Multi-inner ForEach does not leak inner activities into the parent cache."""
+        ctx = default_context()
+        outer = {
+            "name": "outer_task",
+            "type": "DatabricksNotebook",
+            "depends_on": [],
+            "policy": {"timeout": "0.01:00:00"},
+            "notebook_path": "/outer/path",
+        }
+        _, ctx = visit_activity(outer, False, ctx)
+
+        for_each = {
+            "name": "loop",
+            "type": "ForEach",
+            "items": {"value": "@array(['a','b'])"},
+            "batch_count": 1,
+            "activities": [
+                {
+                    "name": "inner_nb",
+                    "type": "DatabricksNotebook",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "notebook_path": "/inner/path",
+                },
+                {
+                    "name": "inner_jar",
+                    "type": "DatabricksSparkJar",
+                    "depends_on": [],
+                    "policy": {"timeout": "0.01:00:00"},
+                    "main_class_name": "com.example.Inner",
+                },
+            ],
+        }
+        result, final_ctx = translate_activities_with_context([for_each], ctx)
+
+        assert result is not None
+        assert "outer_task" in final_ctx.activity_cache
+        assert "loop" in final_ctx.activity_cache
+        assert "inner_nb" not in final_ctx.activity_cache
+        assert "inner_jar" not in final_ctx.activity_cache

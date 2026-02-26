@@ -5,112 +5,123 @@ Each translator must validate required fields, parse the activity's condition ex
 ``UnsupportedValue`` objects for any unparsable inputs.
 """
 
-import importlib
+from __future__ import annotations
+from importlib import import_module
+
 import re
 import warnings
 
 from wkmigrate.enums.condition_operation_pattern import ConditionOperationPattern
 from wkmigrate.models.ir.pipeline import Activity, IfConditionActivity
+from wkmigrate.models.ir.translation_context import TranslationContext
+from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 
 
 def translate_if_condition_activity(
     activity: dict,
     base_kwargs: dict,
-) -> IfConditionActivity | UnsupportedValue:
+    context: TranslationContext | None = None,
+) -> tuple[TranslationResult, TranslationContext]:
     """
-    Translates an ADF IfCondition activity into a ``IfConditionActivity`` object. IfCondition activities are translated into If-Else tasks in Databricks Lakeflow Jobs.
+    Translates an ADF IfCondition activity into a ``IfConditionActivity`` object.
 
-    This method returns an ``UnsuportedValue`` if the activity cannot be translated. This can be due to:
-    * Missing conditional expression
-    * Unparseable conditional expression
+    The context is threaded through each child activity translation so that the
+    activity cache accumulates across branches.
+
+    This method returns an ``UnsupportedValue`` as the first element if the activity
+    cannot be translated due to a missing or unparseable conditional expression.
 
     Args:
         activity: IfCondition activity definition as a ``dict``.
-        base_kwargs: Common activity metadata from ``_build_base_activity_kwargs``.
+        base_kwargs: Common activity metadata.
+        context: Translation context.  When ``None`` a fresh default context is created.
 
     Returns:
-        ``IfConditionActivity`` representation of the IfCondition task and an optional list of nested activities (for child activities).
+        A tuple with the translated result and the updated context.
     """
+    if context is None:
+        activity_translator = import_module("wkmigrate.translators.activity_translators.activity_translator")
+        context = activity_translator.default_context()
+
     source_expression = activity.get("expression")
     if source_expression is None:
-        return UnsupportedValue(value=activity, message="Missing property 'expression' in IfCondition activity")
+        return (
+            UnsupportedValue(value=activity, message="Missing property 'expression' in IfCondition activity"),
+            context,
+        )
 
-    expression = _parse_condition_expression(source_expression)
-    if isinstance(expression, UnsupportedValue):
-        return UnsupportedValue(value=activity, message=expression.message)
+    parsed = _parse_condition_expression(source_expression)
+    if isinstance(parsed, UnsupportedValue):
+        return UnsupportedValue(value=activity, message=parsed.message), context
 
-    parsed_op = expression.get("op")
-    if not parsed_op:
-        return UnsupportedValue(value=activity, message="Missing field 'op' in if condition expression")
+    validation_error = _validate_condition_expression(parsed)
+    if validation_error:
+        return (
+            UnsupportedValue(
+                value=activity,
+                message=f"Unsupported condition expression in IfCondition activity; {validation_error.message}",
+            ),
+            context,
+        )
 
-    parsed_left = expression.get("left")
-    if not parsed_left:
-        return UnsupportedValue(value=activity, message="Missing field 'left' in if condition expression")
-
-    parsed_right = expression.get("right")
-    if not parsed_right:
-        return UnsupportedValue(value=activity, message="Missing field 'right' in if condition expression")
+    parent_task_name = activity.get("name") or "IF_CONDITION_PARENT_TASK"
 
     child_activities: list[Activity] = []
-    parent_task_name = activity.get("name")
-    if parent_task_name is None:
-        parent_task_name = "IF_CONDITION_PARENT_TASK"
-
-    if_false = activity.get("if_false_activities")
-    if if_false:
-        child_activities.extend(
-            _parse_child_activities(if_false, parent_task_name, "false"),
-        )
-
-    if_true = activity.get("if_true_activities")
-    if if_true:
-        child_activities.extend(
-            _parse_child_activities(if_true, parent_task_name, "true"),
-        )
+    for branch_key, outcome in (("if_false_activities", "false"), ("if_true_activities", "true")):
+        branch = activity.get(branch_key)
+        if branch:
+            children, context = _translate_child_activities(branch, parent_task_name, outcome, context)
+            child_activities.extend(children)
 
     if not child_activities:
         warnings.warn(
             "No child activities of if-else condition activity",
             stacklevel=3,
         )
-    return IfConditionActivity(
+
+    result = IfConditionActivity(
         **base_kwargs,
-        op=parsed_op,
-        left=parsed_left,
-        right=parsed_right,
+        op=parsed["op"],
+        left=parsed["left"],
+        right=parsed["right"],
         child_activities=child_activities,
     )
+    return result, context
 
 
-def _parse_child_activities(
+def _translate_child_activities(
     child_activities: list[dict],
     parent_task_name: str,
     parent_task_outcome: str,
-) -> list[Activity]:
+    context: TranslationContext,
+) -> tuple[list[Activity], TranslationContext]:
     """
     Translates child activities referenced by IfCondition tasks.
+
+    The context is threaded through each child so that the activity cache is shared
+    across all branches.
 
     Args:
         child_activities: Child activity definitions attached to the IfCondition.
         parent_task_name: Name of the parent IfCondition task.
-        parent_task_outcome: Expected outcome ('true'/'false').
+        parent_task_outcome: Expected outcome (``'true'``/``'false'``).
+        context: Current translation context.
 
     Returns:
-        List of translated child activities with dependency wiring applied as a ``list[Activity]``.
+        A tuple with the translated children and the updated context.
     """
-    translated = []
+    activity_translator = import_module("wkmigrate.translators.activity_translators.activity_translator")
+    visit_activity = activity_translator.visit_activity
+
+    translated: list[Activity] = []
     for activity in child_activities:
-        depends_on = activity.setdefault("depends_on", [])
+        copied_activity = activity.copy()
+        depends_on = copied_activity.setdefault("depends_on", [])
         depends_on.append({"activity": parent_task_name, "outcome": parent_task_outcome})
-        activity_translator = importlib.import_module("wkmigrate.translators.activity_translators.activity_translator")
-        result = activity_translator.translate_activity(activity, is_conditional_task=True)
-        if isinstance(result, tuple):
-            translated.append(result[0])
-            translated.extend(result[1])
-            continue
+        result, context = visit_activity(copied_activity, True, context)
         translated.append(result)
-    return translated
+    return translated, context
 
 
 def _parse_condition_expression(condition: dict) -> dict | UnsupportedValue:
@@ -121,12 +132,9 @@ def _parse_condition_expression(condition: dict) -> dict | UnsupportedValue:
         condition: Condition expression dictionary from ADF.
 
     Returns:
-        Dictionary describing the parsed operator and its operands.
-
-    Raises:
-        ValueError: If a valid condition expression cannot be parsed.
+        Dictionary describing the parsed operator and its operands, or ``UnsupportedValue``
+        when the expression cannot be parsed.
     """
-    # Match a boolean operator:
     condition_value = str(condition.get("value"))
     if not condition_value:
         return UnsupportedValue(
@@ -144,3 +152,22 @@ def _parse_condition_expression(condition: dict) -> dict | UnsupportedValue:
         value=condition,
         message=f"Unsupported conditional expression '{condition_value}' in IfCondition activity 'expression'",
     )
+
+
+def _validate_condition_expression(expression: dict) -> UnsupportedValue | None:
+    """
+    Validates that a parsed condition expression contains the required fields.
+
+    Args:
+        expression: Parsed condition expression dictionary.
+
+    Returns:
+        ``UnsupportedValue`` describing the validation failure, or ``None`` when valid.
+    """
+    if not expression.get("op"):
+        return UnsupportedValue(value=expression, message="Missing field 'op' in if condition expression")
+    if not expression.get("left"):
+        return UnsupportedValue(value=expression, message="Missing field 'left' in if condition expression")
+    if not expression.get("right"):
+        return UnsupportedValue(value=expression, message="Missing field 'right' in if condition expression")
+    return None

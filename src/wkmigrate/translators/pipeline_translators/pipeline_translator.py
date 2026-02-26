@@ -7,7 +7,7 @@ and warnings so that callers can surface translation diagnostics alongside the g
 
 import warnings
 
-from wkmigrate.translators.activity_translators.activity_translator import translate_activities
+from wkmigrate.translators.activity_translators.activity_translator import translate_activities_with_context
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.pipeline_translators.parameter_translator import translate_parameters
@@ -18,6 +18,10 @@ from wkmigrate.utils import append_system_tags
 def translate_pipeline(pipeline: dict) -> Pipeline:
     """
     Translates an ADF pipeline dictionary into a ``Pipeline``.
+
+    Calls ``translate_activities`` which returns both the translated task list and the
+    final ``TranslationContext``.  The context is currently unused after pipeline
+    construction but is available for future inspection or chaining.
 
     Args:
         pipeline: Raw pipeline payload exported from ADF.
@@ -34,7 +38,7 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
                 ),
                 stacklevel=2,
             )
-        translated_tasks = translate_activities(pipeline.get("activities"))
+        translated_tasks, _ctx = translate_activities_with_context(pipeline.get("activities"))
         pipeline_ir = Pipeline(
             name=pipeline.get("name", "UNNAMED_WORKFLOW"),
             parameters=translate_parameters(pipeline.get("parameters")),
