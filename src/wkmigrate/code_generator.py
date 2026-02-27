@@ -224,6 +224,9 @@ def get_web_activity_notebook_content(
         f"# {method} {url}",
         f"url = {url!r}",
         f"method = {method!r}",
+        "# WARNING: Headers may contain secrets (Authorization, X-Api-Key, etc.)",
+        "# For production use, replace hardcoded values with dbutils.secrets.get()",
+        "# Example: headers[\"Authorization\"] = f\"Bearer {dbutils.secrets.get(scope='myScope', key='apiToken')}\"",
         f"headers = {headers!r}",
         f"body = {body!r}",
         "",
@@ -237,10 +240,10 @@ def get_web_activity_notebook_content(
         '        kwargs["data"] = body',
         "",
         "response = requests.request(method, url, **kwargs)",
-        "response.raise_for_status()",
         "",
         "# Publish response as Databricks task values:",
-        'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
         'dbutils.jobs.taskValues.set(key="status_code", value=str(response.status_code))',
+        'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
+        "response.raise_for_status()",
     ]
     return autopep8.fix_code("\n".join(script_lines))

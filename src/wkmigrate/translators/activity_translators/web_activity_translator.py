@@ -29,6 +29,12 @@ def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | U
     if not method:
         return UnsupportedValue(activity, "Missing value 'method' for Web activity")
 
+    if not isinstance(url, str) or not isinstance(method, str):
+        return UnsupportedValue(
+            activity,
+            "WebActivity url and method must be string values (expression-based urls/methods are not supported)",
+        )
+
     return WebActivity(
         **base_kwargs,
         url=url,
