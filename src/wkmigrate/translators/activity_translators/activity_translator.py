@@ -329,11 +329,8 @@ def _parse_policy(policy: dict | None) -> dict:
     Raises:
         NotTranslatableWarning: If secure input/output logging is used.
     """
-    if policy is None:
+    if not policy:
         return {}
-    cached_policy = policy.get("_wkmigrate_cached_policy")
-    if cached_policy is not None:
-        return cached_policy
 
     if "secure_input" in policy:
         warnings.warn(

@@ -211,3 +211,13 @@ be translated. In those cases, this helper converts the unsupported value into a
 placeholder notebook activity so downstream components (such as the workflow
 preparer) continue to operate on ``Activity`` instances only.
 
+**Arguments**:
+
+- `result` - Activity or UnsupportedValue as an internal representation
+- `base_kwargs` - Activity keyword-arguments
+  
+
+**Returns**:
+
+  A placeholder DatabricksNotebookActivity for any UnsupportedValue; Otherwise the input Activity
+
