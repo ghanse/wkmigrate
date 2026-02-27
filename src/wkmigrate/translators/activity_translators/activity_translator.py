@@ -31,6 +31,7 @@ from wkmigrate.translators.activity_translators.if_condition_activity_translator
 from wkmigrate.translators.activity_translators.lookup_activity_translator import translate_lookup_activity
 from wkmigrate.translators.activity_translators.notebook_activity_translator import translate_notebook_activity
 from wkmigrate.translators.activity_translators.spark_jar_activity_translator import translate_spark_jar_activity
+from wkmigrate.translators.activity_translators.set_variable_activity_translator import translate_set_variable_activity
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import translate_spark_python_activity
 from wkmigrate.translators.linked_service_translators import translate_databricks_cluster_spec
 from wkmigrate.utils import get_placeholder_activity, normalize_translated_result, parse_activity_timeout_string
@@ -45,6 +46,7 @@ _default_type_translators: dict[str, TypeTranslator] = {
     "DatabricksSparkPython": translate_spark_python_activity,
     "Copy": translate_copy_activity,
     "Lookup": translate_lookup_activity,
+    "SetVariable": translate_set_variable_activity,
 }
 
 

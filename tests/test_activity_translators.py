@@ -18,6 +18,7 @@ from wkmigrate.models.ir.pipeline import (
     IfConditionActivity,
     LookupActivity,
     RunJobActivity,
+    SetVariableActivity,
     SparkJarActivity,
     SparkPythonActivity,
 )
@@ -46,6 +47,9 @@ from wkmigrate.translators.activity_translators.spark_jar_activity_translator im
 )
 from wkmigrate.translators.activity_translators.lookup_activity_translator import (
     translate_lookup_activity,
+)
+from wkmigrate.translators.activity_translators.set_variable_activity_translator import (
+    translate_set_variable_activity,
 )
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
@@ -393,14 +397,6 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
     assert result.notebook_path == fixture["expected"]["notebook_path"]
 
 
-def test_set_variable_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
-    """Test that SetVariable activity creates placeholder."""
-    fixture = next(f for f in unsupported_activity_fixtures if "Set Variable" in f["description"])
-    result = translate_activity(fixture["input"])
-
-    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
-
-
 def test_execute_pipeline_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
     """Test that ExecutePipeline activity creates placeholder."""
     fixture = next(f for f in unsupported_activity_fixtures if "Execute Pipeline" in f["description"])
@@ -681,6 +677,78 @@ def test_databricks_job_missing_job_id_returns_unsupported(databricks_job_activi
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
+
+
+# ---------------------------------------------------------------------------
+# SetVariable activity tests
+# ---------------------------------------------------------------------------
+
+
+def test_set_variable_static_string(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a static string value."""
+    fixture = next(f for f in set_variable_activity_fixtures if "static string" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.name == fixture["expected"]["name"]
+    assert result.task_key == fixture["expected"]["task_key"]
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_activity_output_expression(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with an activity output expression dict."""
+    fixture = next(f for f in set_variable_activity_fixtures if "activity output expression" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_pipeline_run_id(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with @pipeline().RunId system variable."""
+    fixture = next(f for f in set_variable_activity_fixtures if "pipeline RunId" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_pipeline_name(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with @pipeline().Pipeline system variable."""
+    fixture = next(f for f in set_variable_activity_fixtures if "pipeline Pipeline name" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_bare_expression_string(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a bare expression string (no wrapper dict)."""
+    fixture = next(f for f in set_variable_activity_fixtures if "bare expression string" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_unsupported_expression_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with unsupported expression returns UnsupportedValue placeholder."""
+    fixture = next(f for f in set_variable_activity_fixtures if "unsupported expression" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert not isinstance(result, SetVariableActivity)
+
+
+def test_set_variable_missing_variable_name_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with missing variable_name returns UnsupportedValue."""
+    fixture = next(f for f in set_variable_activity_fixtures if "missing variable_name" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_set_variable_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert "variable_name" in result.message
 
 
 # ---------------------------------------------------------------------------

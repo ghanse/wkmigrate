@@ -1,13 +1,42 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy and Lookup activity preparers
-to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy, Lookup, and SetVariable activity
+preparers to build Databricks notebooks.
 """
 
 from __future__ import annotations
 
+import autopep8  # type: ignore
+
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
+
+
+def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
+    """
+    Generates notebook source for a SetVariable activity.
+
+    The notebook evaluates ``variable_value`` and publishes the result as a
+    Databricks task value under ``key=variable_name`` so that downstream tasks
+    can retrieve it with ``dbutils.jobs.taskValues.get()``.
+
+    Args:
+        variable_name: ADF variable name (used as the task-value key).
+        variable_value: Python expression string produced by the expression parser.
+
+    Returns:
+        Formatted Python notebook source string.
+    """
+    script_lines = [
+        "# Databricks notebook source",
+        "",
+        f"# Set variable: {variable_name}",
+        f"value = {variable_value}",
+        "",
+        "# Publish as a Databricks task value:",
+        f"dbutils.jobs.taskValues.set(key={variable_name!r}, value=str(value))",
+    ]
+    return autopep8.fix_code("\n".join(script_lines))
 
 
 def get_option_expressions(dataset_definition: dict) -> list[str]:

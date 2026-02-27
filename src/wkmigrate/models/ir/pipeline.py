@@ -204,6 +204,20 @@ class IfConditionActivity(Activity):
     child_activities: list[Activity] = field(default_factory=list)
 
 
+@dataclass(slots=True, kw_only=True)
+class SetVariableActivity(Activity):
+    """
+    SetVariable activity metadata.
+
+    Attributes:
+        variable_name: ADF variable name to set; also used as the Databricks task-value key.
+        variable_value: Python expression string that evaluates to the value to publish.
+    """
+
+    variable_name: str
+    variable_value: str
+
+
 @dataclass(slots=True)
 class ColumnMapping:
     """

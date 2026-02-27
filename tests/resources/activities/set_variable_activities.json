@@ -1,0 +1,121 @@
+[
+  {
+    "description": "SetVariable with a static string value",
+    "input": {
+      "name": "set_customer_name",
+      "type": "SetVariable",
+      "description": "Set the customer name variable",
+      "depends_on": [],
+      "variable_name": "customerName",
+      "value": "Databricks"
+    },
+    "expected": {
+      "name": "set_customer_name",
+      "task_key": "set_customer_name",
+      "description": "Set the customer name variable",
+      "variable_name": "customerName",
+      "variable_value": "'Databricks'"
+    }
+  },
+  {
+    "description": "SetVariable with an activity output expression",
+    "input": {
+      "name": "set_from_lookup",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "lookupResult",
+      "value": {
+        "value": "@activity('GetConfig').output.firstRow",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_lookup",
+      "task_key": "set_from_lookup",
+      "variable_name": "lookupResult",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='firstRow')"
+    }
+  },
+  {
+    "description": "SetVariable with pipeline RunId system variable",
+    "input": {
+      "name": "set_run_id",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "runId",
+      "value": {
+        "value": "@pipeline().RunId",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_run_id",
+      "task_key": "set_run_id",
+      "variable_name": "runId",
+      "variable_value": "dbutils.jobs.getContext().tags().get('runId', '')"
+    }
+  },
+  {
+    "description": "SetVariable with pipeline Pipeline name system variable",
+    "input": {
+      "name": "set_pipeline_name",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "pipelineName",
+      "value": {
+        "value": "@pipeline().Pipeline",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_pipeline_name",
+      "task_key": "set_pipeline_name",
+      "variable_name": "pipelineName",
+      "variable_value": "spark.conf.get('spark.databricks.job.parentName', '')"
+    }
+  },
+  {
+    "description": "SetVariable with a bare expression string (no wrapper dict)",
+    "input": {
+      "name": "set_from_bare_expr",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "outputVal",
+      "value": "@activity('FetchData').output.value"
+    },
+    "expected": {
+      "name": "set_from_bare_expr",
+      "task_key": "set_from_bare_expr",
+      "variable_name": "outputVal",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='FetchData', key='value')"
+    }
+  },
+  {
+    "description": "SetVariable with unsupported expression returns placeholder",
+    "input": {
+      "name": "set_unsupported",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "myVar",
+      "value": {
+        "value": "@concat('hello', 'world')",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "unsupported": true
+    }
+  },
+  {
+    "description": "SetVariable missing variable_name returns placeholder",
+    "input": {
+      "name": "set_missing_name",
+      "type": "SetVariable",
+      "depends_on": [],
+      "value": "someValue"
+    },
+    "expected": {
+      "unsupported": true
+    }
+  }
+]
