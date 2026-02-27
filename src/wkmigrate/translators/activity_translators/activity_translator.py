@@ -302,10 +302,9 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
     depends_on = _parse_dependencies(activity.get("depends_on"), is_conditional_task)
     cluster_spec = activity.get("linked_service_definition")
     new_cluster = translate_databricks_cluster_spec(cluster_spec) if cluster_spec else None
-    name = activity.get("name") or "UNNAMED_TASK"
-    task_key = name or "TASK_NAME_NOT_PROVIDED"
+    task_key = activity.get("name") or "UNNAMED_TASK"
     return {
-        "name": name,
+        "name": task_key,
         "task_key": task_key,
         "description": activity.get("description"),
         "timeout_seconds": policy.get("timeout_seconds"),

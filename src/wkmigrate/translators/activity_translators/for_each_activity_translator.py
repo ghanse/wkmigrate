@@ -204,9 +204,8 @@ def _parse_array_string(array_string: str) -> str:
     Returns:
         JSON-safe representation of the array.
     """
-    double_quote_character = '"'
-    single_quote_character = "'"
-    return f'["{'","'.join([f'{element.replace(single_quote_character, "").replace(double_quote_character, "")}' for element in array_string.split(',')])}"]'
+    items = [item.replace("'", "").replace('"', "") for item in array_string.split(",")]
+    return '["' + '","'.join(items) + '"]'
 
 
 def _filter_parameters(activity: dict) -> dict | UnsupportedValue:
@@ -233,5 +232,4 @@ def _filter_parameters(activity: dict) -> dict | UnsupportedValue:
             )
             continue
         filtered_parameters.update({name: expression})
-    activity["base_parameters"] = filtered_parameters
-    return activity
+    return {**activity, "base_parameters": filtered_parameters}

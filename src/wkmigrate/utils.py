@@ -251,6 +251,13 @@ def normalize_translated_result(result: Activity | UnsupportedValue, base_kwargs
     be translated. In those cases, this helper converts the unsupported value into a
     placeholder notebook activity so downstream components (such as the workflow
     preparer) continue to operate on ``Activity`` instances only.
+
+    Args:
+        result: Activity or UnsupportedValue as an internal representation
+        base_kwargs: Activity keyword-arguments
+
+    Returns:
+        A placeholder DatabricksNotebookActivity for any UnsupportedValue; Otherwise the input Activity
     """
     if isinstance(result, UnsupportedValue):
         return get_placeholder_activity(base_kwargs)

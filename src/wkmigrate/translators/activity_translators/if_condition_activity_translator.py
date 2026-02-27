@@ -118,7 +118,9 @@ def _translate_child_activities(
     translated: list[Activity] = []
     for activity in child_activities:
         _activity = activity.copy()
-        _activity["depends_on"] = activity.get("depends_on", []).append(parent_dependency)
+        _dependencies = activity.get("depends_on", [])
+        _dependencies.append(parent_dependency)
+        _activity["depends_on"] = _dependencies
         result, context = visit_activity(_activity, True, context)
         translated.append(result)
     return translated, context
