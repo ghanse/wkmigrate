@@ -1000,3 +1000,44 @@ def test_web_activity_translate_activity_dispatch(web_activity_fixtures: list[di
     assert isinstance(result, WebActivity)
     assert result.url == fixture["expected"]["url"]
     assert result.method == fixture["expected"]["method"]
+
+
+def test_get_web_activity_notebook_content_contains_request_call() -> None:
+    """Test that get_web_activity_notebook_content produces valid notebook content."""
+    from wkmigrate.code_generator import get_web_activity_notebook_content
+
+    content = get_web_activity_notebook_content(
+        url="https://api.example.com/data",
+        method="GET",
+        headers={"Accept": "application/json"},
+        body=None,
+    )
+
+    assert "requests.request" in content
+    assert "https://api.example.com/data" in content
+    assert "GET" in content
+    assert "taskValues.set" in content
+    assert "status_code" in content
+    assert "response_body" in content
+
+
+def test_prepare_web_activity_returns_prepared_activity() -> None:
+    """Test that prepare_web_activity returns a non-None PreparedActivity with notebook artifact."""
+    from wkmigrate.models.workflows.artifacts import PreparedActivity
+    from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
+
+    activity = WebActivity(
+        name="CallApi",
+        task_key="call_api",
+        url="https://api.example.com/data",
+        method="POST",
+        headers={},
+        body='{"key": "value"}',
+    )
+
+    result = prepare_web_activity(activity)
+
+    assert result is not None
+    assert isinstance(result, PreparedActivity)
+    assert len(result.notebooks) == 1
+    assert "call_api" in result.notebooks[0].file_path
