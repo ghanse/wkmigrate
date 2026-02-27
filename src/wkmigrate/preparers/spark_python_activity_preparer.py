@@ -6,7 +6,8 @@ Python task definition from the translated Spark Python activity.
 from __future__ import annotations
 from wkmigrate.models.ir.pipeline import SparkPythonActivity
 from wkmigrate.models.workflows.artifacts import PreparedActivity
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_spark_python_activity(activity: SparkPythonActivity) -> PreparedActivity:
@@ -19,7 +20,7 @@ def prepare_spark_python_activity(activity: SparkPythonActivity) -> PreparedActi
     Returns:
         Spark Python task configuration
     """
-    task = prune_nones(
+    task = parse_mapping(
         {
             **get_base_task(activity),
             "spark_python_task": {

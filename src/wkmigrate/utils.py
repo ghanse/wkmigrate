@@ -6,6 +6,7 @@ metadata (e.g. appending system tags).
 """
 
 import re
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from importlib import import_module
 from typing import Any
@@ -13,11 +14,6 @@ from typing import Any
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.pipeline import Activity, DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-
-
-def identity(item: Any) -> Any:
-    """Returns the provided value unchanged."""
-    return item
 
 
 def translate(items: dict | None, mapping: dict) -> dict | None:
@@ -41,6 +37,26 @@ def translate(items: dict | None, mapping: dict) -> dict | None:
         if value is not None:
             output[key] = value
     return output
+
+
+def parse_mapping(mapping: dict[str, Any] | None, parser: Callable[[Any], Any] | None = None) -> dict[str, Any]:
+    """
+    Parses dictionary values into strings.
+
+    Args:
+        mapping: Dictionary of key-value pairs
+        parser: Method to apply to each mapping value
+
+    Returns:
+        Mapping with parsed values
+    """
+    if not mapping:
+        return {}
+
+    if parser is not None:
+        return {key: parser(value) for key, value in mapping.items() if value is not None}
+
+    return {key: value for key, value in mapping.items() if value is not None}
 
 
 def append_system_tags(tags: dict | None) -> dict:
@@ -88,20 +104,6 @@ def parse_activity_timeout_string(timeout_string: str) -> int:
             seconds=date_time.second,
         )
     return int(time_delta.total_seconds())
-
-
-def parse_expression(expression: str) -> str:
-    """
-    Parses a variable or parameter expression to a Workflows-compatible parameter value.
-
-    Args:
-        expression: Variable or parameter expression as a ``str``.
-
-    Returns:
-        Workflows-compatible parameter value as a ``str``.
-    """
-    # TODO: ADD DIFFERENT FUNCTIONS TO BE PARSED INTO {{}} OPERATORS
-    return expression
 
 
 def extract_group(input_string: str, regex: str) -> str | UnsupportedValue:

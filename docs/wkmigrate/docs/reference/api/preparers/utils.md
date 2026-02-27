@@ -22,20 +22,3 @@ Returns the fields common to every task.
 
   Dictionary containing the common task fields.
 
-#### prune\_nones
-
-```python
-def prune_nones(mapping: dict[str, Any] | None) -> dict[str, Any] | None
-```
-
-Prunes None values from a dictionary.
-
-**Arguments**:
-
-- `mapping` - Dictionary to prune.
-  
-
-**Returns**:
-
-  Dictionary with `None` values removed.
-

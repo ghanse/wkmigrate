@@ -224,13 +224,8 @@ def _filter_parameters(activity: dict) -> dict | UnsupportedValue:
     base_parameters = activity.get("base_parameters")
     if base_parameters is None:
         return UnsupportedValue(value=activity, message="Property 'base_parameters' is None for ForEach inner activity")
-    parameters = base_parameters
-    if isinstance(parameters, UnsupportedValue):
-        return parameters
-    if parameters is None:
-        return {}
     filtered_parameters = {}
-    for name, expression in parameters.items():
+    for name, expression in base_parameters.items():
         if expression is not None and expression.get("value") == "@item()":
             warnings.warn(
                 f"Removing redundant parameter {name} with value {expression.get('value')}",

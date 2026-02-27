@@ -24,7 +24,8 @@ from wkmigrate.code_generator import (
 from wkmigrate.models.ir.pipeline import CopyActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
 from wkmigrate.models.workflows.instructions import PipelineInstruction
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_copy_activity(
@@ -66,7 +67,7 @@ def prepare_copy_activity(
 
     if not files_to_delta_sinks:
         # Standard notebook execution
-        task = prune_nones(
+        task = parse_mapping(
             {
                 **base_task,
                 "notebook_task": {"notebook_path": notebook_path},
@@ -80,7 +81,7 @@ def prepare_copy_activity(
 
     # DLT pipeline execution - pipeline_id will be resolved later
     pipeline_name = f"{activity.task_key}_pipeline"
-    task = prune_nones(
+    task = parse_mapping(
         {
             **base_task,
             "pipeline_task": {"pipeline_id": "__PIPELINE_ID__"},

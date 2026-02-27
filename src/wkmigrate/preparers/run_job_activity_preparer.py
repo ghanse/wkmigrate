@@ -14,7 +14,8 @@ from typing import Any
 from wkmigrate.models.ir.pipeline import RunJobActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_run_job_activity(
@@ -23,8 +24,8 @@ def prepare_run_job_activity(
 ) -> tuple[PreparedActivity, PreparedWorkflow | None]:
 
     if activity.existing_job_id:
-        run_job_task = prune_nones({"job_id": activity.existing_job_id, "job_parameters": activity.job_parameters})
-        task = prune_nones({**get_base_task(activity), "run_job_task": run_job_task})
+        run_job_task = parse_mapping({"job_id": activity.existing_job_id, "job_parameters": activity.job_parameters})
+        task = parse_mapping({**get_base_task(activity), "run_job_task": run_job_task})
         return PreparedActivity(task=task), None
 
     if not activity.pipeline and not activity.existing_job_id:
@@ -71,6 +72,6 @@ def prepare_run_job_activity(
     )
 
     prepared_activity = PreparedActivity(
-        task=prune_nones({**get_base_task(activity), "run_job_task": f"__INNER_JOB__:{activity.name}"})
+        task=parse_mapping({**get_base_task(activity), "run_job_task": f"__INNER_JOB__:{activity.name}"})
     )
     return prepared_activity, prepared_workflow

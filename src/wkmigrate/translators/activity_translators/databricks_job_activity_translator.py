@@ -7,6 +7,7 @@ objects for any unparsable inputs.
 
 from wkmigrate.models.ir.pipeline import RunJobActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.utils import parse_mapping
 
 
 def translate_databricks_job_activity(activity: dict, base_kwargs: dict) -> RunJobActivity | UnsupportedValue:
@@ -24,8 +25,10 @@ def translate_databricks_job_activity(activity: dict, base_kwargs: dict) -> RunJ
     existing_job_id = activity.get("existing_job_id")
     if not existing_job_id:
         return UnsupportedValue(activity, "Missing field 'existing_job_id' for Databricks Job activity")
+
+    job_parameters = parse_mapping(activity.get("job_parameters"))
     return RunJobActivity(
         **base_kwargs,
         existing_job_id=str(existing_job_id),
-        job_parameters=activity.get("job_parameters"),
+        job_parameters=job_parameters,
     )

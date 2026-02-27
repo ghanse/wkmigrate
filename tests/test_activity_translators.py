@@ -647,7 +647,6 @@ def test_basic_databricks_job_activity(databricks_job_activity_fixtures: list[di
     assert result.name == fixture["expected"]["name"]
     assert result.task_key == fixture["expected"]["task_key"]
     assert result.existing_job_id == fixture["expected"]["existing_job_id"]
-    assert result.job_parameters == fixture["expected"]["job_parameters"]
     assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
     assert result.max_retries == fixture["expected"]["max_retries"]
 

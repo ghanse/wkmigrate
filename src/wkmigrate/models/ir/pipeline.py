@@ -132,7 +132,7 @@ class RunJobActivity(Activity):
     name: str
     pipeline: Pipeline | None = None
     existing_job_id: str | None = None
-    job_parameters: dict[str, str] | None = None
+    job_parameters: dict[str, Any] | None = None
 
 
 @dataclass(slots=True, kw_only=True)

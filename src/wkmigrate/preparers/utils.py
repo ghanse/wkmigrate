@@ -1,9 +1,10 @@
 """Shared helpers for workflow preparers."""
 
 from __future__ import annotations
-from typing import Any, overload
+from typing import Any
 from databricks.sdk.service.compute import Library, MavenLibrary, PythonPyPiLibrary, RCranLibrary
 from wkmigrate.models.ir.pipeline import Activity
+from wkmigrate.utils import parse_mapping
 
 
 def get_base_task(activity: Activity) -> dict[str, Any]:
@@ -20,7 +21,7 @@ def get_base_task(activity: Activity) -> dict[str, Any]:
     libraries = None
     if activity.depends_on:
         depends_on = [
-            prune_nones(
+            parse_mapping(
                 {
                     "task_key": dep.task_key,
                     "outcome": dep.outcome,
@@ -30,7 +31,7 @@ def get_base_task(activity: Activity) -> dict[str, Any]:
         ]
     if activity.libraries:
         libraries = [_create_library(library) for library in activity.libraries]
-    return prune_nones(
+    return parse_mapping(
         {
             "task_key": activity.task_key,
             "description": activity.description,
@@ -42,29 +43,6 @@ def get_base_task(activity: Activity) -> dict[str, Any]:
             "libraries": libraries,
         }
     )
-
-
-@overload
-def prune_nones(mapping: dict[str, Any]) -> dict[str, Any]: ...
-
-
-@overload
-def prune_nones(mapping: None) -> None: ...
-
-
-def prune_nones(mapping: dict[str, Any] | None) -> dict[str, Any] | None:
-    """
-    Prunes None values from a dictionary.
-
-    Args:
-        mapping: Dictionary to prune.
-
-    Returns:
-        Dictionary with `None` values removed.
-    """
-    if mapping is None:
-        return None
-    return {key: value for key, value in mapping.items() if value is not None}
 
 
 def _create_library(library: dict[str, Any]) -> Library:

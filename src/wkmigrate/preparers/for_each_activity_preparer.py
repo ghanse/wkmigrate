@@ -10,7 +10,8 @@ from __future__ import annotations
 from importlib import import_module
 from wkmigrate.models.ir.pipeline import ForEachActivity
 from wkmigrate.models.workflows.artifacts import PreparedActivity, PreparedWorkflow
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_for_each_activity(
@@ -39,6 +40,6 @@ def prepare_for_each_activity(
         "inputs": activity.items_string,
         "concurrency": activity.concurrency,
     }
-    task = PreparedActivity(task=prune_nones({**get_base_task(activity), "for_each_task": for_each_task}))
+    task = PreparedActivity(task=parse_mapping({**get_base_task(activity), "for_each_task": for_each_task}))
 
     return task, inner_workflow

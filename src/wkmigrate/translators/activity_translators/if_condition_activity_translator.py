@@ -113,13 +113,13 @@ def _translate_child_activities(
     """
     activity_translator = import_module("wkmigrate.translators.activity_translators.activity_translator")
     visit_activity = activity_translator.visit_activity
+    parent_dependency = {"activity": parent_task_name, "outcome": parent_task_outcome}
 
     translated: list[Activity] = []
     for activity in child_activities:
-        copied_activity = activity.copy()
-        depends_on = copied_activity.setdefault("depends_on", [])
-        depends_on.append({"activity": parent_task_name, "outcome": parent_task_outcome})
-        result, context = visit_activity(copied_activity, True, context)
+        _activity = activity.copy()
+        _activity["depends_on"] = activity.get("depends_on", []).append(parent_dependency)
+        result, context = visit_activity(_activity, True, context)
         translated.append(result)
     return translated, context
 

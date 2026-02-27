@@ -90,23 +90,6 @@ Converts ``DatasetProperties`` into a dictionary.
 
   Flat dictionary representation of the dataset properties with ``None`` values removed.
 
-#### filter\_none\_dict
-
-```python
-def filter_none_dict(values: dict[str, Any] | None) -> dict[str, Any]
-```
-
-Removes ``None`` values from a dictionary.
-
-**Arguments**:
-
-- `values` - Dictionary to filter.
-  
-
-**Returns**:
-
-  Filtered dictionary.
-
 #### collect\_data\_source\_secrets
 
 ```python

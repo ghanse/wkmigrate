@@ -10,7 +10,8 @@ from __future__ import annotations
 from databricks.sdk.service.jobs import ConditionTaskOp
 from wkmigrate.models.ir.pipeline import IfConditionActivity
 from wkmigrate.models.workflows.artifacts import PreparedActivity
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_if_condition_activity(activity: IfConditionActivity) -> PreparedActivity:
@@ -23,7 +24,7 @@ def prepare_if_condition_activity(activity: IfConditionActivity) -> PreparedActi
     Returns:
         Databricks condition task configuration
     """
-    task = prune_nones(
+    task = parse_mapping(
         {
             **get_base_task(activity),
             "condition_task": {

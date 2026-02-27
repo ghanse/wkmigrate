@@ -14,6 +14,7 @@ from typing import Any
 
 from wkmigrate.models.ir.datasets import Dataset, DatasetProperties
 from wkmigrate.models.workflows.instructions import SecretInstruction
+from wkmigrate.utils import parse_mapping
 
 FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
 SQL_DATASET_TYPES = {"AzureSqlTable"}
@@ -120,11 +121,11 @@ def dataset_to_dict(dataset: Dataset | dict) -> dict:
             dataset_dict["type"] = dataset_type_value
         format_options = dataset_dict.pop("format_options", None)
         if isinstance(format_options, dict):
-            dataset_dict.update(filter_none_dict(format_options))
+            dataset_dict.update(parse_mapping(format_options))
         connection_options = dataset_dict.pop("connection_options", None)
         if isinstance(connection_options, dict):
-            dataset_dict.update(filter_none_dict(connection_options))
-        return filter_none_dict(dataset_dict)
+            dataset_dict.update(parse_mapping(connection_options))
+        return parse_mapping(dataset_dict)
     return {}
 
 
@@ -143,23 +144,8 @@ def dataset_properties_to_dict(properties: DatasetProperties | dict | None) -> d
     if isinstance(properties, dict):
         return properties
     values: dict[str, Any] = {"type": properties.dataset_type}
-    values.update(filter_none_dict(properties.options))
+    values.update(parse_mapping(properties.options))
     return values
-
-
-def filter_none_dict(values: dict[str, Any] | None) -> dict[str, Any]:
-    """
-    Removes ``None`` values from a dictionary.
-
-    Args:
-        values: Dictionary to filter.
-
-    Returns:
-        Filtered dictionary.
-    """
-    if values is None:
-        return {}
-    return {key: value for key, value in values.items() if value is not None}
 
 
 def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:

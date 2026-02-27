@@ -9,14 +9,6 @@ Utilities in this module cover common translation patterns such as mapping
 dictionaries with parser specifications, normalizing expressions, and enriching
 metadata (e.g. appending system tags).
 
-#### identity
-
-```python
-def identity(item: Any) -> Any
-```
-
-Returns the provided value unchanged.
-
 #### translate
 
 ```python
@@ -34,6 +26,26 @@ Maps dictionary values using a translation specification.
 **Returns**:
 
   Translated dictionary as a ``dict`` or ``None`` when no input is provided.
+
+#### parse\_mapping
+
+```python
+def parse_mapping(
+        mapping: dict[str, Any] | None,
+        parser: Callable[[Any], Any] | None = None) -> dict[str, Any]
+```
+
+Parses dictionary values into strings.
+
+**Arguments**:
+
+- `mapping` - Dictionary of key-value pairs
+- `parser` - Method to apply to each mapping value
+  
+
+**Returns**:
+
+  Mapping with parsed values
 
 #### append\_system\_tags
 
@@ -68,23 +80,6 @@ Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
 **Returns**:
 
   Total seconds represented by the timeout.
-
-#### parse\_expression
-
-```python
-def parse_expression(expression: str) -> str
-```
-
-Parses a variable or parameter expression to a Workflows-compatible parameter value.
-
-**Arguments**:
-
-- `expression` - Variable or parameter expression as a ``str``.
-  
-
-**Returns**:
-
-  Workflows-compatible parameter value as a ``str``.
 
 #### extract\_group
 

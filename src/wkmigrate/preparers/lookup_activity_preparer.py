@@ -15,7 +15,8 @@ from wkmigrate.datasets import collect_data_source_secrets, merge_dataset_defini
 from wkmigrate.code_generator import get_option_expressions, get_read_expression
 from wkmigrate.models.ir.pipeline import LookupActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
-from wkmigrate.preparers.utils import get_base_task, prune_nones
+from wkmigrate.preparers.utils import get_base_task
+from wkmigrate.utils import parse_mapping
 
 
 def prepare_lookup_activity(activity: LookupActivity) -> PreparedActivity:
@@ -48,7 +49,7 @@ def prepare_lookup_activity(activity: LookupActivity) -> PreparedActivity:
     )
 
     base_task = get_base_task(activity)
-    task = prune_nones(
+    task = parse_mapping(
         {
             **base_task,
             "notebook_task": {"notebook_path": notebook_path},
