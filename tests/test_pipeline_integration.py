@@ -431,11 +431,9 @@ def test_foreach_with_unsupported_inner_activity() -> None:
                 "items": {"type": "Expression", "value": "@array(['a', 'b'])"},
                 "activities": [
                     {
-                        "name": "web_activity",
-                        "type": "WebActivity",
+                        "name": "unsupported_inner",
+                        "type": "SomeUnsupportedType",
                         "depends_on": [],
-                        "method": "GET",
-                        "url": "https://api.example.com",
                     }
                 ],
             }

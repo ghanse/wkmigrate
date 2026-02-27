@@ -187,6 +187,27 @@ class LookupActivity(Activity):
 
 
 @dataclass(slots=True, kw_only=True)
+class WebActivity(Activity):
+    """
+    Web activity metadata.
+
+    Translates an ADF Web activity into a notebook task that submits an HTTP request
+    using the Python ``requests`` library and publishes the response as Databricks task values.
+
+    Attributes:
+        url: Target URL for the HTTP request.
+        method: HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
+        body: Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
+        headers: Optional HTTP headers dictionary.
+    """
+
+    url: str
+    method: str
+    body: Any = None
+    headers: dict[str, str] | None = None
+
+
+@dataclass(slots=True, kw_only=True)
 class IfConditionActivity(Activity):
     """
     If Condition activity metadata.

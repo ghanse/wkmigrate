@@ -20,6 +20,7 @@ from wkmigrate.models.ir.pipeline import (
     RunJobActivity,
     SparkJarActivity,
     SparkPythonActivity,
+    WebActivity,
 )
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
@@ -47,6 +48,7 @@ from wkmigrate.translators.activity_translators.spark_jar_activity_translator im
 from wkmigrate.translators.activity_translators.lookup_activity_translator import (
     translate_lookup_activity,
 )
+from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
 )
@@ -916,3 +918,85 @@ class TestTranslationContextCache:
         assert "loop" in final_ctx.activity_cache
         assert "inner_nb" not in final_ctx.activity_cache
         assert "inner_jar" not in final_ctx.activity_cache
+
+
+def test_web_activity_post_with_body_and_headers(web_activity_fixtures: list[dict]) -> None:
+    """Test translation of a Web activity with POST method, body, and headers."""
+    fixture = next(f for f in web_activity_fixtures if "POST with body" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, WebActivity)
+    assert result.name == fixture["expected"]["name"]
+    assert result.task_key == fixture["expected"]["task_key"]
+    assert result.url == fixture["expected"]["url"]
+    assert result.method == fixture["expected"]["method"]
+    assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
+    assert result.max_retries == fixture["expected"]["max_retries"]
+    assert result.min_retry_interval_millis == fixture["expected"]["min_retry_interval_millis"]
+
+
+def test_web_activity_post_body_and_headers_stored(web_activity_fixtures: list[dict]) -> None:
+    """Test that body and headers are stored on the WebActivity IR."""
+    fixture = next(f for f in web_activity_fixtures if "POST with body" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_web_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, WebActivity)
+    assert result.body == {"event": "pipeline_started", "status": "running"}
+    assert result.headers == {"Content-Type": "application/json", "X-Api-Key": "secret-key"}
+
+
+def test_web_activity_get_no_body(web_activity_fixtures: list[dict]) -> None:
+    """Test translation of a GET Web activity with no body."""
+    fixture = next(f for f in web_activity_fixtures if "GET with no body" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_web_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, WebActivity)
+    assert result.method == "GET"
+    assert result.body is None
+    assert result.headers is None
+
+
+def test_web_activity_method_uppercased(web_activity_fixtures: list[dict]) -> None:
+    """Test that the HTTP method is normalised to uppercase."""
+    fixture = next(f for f in web_activity_fixtures if "PUT with body" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_web_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, WebActivity)
+    assert result.method == "PUT"
+
+
+def test_web_activity_missing_url_returns_unsupported(web_activity_fixtures: list[dict]) -> None:
+    """Test that a missing URL returns UnsupportedValue."""
+    from wkmigrate.models.ir.unsupported import UnsupportedValue
+
+    fixture = next(f for f in web_activity_fixtures if "missing URL" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_web_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_web_activity_missing_method_returns_unsupported(web_activity_fixtures: list[dict]) -> None:
+    """Test that a missing method returns UnsupportedValue."""
+    from wkmigrate.models.ir.unsupported import UnsupportedValue
+
+    fixture = next(f for f in web_activity_fixtures if "missing method" in f["description"])
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_web_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_web_activity_translate_activity_dispatch(web_activity_fixtures: list[dict]) -> None:
+    """Test that translate_activity dispatches WebActivity to the correct translator."""
+    fixture = next(f for f in web_activity_fixtures if "GET with no body" in f["description"])
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, WebActivity)
+    assert result.url == fixture["expected"]["url"]
+    assert result.method == fixture["expected"]["method"]

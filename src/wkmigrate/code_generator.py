@@ -7,6 +7,10 @@ to build Databricks notebooks.
 
 from __future__ import annotations
 
+from typing import Any
+
+import autopep8  # type: ignore
+
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
 
 
@@ -190,3 +194,53 @@ def get_jdbc_read_expression(source_definition: dict, source_query: str | None =
     lines.append("        .load()")
     lines.append(")")
     return "\n".join(lines) + "\n"
+
+
+def get_web_activity_notebook_content(
+    url: str,
+    method: str,
+    body: Any,
+    headers: dict[str, str] | None,
+) -> str:
+    """
+    Generates notebook source for a Web activity.
+
+    The generated notebook submits an HTTP request using the ``requests`` library
+    and publishes the response body and status code as Databricks task values.
+
+    Args:
+        url: Target URL for the HTTP request.
+        method: HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
+        body: Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
+        headers: Optional HTTP headers dictionary.
+
+    Returns:
+        Formatted Python notebook source as a ``str``.
+    """
+    script_lines = [
+        "# Databricks notebook source",
+        "import requests",
+        "",
+        f"# {method} {url}",
+        f"url = {url!r}",
+        f"method = {method!r}",
+        f"headers = {headers!r}",
+        f"body = {body!r}",
+        "",
+        "kwargs = {}",
+        "if headers:",
+        '    kwargs["headers"] = headers',
+        "if body is not None:",
+        "    if isinstance(body, dict):",
+        '        kwargs["json"] = body',
+        "    else:",
+        '        kwargs["data"] = body',
+        "",
+        "response = requests.request(method, url, **kwargs)",
+        "response.raise_for_status()",
+        "",
+        "# Publish response as Databricks task values:",
+        'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
+        'dbutils.jobs.taskValues.set(key="status_code", value=str(response.status_code))',
+    ]
+    return autopep8.fix_code("\n".join(script_lines))

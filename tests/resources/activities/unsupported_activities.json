@@ -2,25 +2,14 @@
   {
     "description": "Unsupported activity type creates placeholder notebook",
     "input": {
-      "name": "web_activity",
-      "type": "WebActivity",
-      "description": "Call external API",
-      "depends_on": [],
-      "policy": {
-        "timeout": "0.00:10:00",
-        "retry": 3,
-        "retry_interval_in_seconds": 30
-      },
-      "method": "POST",
-      "url": "https://api.example.com/webhook"
+      "name": "some_unsupported_activity",
+      "type": "SomeUnsupportedType",
+      "description": "An activity type that is not supported"
     },
     "expected": {
-      "name": "web_activity",
-      "task_key": "web_activity",
-      "activity_type": "WebActivity",
-      "timeout_seconds": 600,
-      "max_retries": 3,
-      "min_retry_interval_millis": 30000,
+      "name": "some_unsupported_activity",
+      "task_key": "some_unsupported_activity",
+      "activity_type": "SomeUnsupportedType",
       "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"
     }
   },

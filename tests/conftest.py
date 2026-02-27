@@ -92,6 +92,12 @@ def linked_service_fixtures() -> list[dict]:
 
 
 @pytest.fixture
+def web_activity_fixtures() -> list[dict]:
+    """Load Web activity test fixtures."""
+    return load_fixtures("web_activities.json")
+
+
+@pytest.fixture
 def complex_pipeline_fixtures() -> list[dict]:
     """Load complex pipeline test fixtures."""
     return load_fixtures("pipelines.json")

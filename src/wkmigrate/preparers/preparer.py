@@ -21,6 +21,7 @@ from wkmigrate.models.ir.pipeline import (
     RunJobActivity,
     SparkJarActivity,
     SparkPythonActivity,
+    WebActivity,
 )
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
@@ -32,6 +33,7 @@ from wkmigrate.preparers.notebook_activity_preparer import prepare_notebook_acti
 from wkmigrate.preparers.run_job_activity_preparer import prepare_run_job_activity
 from wkmigrate.preparers.spark_jar_activity_preparer import prepare_spark_jar_activity
 from wkmigrate.preparers.spark_python_activity_preparer import prepare_spark_python_activity
+from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
 
 
 def prepare_workflow(pipeline: Pipeline, files_to_delta_sinks: bool | None = None) -> PreparedWorkflow:
@@ -133,4 +135,6 @@ def prepare_activity(
         return prepare_copy_activity(activity, default_files_to_delta_sinks), None
     if isinstance(activity, LookupActivity):
         return prepare_lookup_activity(activity), None
+    if isinstance(activity, WebActivity):
+        return prepare_web_activity(activity), None
     raise ValueError(f"Unsupported activity type '{type(activity)}'")
