@@ -38,7 +38,7 @@ def parse_variable_value(value: str | dict) -> str | UnsupportedValue:
         or an :class:`UnsupportedValue` when the expression cannot be translated.
     """
     if isinstance(value, dict):
-        if value.get("type") \!= "Expression":
+        if value.get("type") != "Expression":
             return UnsupportedValue(value=value, message=f"Unsupported value type: {value.get('type')}")
         inner = value.get("value", "")
         if not inner:
