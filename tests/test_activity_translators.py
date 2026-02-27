@@ -738,7 +738,7 @@ def test_set_variable_unsupported_expression_returns_unsupported(set_variable_ac
     fixture = next(f for f in set_variable_activity_fixtures if "unsupported expression" in f["description"])
     result = translate_activity(fixture["input"])
 
-    assert not isinstance(result, SetVariableActivity)
+    assert isinstance(result, UnsupportedValue)
 
 
 def test_set_variable_missing_variable_name_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:

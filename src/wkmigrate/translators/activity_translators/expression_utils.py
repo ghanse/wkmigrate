@@ -38,6 +38,8 @@ def parse_variable_value(value: str | dict) -> str | UnsupportedValue:
         or an :class:`UnsupportedValue` when the expression cannot be translated.
     """
     if isinstance(value, dict):
+        if value.get("type") \!= "Expression":
+            return UnsupportedValue(value=value, message=f"Unsupported value type: {value.get('type')}")
         inner = value.get("value", "")
         if not inner:
             return UnsupportedValue(value=value, message="Empty ADF expression value")
@@ -71,7 +73,11 @@ def _parse_expression_string(expr: str) -> str | UnsupportedValue:
         inner = inner[1:-1].strip()
 
     # @activity('X').output.Y
-    if match := re.match(r"activity\('(.+?)'\)\.output\.(.+)", inner):
+    # TODO: Known limitation: @activity(...).output.<key> references assume the upstream task
+    # publishes that exact key. The Lookup preparer publishes under key="result", so
+    # @activity('X').output.firstRow will fail at runtime. Consider mapping well-known
+    # output paths or returning UnsupportedValue for @activity references until resolved.
+    if match := re.match(r"activity\('([\w\s-]+)'\)\.output\.([\w.]+)", inner):
         task_key, output_key = match.group(1), match.group(2)
         return f"dbutils.jobs.taskValues.get(taskKey={task_key!r}, key={output_key!r})"
 

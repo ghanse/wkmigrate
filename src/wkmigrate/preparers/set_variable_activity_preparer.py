@@ -34,7 +34,7 @@ def prepare_set_variable_activity(activity: SetVariableActivity) -> PreparedActi
         the generated notebook artifact.
     """
     notebook_content = get_set_variable_notebook_content(activity.variable_name, activity.variable_value)
-    notebook_path = f"/wkmigrate/set_variable_notebooks/set_{activity.variable_name}"
+    notebook_path = f"/wkmigrate/set_variable_notebooks/{activity.task_key}/set_{activity.variable_name}"
     notebook = NotebookArtifact(file_path=notebook_path, content=notebook_content)
     base_task = get_base_task(activity)
     task = parse_mapping(
