@@ -734,11 +734,11 @@ def test_set_variable_bare_expression_string(set_variable_activity_fixtures: lis
 
 
 def test_set_variable_unsupported_expression_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
-    """Test SetVariable with unsupported expression returns UnsupportedValue placeholder."""
+    """Test SetVariable with unsupported expression produces an UNSUPPORTED_ADF_ACTIVITY placeholder."""
     fixture = next(f for f in set_variable_activity_fixtures if "unsupported expression" in f["description"])
     result = translate_activity(fixture["input"])
 
-    assert isinstance(result, UnsupportedValue)
+    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
 
 
 def test_set_variable_missing_variable_name_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:

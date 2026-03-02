@@ -6,8 +6,8 @@ title: wkmigrate.code_generator
 This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy and Lookup activity preparers
-to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy, Lookup, and SetVariable activity
+preparers to build Databricks notebooks.
 
 #### get\_option\_expressions
 
