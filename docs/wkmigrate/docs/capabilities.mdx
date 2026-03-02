@@ -30,6 +30,7 @@ The activity translator currently recognizes the following ADF activity types:
 | For Each Loops                            | `ForEachActivity`             | Supports simple `@array('value')` and `@createArray(...)` constructs; stores items expression, nested activities, and optional concurrency.                               |
 | Copy Data activities                      | `CopyActivity`                | Combines source dataset and properties, sink dataset and properties, and column-level mappings. See [Datasets](#datasets) for a list of supported sources and sinks.      |
 | Lookup activities                         | `LookupActivity`              | Combines source dataset and properties for looking up data. See [Datasets](#datasets) for a list of supported sources.                                                    |
+| Web activities                            | `WebActivity`                 | Submits an HTTP request using the `requests` library and publishes the response body and status code as Databricks task values.                                            |
 
 <Admonition type="warning" title="Unsupported activities">
 When calling `to_job` or `to_asset_bundle`, unsupported activities are translated into placeholder notebook tasks 

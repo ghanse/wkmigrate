@@ -22,18 +22,12 @@ def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | U
         ``WebActivity`` representation of the HTTP request task.
     """
     url = activity.get("url")
-    if not url:
+    if not isinstance(url, str) or not url:
         return UnsupportedValue(activity, "Missing value 'url' for Web activity")
 
     method = activity.get("method")
-    if not method:
+    if not isinstance(method, str) or not method:
         return UnsupportedValue(activity, "Missing value 'method' for Web activity")
-
-    if not isinstance(url, str) or not isinstance(method, str):
-        return UnsupportedValue(
-            activity,
-            "WebActivity url and method must be string values (expression-based urls/methods are not supported)",
-        )
 
     return WebActivity(
         **base_kwargs,

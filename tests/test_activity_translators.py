@@ -48,6 +48,9 @@ from wkmigrate.translators.activity_translators.spark_jar_activity_translator im
 from wkmigrate.translators.activity_translators.lookup_activity_translator import (
     translate_lookup_activity,
 )
+from wkmigrate.code_generator import get_web_activity_notebook_content
+from wkmigrate.models.workflows.artifacts import PreparedActivity
+from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
@@ -970,8 +973,6 @@ def test_web_activity_method_uppercased(web_activity_fixtures: list[dict]) -> No
 
 def test_web_activity_missing_url_returns_unsupported(web_activity_fixtures: list[dict]) -> None:
     """Test that a missing URL returns UnsupportedValue."""
-    from wkmigrate.models.ir.unsupported import UnsupportedValue
-
     fixture = next(f for f in web_activity_fixtures if "missing URL" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
     result = translate_web_activity(fixture["input"], base_kwargs)
@@ -982,8 +983,6 @@ def test_web_activity_missing_url_returns_unsupported(web_activity_fixtures: lis
 
 def test_web_activity_missing_method_returns_unsupported(web_activity_fixtures: list[dict]) -> None:
     """Test that a missing method returns UnsupportedValue."""
-    from wkmigrate.models.ir.unsupported import UnsupportedValue
-
     fixture = next(f for f in web_activity_fixtures if "missing method" in f["description"])
     base_kwargs = get_base_kwargs(fixture["input"])
     result = translate_web_activity(fixture["input"], base_kwargs)
@@ -1004,8 +1003,6 @@ def test_web_activity_translate_activity_dispatch(web_activity_fixtures: list[di
 
 def test_get_web_activity_notebook_content_contains_request_call() -> None:
     """Test that get_web_activity_notebook_content produces valid notebook content."""
-    from wkmigrate.code_generator import get_web_activity_notebook_content
-
     content = get_web_activity_notebook_content(
         url="https://api.example.com/data",
         method="GET",
@@ -1023,9 +1020,6 @@ def test_get_web_activity_notebook_content_contains_request_call() -> None:
 
 def test_prepare_web_activity_returns_prepared_activity() -> None:
     """Test that prepare_web_activity returns a non-None PreparedActivity with notebook artifact."""
-    from wkmigrate.models.workflows.artifacts import PreparedActivity
-    from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
-
     activity = WebActivity(
         name="CallApi",
         task_key="call_api",

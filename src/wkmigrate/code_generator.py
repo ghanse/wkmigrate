@@ -1,7 +1,7 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy and Lookup activity preparers
+and manage credentials.  They are consumed by the Copy, Lookup, and Web activity preparers
 to build Databricks notebooks.
 """
 
@@ -221,12 +221,8 @@ def get_web_activity_notebook_content(
         "# Databricks notebook source",
         "import requests",
         "",
-        f"# {method} {url}",
         f"url = {url!r}",
         f"method = {method!r}",
-        "# WARNING: Headers may contain secrets (Authorization, X-Api-Key, etc.)",
-        "# For production use, replace hardcoded values with dbutils.secrets.get()",
-        "# Example: headers[\"Authorization\"] = f\"Bearer {dbutils.secrets.get(scope='myScope', key='apiToken')}\"",
         f"headers = {headers!r}",
         f"body = {body!r}",
         "",

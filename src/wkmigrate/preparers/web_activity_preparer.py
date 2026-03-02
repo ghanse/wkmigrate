@@ -1,5 +1,4 @@
-"""
-This module defines a preparer for Web activities.
+"""This module defines a preparer for Web activities.
 
 The preparer builds a Databricks notebook task that submits an HTTP request using
 the Python ``requests`` library. The response body and status code are published
