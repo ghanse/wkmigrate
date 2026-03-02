@@ -1,5 +1,6 @@
 [
   {
+    "id": "basic",
     "description": "Basic notebook activity with minimal configuration",
     "input": {
       "name": "run_basic_notebook",
@@ -27,6 +28,7 @@
     }
   },
   {
+    "id": "with_parameters",
     "description": "Notebook activity with parameters",
     "input": {
       "name": "run_parameterized_notebook",
@@ -63,6 +65,7 @@
     }
   },
   {
+    "id": "with_dependency",
     "description": "Notebook activity with dependency",
     "input": {
       "name": "run_dependent_notebook",
@@ -71,7 +74,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "policy": {
@@ -91,10 +96,16 @@
       "min_retry_interval_millis": 30000,
       "notebook_path": "/Workspace/notebooks/dependent_notebook",
       "base_parameters": null,
-      "depends_on": [{"task_key": "upstream_task", "outcome": null}]
+      "depends_on": [
+        {
+          "task_key": "upstream_task",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "with_linked_service",
     "description": "Notebook activity with linked service definition (cluster config)",
     "input": {
       "name": "run_notebook_with_cluster",
@@ -114,8 +125,12 @@
           "new_cluster_node_type": "Standard_DS3_v2",
           "new_cluster_version": "13.3.x-scala2.12",
           "new_cluster_num_of_worker": "2:8",
-          "new_cluster_custom_tags": {"env": "production"},
-          "new_cluster_spark_conf": {"spark.sql.shuffle.partitions": "200"}
+          "new_cluster_custom_tags": {
+            "env": "production"
+          },
+          "new_cluster_spark_conf": {
+            "spark.sql.shuffle.partitions": "200"
+          }
         }
       }
     },
@@ -136,13 +151,22 @@
         "host_name": "https://adb-123456789.1.azuredatabricks.net",
         "node_type_id": "Standard_DS3_v2",
         "spark_version": "13.3.x-scala2.12",
-        "autoscale": {"min_workers": 2, "max_workers": 8},
-        "custom_tags": {"env": "production", "CREATED_BY_WKMIGRATE": ""},
-        "spark_conf": {"spark.sql.shuffle.partitions": "200"}
+        "autoscale": {
+          "min_workers": 2,
+          "max_workers": 8
+        },
+        "custom_tags": {
+          "env": "production",
+          "CREATED_BY_WKMIGRATE": ""
+        },
+        "spark_conf": {
+          "spark.sql.shuffle.partitions": "200"
+        }
       }
     }
   },
   {
+    "id": "secure_io",
     "description": "Notebook activity with secure input/output (should warn)",
     "input": {
       "name": "run_secure_notebook",
@@ -173,6 +197,7 @@
     "expects_warnings": true
   },
   {
+    "id": "missing_notebook_path",
     "description": "Notebook activity missing notebook_path (should return UnsupportedValue)",
     "input": {
       "name": "invalid_notebook",
@@ -187,6 +212,7 @@
     "expected_message": "Missing field 'notebook_path'"
   },
   {
+    "id": "expression_parameters",
     "description": "Notebook activity with expression parameters (should warn)",
     "input": {
       "name": "run_expression_notebook",

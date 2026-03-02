@@ -75,7 +75,7 @@ def prepare_workflow(pipeline: Pipeline, files_to_delta_sinks: bool | None = Non
         "tags": pipeline.tags,
         "tasks": tasks,
         "not_translatable": list(pipeline.not_translatable),
-        "inner_jobs": inner_jobs if inner_jobs else None,
+        "inner_jobs": inner_jobs,
     }
 
     return PreparedWorkflow(
@@ -84,7 +84,7 @@ def prepare_workflow(pipeline: Pipeline, files_to_delta_sinks: bool | None = Non
         pipelines=pipelines if pipelines else None,
         secrets=secrets if secrets else None,
         unsupported=list(pipeline.not_translatable),
-        inner_jobs=inner_jobs if inner_jobs else None,
+        inner_jobs=inner_jobs,
     )
 
 

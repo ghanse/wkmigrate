@@ -1,5 +1,6 @@
 [
   {
+    "id": "equals_both_branches",
     "description": "IfCondition activity with equals expression and both branches",
     "input": {
       "name": "check_status",
@@ -51,6 +52,7 @@
     }
   },
   {
+    "id": "only_true_branch",
     "description": "IfCondition activity with only if_true branch",
     "input": {
       "name": "check_mode",
@@ -85,6 +87,7 @@
     }
   },
   {
+    "id": "greater_than",
     "description": "IfCondition activity with greater than expression",
     "input": {
       "name": "check_threshold",
@@ -101,7 +104,9 @@
           "type": "DatabricksNotebook",
           "notebook_path": "/Workspace/notebooks/high_volume",
           "depends_on": [],
-          "policy": {"timeout": "0.01:00:00"}
+          "policy": {
+            "timeout": "0.01:00:00"
+          }
         }
       ],
       "if_false_activities": [
@@ -110,7 +115,9 @@
           "type": "DatabricksNotebook",
           "notebook_path": "/Workspace/notebooks/low_volume",
           "depends_on": [],
-          "policy": {"timeout": "0.00:30:00"}
+          "policy": {
+            "timeout": "0.00:30:00"
+          }
         }
       ]
     },
@@ -125,6 +132,7 @@
     }
   },
   {
+    "id": "nested_foreach",
     "description": "IfCondition activity with nested ForEach in false branch",
     "input": {
       "name": "conditional_foreach",
@@ -141,7 +149,9 @@
           "type": "DatabricksNotebook",
           "notebook_path": "/Workspace/notebooks/single",
           "depends_on": [],
-          "policy": {"timeout": "0.01:00:00"}
+          "policy": {
+            "timeout": "0.01:00:00"
+          }
         }
       ],
       "if_false_activities": [
@@ -160,9 +170,14 @@
               "type": "DatabricksNotebook",
               "notebook_path": "/Workspace/notebooks/batch_item",
               "depends_on": [],
-              "policy": {"timeout": "0.00:30:00"},
+              "policy": {
+                "timeout": "0.00:30:00"
+              },
               "base_parameters": {
-                "item": {"value": "@item()", "type": "Expression"}
+                "item": {
+                  "value": "@item()",
+                  "type": "Expression"
+                }
               }
             }
           ]
@@ -180,6 +195,7 @@
     }
   },
   {
+    "id": "less_than",
     "description": "IfCondition activity with less than expression",
     "input": {
       "name": "check_count",
@@ -196,7 +212,9 @@
           "type": "DatabricksNotebook",
           "notebook_path": "/Workspace/notebooks/small",
           "depends_on": [],
-          "policy": {"timeout": "0.00:15:00"}
+          "policy": {
+            "timeout": "0.00:15:00"
+          }
         }
       ]
     },
@@ -211,6 +229,7 @@
     }
   },
   {
+    "id": "missing_expression",
     "description": "IfCondition activity missing expression (should return UnsupportedValue)",
     "input": {
       "name": "invalid_condition",
@@ -229,6 +248,7 @@
     "expected_message": "Missing property 'expression'"
   },
   {
+    "id": "unsupported_expression",
     "description": "IfCondition activity with unsupported expression",
     "input": {
       "name": "unsupported_condition",
@@ -245,7 +265,9 @@
           "type": "DatabricksNotebook",
           "notebook_path": "/test",
           "depends_on": [],
-          "policy": {"timeout": "0.01:00:00"}
+          "policy": {
+            "timeout": "0.01:00:00"
+          }
         }
       ]
     },
@@ -253,6 +275,7 @@
     "expected_message": "Unsupported conditional expression"
   },
   {
+    "id": "no_children",
     "description": "IfCondition activity with no child activities (should warn)",
     "input": {
       "name": "empty_condition",

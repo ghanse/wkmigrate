@@ -1,5 +1,6 @@
 [
   {
+    "id": "unsupported_type",
     "description": "Unsupported activity type creates placeholder notebook",
     "input": {
       "name": "some_unsupported_activity",
@@ -14,6 +15,7 @@
     }
   },
   {
+    "id": "set_variable",
     "description": "Set Variable activity creates placeholder",
     "input": {
       "name": "set_variable",
@@ -35,6 +37,7 @@
     }
   },
   {
+    "id": "execute_pipeline",
     "description": "Execute Pipeline activity creates placeholder",
     "input": {
       "name": "call_child_pipeline",
@@ -58,6 +61,7 @@
     }
   },
   {
+    "id": "wait_activity",
     "description": "Wait activity creates placeholder",
     "input": {
       "name": "wait_task",
@@ -66,7 +70,9 @@
       "depends_on": [
         {
           "activity": "previous_task",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "wait_time_in_seconds": 300
@@ -76,10 +82,16 @@
       "task_key": "wait_task",
       "activity_type": "Wait",
       "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY",
-      "depends_on": [{"task_key": "previous_task", "outcome": null}]
+      "depends_on": [
+        {
+          "task_key": "previous_task",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "no_name",
     "description": "Activity with no name gets default name",
     "input": {
       "type": "CustomActivity",
@@ -93,6 +105,7 @@
     }
   },
   {
+    "id": "dependency_failed",
     "description": "Activity with dependency on failed task creates UnsupportedValue",
     "input": {
       "name": "failure_handler",
@@ -101,7 +114,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Failed"]
+          "dependency_conditions": [
+            "Failed"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/error_handler",
@@ -112,6 +127,7 @@
     "expected_dependency_unsupported": true
   },
   {
+    "id": "dependency_skipped",
     "description": "Activity with dependency on skipped task creates UnsupportedValue",
     "input": {
       "name": "skip_handler",
@@ -120,7 +136,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Skipped"]
+          "dependency_conditions": [
+            "Skipped"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/skip_handler",
@@ -131,6 +149,7 @@
     "expected_dependency_unsupported": true
   },
   {
+    "id": "multiple_conditions",
     "description": "Activity with multiple dependency conditions creates UnsupportedValue",
     "input": {
       "name": "multi_condition",
@@ -139,7 +158,10 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Succeeded", "Failed"]
+          "dependency_conditions": [
+            "Succeeded",
+            "Failed"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/handler",

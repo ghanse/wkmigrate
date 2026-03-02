@@ -1,5 +1,6 @@
 [
   {
+    "id": "single_inner_notebook",
     "description": "ForEach activity with single inner notebook activity",
     "input": {
       "name": "process_each_file",
@@ -44,6 +45,7 @@
     }
   },
   {
+    "id": "create_array",
     "description": "ForEach activity with createArray expression",
     "input": {
       "name": "process_regions",
@@ -88,6 +90,7 @@
     }
   },
   {
+    "id": "multiple_inner_activities",
     "description": "ForEach activity with multiple inner activities (becomes RunJobActivity)",
     "input": {
       "name": "complex_foreach",
@@ -126,7 +129,9 @@
           "depends_on": [
             {
               "activity": "prepare_data",
-              "dependency_conditions": ["Succeeded"]
+              "dependency_conditions": [
+                "Succeeded"
+              ]
             }
           ],
           "policy": {
@@ -156,6 +161,7 @@
     }
   },
   {
+    "id": "spark_jar_inner",
     "description": "ForEach activity with Spark JAR inner activity",
     "input": {
       "name": "run_jars_foreach",
@@ -179,7 +185,10 @@
             "retry_interval_in_seconds": 30
           },
           "main_class_name": "com.example.BatchProcessor",
-          "parameters": ["--config", "@item()"]
+          "parameters": [
+            "--config",
+            "@item()"
+          ]
         }
       ]
     },
@@ -193,6 +202,7 @@
     }
   },
   {
+    "id": "missing_items",
     "description": "ForEach activity missing items (should return UnsupportedValue)",
     "input": {
       "name": "invalid_foreach",
@@ -211,6 +221,7 @@
     "expected_message": "Missing property 'items'"
   },
   {
+    "id": "empty_activities",
     "description": "ForEach activity with empty activities (should return UnsupportedValue)",
     "input": {
       "name": "empty_foreach",
@@ -227,6 +238,7 @@
     "expected_message": "ForEach activity requires at least one inner activity"
   },
   {
+    "id": "unsupported_items",
     "description": "ForEach activity with unsupported items expression",
     "input": {
       "name": "unsupported_foreach",

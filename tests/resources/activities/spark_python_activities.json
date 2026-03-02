@@ -1,5 +1,6 @@
 [
   {
+    "id": "basic",
     "description": "Basic Spark Python activity with minimal configuration",
     "input": {
       "name": "run_basic_python",
@@ -26,6 +27,7 @@
     }
   },
   {
+    "id": "with_parameters",
     "description": "Spark Python activity with parameters",
     "input": {
       "name": "run_parameterized_python",
@@ -39,9 +41,12 @@
       },
       "python_file": "dbfs:/scripts/etl_script.py",
       "parameters": [
-        "--input", "/data/raw",
-        "--output", "/data/processed",
-        "--partitions", "100"
+        "--input",
+        "/data/raw",
+        "--output",
+        "/data/processed",
+        "--partitions",
+        "100"
       ]
     },
     "expected": {
@@ -53,10 +58,18 @@
       "max_retries": 2,
       "min_retry_interval_millis": 60000,
       "python_file": "dbfs:/scripts/etl_script.py",
-      "parameters": ["--input", "/data/raw", "--output", "/data/processed", "--partitions", "100"]
+      "parameters": [
+        "--input",
+        "/data/raw",
+        "--output",
+        "/data/processed",
+        "--partitions",
+        "100"
+      ]
     }
   },
   {
+    "id": "with_dependency",
     "description": "Spark Python activity with dependency",
     "input": {
       "name": "run_dependent_python",
@@ -65,7 +78,9 @@
       "depends_on": [
         {
           "activity": "ingest_data",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "policy": {
@@ -74,7 +89,10 @@
         "retry_interval_in_seconds": 30
       },
       "python_file": "dbfs:/scripts/transform_data.py",
-      "parameters": ["--mode", "incremental"]
+      "parameters": [
+        "--mode",
+        "incremental"
+      ]
     },
     "expected": {
       "name": "run_dependent_python",
@@ -85,11 +103,20 @@
       "max_retries": 1,
       "min_retry_interval_millis": 30000,
       "python_file": "dbfs:/scripts/transform_data.py",
-      "parameters": ["--mode", "incremental"],
-      "depends_on": [{"task_key": "ingest_data", "outcome": null}]
+      "parameters": [
+        "--mode",
+        "incremental"
+      ],
+      "depends_on": [
+        {
+          "task_key": "ingest_data",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "workspace_file_path",
     "description": "Spark Python activity with workspace file path",
     "input": {
       "name": "run_workspace_python",
@@ -102,7 +129,10 @@
         "retry_interval_in_seconds": 30
       },
       "python_file": "/Workspace/scripts/analytics.py",
-      "parameters": ["--date", "2024-01-01"]
+      "parameters": [
+        "--date",
+        "2024-01-01"
+      ]
     },
     "expected": {
       "name": "run_workspace_python",
@@ -113,10 +143,14 @@
       "max_retries": 0,
       "min_retry_interval_millis": 30000,
       "python_file": "/Workspace/scripts/analytics.py",
-      "parameters": ["--date", "2024-01-01"]
+      "parameters": [
+        "--date",
+        "2024-01-01"
+      ]
     }
   },
   {
+    "id": "missing_python_file",
     "description": "Spark Python activity missing python_file (should return UnsupportedValue)",
     "input": {
       "name": "invalid_python",

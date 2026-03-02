@@ -12,6 +12,7 @@ from typing import Any
 import autopep8  # type: ignore
 
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
+from wkmigrate.models.ir.pipeline import Authentication
 
 
 def get_option_expressions(dataset_definition: dict) -> list[str]:
@@ -201,6 +202,10 @@ def get_web_activity_notebook_content(
     method: str,
     body: Any,
     headers: dict[str, str] | None,
+    authentication: Authentication | None = None,
+    disable_cert_validation: bool = False,
+    http_request_timeout_seconds: int | None = None,
+    turn_off_async: bool = False,
 ) -> str:
     """
     Generates notebook source for a Web activity.
@@ -213,6 +218,10 @@ def get_web_activity_notebook_content(
         method: HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
         body: Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
         headers: Optional HTTP headers dictionary.
+        authentication: Parsed authentication configuration, or ``None``.
+        disable_cert_validation: When ``True``, TLS certificate verification is skipped.
+        http_request_timeout_seconds: Optional HTTP request timeout in seconds.
+        turn_off_async: When ``True``, noted in the notebook as a comment for visibility.
 
     Returns:
         Formatted Python notebook source as a ``str``.
@@ -234,12 +243,63 @@ def get_web_activity_notebook_content(
         '        kwargs["json"] = body',
         "    else:",
         '        kwargs["data"] = body',
-        "",
-        "response = requests.request(method, url, **kwargs)",
-        "",
-        "# Publish response as Databricks task values:",
-        'dbutils.jobs.taskValues.set(key="status_code", value=str(response.status_code))',
-        'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
-        "response.raise_for_status()",
     ]
+
+    if disable_cert_validation:
+        script_lines.append('kwargs["verify"] = False')
+
+    if http_request_timeout_seconds is not None:
+        script_lines.append(f'kwargs["timeout"] = {http_request_timeout_seconds}')
+
+    if authentication:
+        script_lines.extend(_get_authentication_lines(authentication))
+
+    if turn_off_async:
+        script_lines.append("")
+        script_lines.append("# Note: ADF turnOffAsync was enabled — this request runs synchronously.")
+
+    script_lines.extend(
+        [
+            "",
+            "response = requests.request(method, url, **kwargs)",
+            "",
+            "# Publish response as Databricks task values:",
+            'dbutils.jobs.taskValues.set(key="status_code", value=str(response.status_code))',
+            'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
+            "response.raise_for_status()",
+        ]
+    )
     return autopep8.fix_code("\n".join(script_lines))
+
+
+def _get_authentication_lines(authentication: Authentication) -> list[str]:
+    """
+    Generates notebook source lines for an authentication configuration.
+
+    Args:
+        authentication: Parsed authentication configuration.
+
+    Returns:
+        List of Python source lines to append to the notebook script.
+    """
+    match authentication.auth_type.lower():
+        case "basic":
+            return _get_basic_authentication_lines(authentication)
+        case _:
+            raise ValueError(f"Unsupported authentication type '{authentication.auth_type}'")
+
+
+def _get_basic_authentication_lines(authentication: Authentication) -> list[str]:
+    """
+    Generates notebook source lines for Basic authentication.
+
+    Args:
+        authentication: Parsed authentication configuration.
+
+    Returns:
+        List of Python source lines to append to the notebook script.
+    """
+    return [
+        f'kwargs["auth"] = ({authentication.username!r}, '
+        f'dbutils.secrets.get(scope="wkmigrate_credentials_scope", key="{authentication.password_secret_key}"))'
+    ]

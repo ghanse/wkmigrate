@@ -32,6 +32,10 @@ def prepare_web_activity(activity: WebActivity) -> PreparedActivity:
         method=activity.method,
         body=activity.body,
         headers=activity.headers,
+        authentication=activity.authentication,
+        disable_cert_validation=activity.disable_cert_validation,
+        http_request_timeout_seconds=activity.http_request_timeout_seconds,
+        turn_off_async=activity.turn_off_async,
     )
     notebook_path = f"/wkmigrate/web_activity_notebooks/{activity.task_key}"
     notebook = NotebookArtifact(file_path=notebook_path, content=notebook_content)

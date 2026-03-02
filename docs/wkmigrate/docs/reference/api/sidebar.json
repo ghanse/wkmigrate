@@ -74,7 +74,8 @@
             "reference/api/wkmigrate/preparers/run_job_activity_preparer",
             "reference/api/wkmigrate/preparers/spark_jar_activity_preparer",
             "reference/api/wkmigrate/preparers/spark_python_activity_preparer",
-            "reference/api/wkmigrate/preparers/utils"
+            "reference/api/wkmigrate/preparers/utils",
+            "reference/api/wkmigrate/preparers/web_activity_preparer"
           ],
           "label": "wkmigrate.preparers",
           "type": "category"
@@ -91,7 +92,8 @@
                 "reference/api/wkmigrate/translators/activity_translators/lookup_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/notebook_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/spark_jar_activity_translator",
-                "reference/api/wkmigrate/translators/activity_translators/spark_python_activity_translator"
+                "reference/api/wkmigrate/translators/activity_translators/spark_python_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/web_activity_translator"
               ],
               "label": "wkmigrate.translators.activity_translators",
               "type": "category"

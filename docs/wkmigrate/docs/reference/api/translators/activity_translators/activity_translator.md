@@ -85,9 +85,6 @@ def translate_activity(activity: dict,
 
 Translates a single ADF activity into an ``Activity`` object.
 
-This is a convenience wrapper that discards the final context.  Use
-``visit_activity`` directly when you need the updated context.
-
 **Arguments**:
 
 - `activity` - Activity definition emitted by ADF.

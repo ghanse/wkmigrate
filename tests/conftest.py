@@ -22,6 +22,25 @@ def load_fixtures(filename: str) -> list[dict[str, Any]]:
         return json.load(f)
 
 
+def get_fixture(fixtures: list[dict[str, Any]], fixture_id: str) -> dict[str, Any]:
+    """Look up a fixture by its ``id`` field.
+
+    Args:
+        fixtures: List of fixture dicts loaded from a JSON file.
+        fixture_id: Unique identifier for the fixture.
+
+    Returns:
+        The matching fixture dict.
+
+    Raises:
+        KeyError: If no fixture matches the id.
+    """
+    for fixture in fixtures:
+        if fixture.get("id") == fixture_id:
+            return fixture
+    raise KeyError(f"No fixture with id '{fixture_id}'")
+
+
 def get_base_kwargs(activity: dict) -> dict[str, Any]:
     """Build base kwargs for activity translators."""
     return {

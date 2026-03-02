@@ -112,9 +112,6 @@ def translate_activity(activity: dict, is_conditional_task: bool = False) -> Act
     """
     Translates a single ADF activity into an ``Activity`` object.
 
-    This is a convenience wrapper that discards the final context.  Use
-    ``visit_activity`` directly when you need the updated context.
-
     Args:
         activity: Activity definition emitted by ADF.
         is_conditional_task: Whether the task is a conditional task.

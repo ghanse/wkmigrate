@@ -12,7 +12,7 @@ from importlib import import_module
 from typing import Any
 
 from wkmigrate.models.ir.datasets import Dataset
-from wkmigrate.models.ir.pipeline import Activity, DatabricksNotebookActivity
+from wkmigrate.models.ir.pipeline import Activity, Authentication, DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 
 
@@ -104,6 +104,33 @@ def parse_activity_timeout_string(timeout_string: str) -> int:
             seconds=date_time.second,
         )
     return int(time_delta.total_seconds())
+
+
+def parse_authentication(authentication: dict | None) -> Authentication | UnsupportedValue | None:
+    """
+    Parses an ADF authentication configuration into an ``Authentication`` object.
+
+    Args:
+        authentication: Authentication dictionary from the ADF activity, or ``None``.
+
+    Returns:
+        Parsed ``Authentication`` or ``None`` when no auth is configured.
+    """
+    if authentication is None:
+        return None
+    authentication_type = authentication.get("type")
+    if not authentication_type:
+        return UnsupportedValue(value=authentication, message="Missing value 'type' for authentication")
+    if authentication_type.lower() == "basic":
+        username = authentication.get("username", "")
+        if not username:
+            return UnsupportedValue(value=authentication, message="Missing value 'username' for basic authentication")
+        return Authentication(
+            auth_type=authentication_type,
+            username=username,
+            password_secret_key=f"{username}_password",
+        )
+    return UnsupportedValue(value=authentication, message=f"Unsupported authentication type '{authentication_type}'")
 
 
 def extract_group(input_string: str, regex: str) -> str | UnsupportedValue:

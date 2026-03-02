@@ -163,6 +163,29 @@ Spark and publishes the result as a Databricks task value.
 - `first_row_only` - When ``True`` only the first row is returned; mirrors the ADF setting.
 - `source_query` - Optional SQL query or stored-procedure call for database sources.
 
+## WebActivity Objects
+
+```python
+@dataclass(slots=True, kw_only=True)
+class WebActivity(Activity)
+```
+
+Web activity metadata.
+
+Translates an ADF Web activity into a notebook task that submits an HTTP request
+using the Python ``requests`` library and publishes the response as Databricks task values.
+
+**Attributes**:
+
+- `url` - Target URL for the HTTP request.
+- `method` - HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
+- `body` - Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
+- `headers` - Optional HTTP headers dictionary.
+- `authentication` - Parsed authentication configuration, or ``None`` when no auth is required.
+- `disable_cert_validation` - When ``True``, TLS certificate verification is skipped.
+- `http_request_timeout_seconds` - Optional HTTP request timeout in seconds from the ADF activity.
+- `turn_off_async` - When ``True``, the activity executes synchronously rather than polling.
+
 ## IfConditionActivity Objects
 
 ```python
@@ -207,4 +230,19 @@ Represents a dependency on another task.
 
 - `task_key` - Task key of the upstream activity this task depends on.
 - `outcome` - Required outcome of the upstream task (for example ``Succeeded``) for this dependency.
+
+## Authentication Objects
+
+```python
+@dataclass(slots=True)
+class Authentication()
+```
+
+Authentication configuration for an HTTP request.
+
+**Attributes**:
+
+- `auth_type` - Authentication type (e.g. 'basic').
+- `username` - Optional username for Basic authentication.
+- `password_secret_key` - Optional secret scope key that holds the password.
 

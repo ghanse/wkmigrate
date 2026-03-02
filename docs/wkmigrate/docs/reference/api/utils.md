@@ -81,6 +81,25 @@ Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
 
   Total seconds represented by the timeout.
 
+#### parse\_authentication
+
+```python
+def parse_authentication(
+        authentication: dict | None
+) -> Authentication | UnsupportedValue | None
+```
+
+Parses an ADF authentication configuration into an ``Authentication`` object.
+
+**Arguments**:
+
+- `authentication` - Authentication dictionary from the ADF activity, or ``None``.
+  
+
+**Returns**:
+
+  Parsed ``Authentication`` or ``None`` when no auth is configured.
+
 #### extract\_group
 
 ```python
