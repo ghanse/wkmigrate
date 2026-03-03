@@ -30,32 +30,12 @@ Prepares a pipeline internal representation for creation as a Databricks Lakeflo
 
   Prepared workflow containing the Databricks job payload and supporting artifacts for the pipeline.
 
-#### prepare\_activities
-
-```python
-def prepare_activities(
-    activities: list[Activity], default_files_to_delta_sinks: bool | None
-) -> list[tuple[PreparedActivity, PreparedWorkflow | None]]
-```
-
-Prepares a list of activity internal representations for creation as Databricks Lakeflow job tasks.
-
-**Arguments**:
-
-- `activities` - List of activity internal representations to prepare.
-- `default_files_to_delta_sinks` - Whether to use the default files-to-delta sinks behavior.
-  
-
-**Returns**:
-
-  List of tuples containing the prepared activity and workflow for each activity internal representation.
-
 #### prepare\_activity
 
 ```python
 def prepare_activity(
-    activity: Activity, default_files_to_delta_sinks: bool | None
-) -> tuple[PreparedActivity, PreparedWorkflow | None]
+        activity: Activity,
+        default_files_to_delta_sinks: bool | None) -> PreparedActivity
 ```
 
 Prepares an activity internal representation for creation as a Databricks Lakeflow job task.
@@ -68,5 +48,5 @@ Prepares an activity internal representation for creation as a Databricks Lakefl
 
 **Returns**:
 
-  A tuple containing the prepared activity and workflow for the activity.
+  Prepared activity containing the task configuration and any associated artifacts.
 

@@ -13,6 +13,7 @@ import autopep8  # type: ignore
 
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
 from wkmigrate.models.ir.pipeline import Authentication
+from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 
 
 def get_option_expressions(dataset_definition: dict) -> list[str]:
@@ -198,6 +199,8 @@ def get_jdbc_read_expression(source_definition: dict, source_query: str | None =
 
 
 def get_web_activity_notebook_content(
+    activity_name: str,
+    activity_type: str,
     url: str,
     method: str,
     body: Any,
@@ -214,6 +217,8 @@ def get_web_activity_notebook_content(
     and publishes the response body and status code as Databricks task values.
 
     Args:
+        activity_name: Logical name of the activity being translated.
+        activity_type: Activity type string emitted by ADF.
         url: Target URL for the HTTP request.
         method: HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
         body: Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
@@ -252,7 +257,7 @@ def get_web_activity_notebook_content(
         script_lines.append(f'kwargs["timeout"] = {http_request_timeout_seconds}')
 
     if authentication:
-        script_lines.extend(_get_authentication_lines(authentication))
+        script_lines.extend(_get_authentication_lines(activity_name, activity_type, authentication))
 
     if turn_off_async:
         script_lines.append("")
@@ -272,21 +277,26 @@ def get_web_activity_notebook_content(
     return autopep8.fix_code("\n".join(script_lines))
 
 
-def _get_authentication_lines(authentication: Authentication) -> list[str]:
+def _get_authentication_lines(activity_name: str, activity_type: str, authentication: Authentication) -> list[str]:
     """
     Generates notebook source lines for an authentication configuration.
 
     Args:
+        activity_name: Logical name of the activity being translated.
+        activity_type: Activity type string emitted by ADF.
         authentication: Parsed authentication configuration.
 
     Returns:
         List of Python source lines to append to the notebook script.
     """
-    match authentication.auth_type.lower():
-        case "basic":
-            return _get_basic_authentication_lines(authentication)
-        case _:
-            raise ValueError(f"Unsupported authentication type '{authentication.auth_type}'")
+    with not_translatable_context(activity_name, activity_type):
+        match authentication.auth_type.lower():
+            case "basic":
+                return _get_basic_authentication_lines(authentication)
+            case _:
+                raise NotTranslatableWarning(
+                    "authentication_type", f"Unsupported authentication type '{authentication.auth_type}'"
+                )
 
 
 def _get_basic_authentication_lines(authentication: Authentication) -> list[str]:

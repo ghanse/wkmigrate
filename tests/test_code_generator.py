@@ -5,14 +5,18 @@ the Web activity notebook builder.
 """
 
 from __future__ import annotations
+import pytest
 
 from wkmigrate.code_generator import get_web_activity_notebook_content
 from wkmigrate.models.ir.pipeline import Authentication
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def test_web_activity_notebook_with_auth_and_cert_validation() -> None:
     """Generated notebook includes auth, verify=False, and timeout."""
     content = get_web_activity_notebook_content(
+        activity_name="test_web_activity",
+        activity_type="WebActivity",
         url="https://api.example.com/secure",
         method="POST",
         body=None,
@@ -35,6 +39,8 @@ def test_web_activity_notebook_with_auth_and_cert_validation() -> None:
 def test_web_activity_notebook_contains_request_call() -> None:
     """get_web_activity_notebook_content produces valid notebook content."""
     content = get_web_activity_notebook_content(
+        activity_name="test_web_activity",
+        activity_type="WebActivity",
         url="https://api.example.com/data",
         method="GET",
         headers={"Accept": "application/json"},
@@ -47,3 +53,20 @@ def test_web_activity_notebook_contains_request_call() -> None:
     assert "taskValues.set" in content
     assert "status_code" in content
     assert "response_body" in content
+
+
+def test_web_activity_notebook_with_unsupported_auth_type(caplog) -> None:
+    """get_web_activity_notebook_content raises NotTranslatableWarning for unsupported auth type."""
+    with pytest.raises(NotTranslatableWarning):
+        content = get_web_activity_notebook_content(
+            activity_name="test_web_activity_invalid_auth",
+            activity_type="WebActivity",
+            url="https://api.example.com/data",
+            method="GET",
+            body=None,
+            headers=None,
+            authentication=Authentication(auth_type="UNSUPPORTED_AUTH_TYPE"),
+        )
+        assert "Unsupported authentication type 'UNSUPPORTED_AUTH_TYPE'" in caplog.text
+        assert "test_web_activity_invalid_auth" in content
+        assert "WebActivity" in content

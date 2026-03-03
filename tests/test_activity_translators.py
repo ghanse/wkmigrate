@@ -765,7 +765,7 @@ def test_web_activity_with_auth_and_advanced_options(web_activity_fixtures: list
     assert isinstance(result.authentication, Authentication)
     assert result.authentication.auth_type == fixture["expected"]["authentication_type"]
     assert result.authentication.username == "atest"
-    assert result.authentication.password_secret_key == "atest_password"
+    assert result.authentication.password_secret_key == "authenticated_post_auth_password"
 
 
 def test_web_activity_defaults_for_optional_fields(web_activity_fixtures: list[dict]) -> None:

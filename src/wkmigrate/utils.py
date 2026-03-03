@@ -76,22 +76,27 @@ def append_system_tags(tags: dict | None) -> dict:
     return tags
 
 
-def parse_activity_timeout_string(timeout_string: str) -> int:
+def parse_activity_timeout_string(timeout_string: str, prefix: str = "") -> int:
     """
     Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
 
     Args:
         timeout_string: Timeout string from the activity policy.
+        prefix: Prefix to add to the timeout string to align with the format 'd.hh:mm:ss'.
 
     Returns:
         Total seconds represented by the timeout.
     """
+    if prefix:
+        timeout_string = f"{prefix}{timeout_string}"
+
     if timeout_string[:2] == "0.":
         # Parse the timeout string to HH:MM:SS format:
         timeout_string = timeout_string[2:]
         time_format = "%H:%M:%S"
         date_time = datetime.strptime(timeout_string, time_format)
         time_delta = timedelta(hours=date_time.hour, minutes=date_time.minute, seconds=date_time.second)
+
     else:
         # Parse the timeout string to DD.HH:MM:SS format:
         timeout_string = timeout_string.zfill(11)
@@ -106,11 +111,12 @@ def parse_activity_timeout_string(timeout_string: str) -> int:
     return int(time_delta.total_seconds())
 
 
-def parse_authentication(authentication: dict | None) -> Authentication | UnsupportedValue | None:
+def parse_authentication(secret_key: str, authentication: dict | None) -> Authentication | UnsupportedValue | None:
     """
     Parses an ADF authentication configuration into an ``Authentication`` object.
 
     Args:
+        secret_key: Secret scope key for the password.
         authentication: Authentication dictionary from the ADF activity, or ``None``.
 
     Returns:
@@ -128,7 +134,7 @@ def parse_authentication(authentication: dict | None) -> Authentication | Unsupp
         return Authentication(
             auth_type=authentication_type,
             username=username,
-            password_secret_key=f"{username}_password",
+            password_secret_key=secret_key,
         )
     return UnsupportedValue(value=authentication, message=f"Unsupported authentication type '{authentication_type}'")
 

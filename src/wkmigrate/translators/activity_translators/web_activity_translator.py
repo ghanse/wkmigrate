@@ -31,9 +31,14 @@ def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | U
         return UnsupportedValue(activity, "Missing value 'method' for Web activity")
 
     raw_timeout = activity.get("http_request_timeout")
-    timeout_seconds = parse_activity_timeout_string(f"0.{raw_timeout}") if raw_timeout else None
+    timeout_seconds = parse_activity_timeout_string(raw_timeout, prefix="0.") if raw_timeout else None
 
-    authentication = parse_authentication(activity.get("authentication"))
+    activity_name = activity.get("name")
+    if not activity_name:
+        return UnsupportedValue(activity, "Missing value 'name' for Web activity")
+    secret_key = f"{activity_name}_auth_password"
+    authentication = parse_authentication(secret_key, activity.get("authentication"))
+
     if isinstance(authentication, UnsupportedValue):
         return UnsupportedValue(activity, authentication.message)
     return WebActivity(

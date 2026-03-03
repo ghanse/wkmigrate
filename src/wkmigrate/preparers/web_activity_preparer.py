@@ -28,6 +28,8 @@ def prepare_web_activity(activity: WebActivity) -> PreparedActivity:
         PreparedActivity containing the notebook task configuration and artifacts.
     """
     notebook_content = get_web_activity_notebook_content(
+        activity_name=activity.name,
+        activity_type="WebActivity",
         url=activity.url,
         method=activity.method,
         body=activity.body,

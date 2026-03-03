@@ -143,7 +143,9 @@ Generates code to read data from a database into a DataFrame.
 #### get\_web\_activity\_notebook\_content
 
 ```python
-def get_web_activity_notebook_content(url: str,
+def get_web_activity_notebook_content(activity_name: str,
+                                      activity_type: str,
+                                      url: str,
                                       method: str,
                                       body: Any,
                                       headers: dict[str, str] | None,
@@ -162,6 +164,8 @@ and publishes the response body and status code as Databricks task values.
 
 **Arguments**:
 
+- `activity_name` - Logical name of the activity being translated.
+- `activity_type` - Activity type string emitted by ADF.
 - `url` - Target URL for the HTTP request.
 - `method` - HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
 - `body` - Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.

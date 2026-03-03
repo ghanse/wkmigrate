@@ -16,8 +16,8 @@ when migrating from ADF definitions to Databricks.
     from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 
     store = WorkspaceDefinitionStore(authentication_type="pat", host_name="https://adb-123.azuredatabricks.net", pat="TOKEN")
-    workflow = store.load("existing_job_name")  # raises ValueError if missing
-    store.dump(translated_pipeline_ir)
+    store.to_local_files(translated_pipeline_ir, local_directory="/path/to/local/directory")
+    store.to_job(translated_pipeline_ir)
     ```
 
 ## WorkspaceDefinitionStore Objects

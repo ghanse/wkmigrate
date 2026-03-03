@@ -1,28 +1,92 @@
 """This module defines representational classes for Databricks workflow artifacts."""
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-from databricks.sdk.service.jobs import NotebookTask, PipelineTask
+from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 
 
 @dataclass(slots=True)
-class CopyDataArtifact:
+class PreparedWorkflow:
     """
-    Represents a copy data artifact.
+    Artifacts generated while preparing a workflow.
 
     Attributes:
-        task: Databricks notebook or pipeline task configuration
-        notebook: Databricks notebook to be created in the target workspace
-        secrets: List of Databricks secrets to be created in the target workspace
-        pipeline_name: Name of a Spark Declarative Pipeline to be created in the target workspace
+        pipeline: Pipeline IR that this workflow was prepared from.
+        activities: Prepared activities that make up this workflow's tasks.
     """
 
-    task: NotebookTask | PipelineTask
-    notebook: NotebookArtifact
-    secrets: list[SecretInstruction] = field(default_factory=list)
-    pipeline_name: str | None = None
+    pipeline: Pipeline
+    activities: list[PreparedActivity]
+
+    @property
+    def tasks(self) -> list[dict[str, Any]]:
+        """Task dicts for the activities at this level."""
+        return [activity.task for activity in self.activities]
+
+    @property
+    def all_notebooks(self) -> list[NotebookArtifact]:
+        """All notebooks across this workflow and any nested inner workflows."""
+        result: list[NotebookArtifact] = []
+        for activity in self.activities:
+            if activity.notebooks:
+                result.extend(activity.notebooks)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_notebooks)
+        return result
+
+    @property
+    def all_pipelines(self) -> list[PipelineInstruction]:
+        """All pipeline instructions across this workflow and any nested inner workflows."""
+        result: list[PipelineInstruction] = []
+        for activity in self.activities:
+            if activity.pipelines:
+                result.extend(activity.pipelines)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_pipelines)
+        return result
+
+    @property
+    def all_secrets(self) -> list[SecretInstruction]:
+        """All secret instructions across this workflow and any nested inner workflows."""
+        result: list[SecretInstruction] = []
+        for activity in self.activities:
+            if activity.secrets:
+                result.extend(activity.secrets)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_secrets)
+        return result
+
+    @property
+    def inner_workflows(self) -> list["PreparedWorkflow"]:
+        """All inner workflows (recursively) produced by activities in this workflow."""
+        result: list[PreparedWorkflow] = []
+        for activity in self.activities:
+            if activity.inner_workflow:
+                result.append(activity.inner_workflow)
+                result.extend(activity.inner_workflow.inner_workflows)
+        return result
+
+
+@dataclass(slots=True)
+class PreparedActivity:
+    """
+    Artifacts generated while preparing a workflow task.
+
+    Attributes:
+        task: Task configuration as a dictionary.
+        notebooks: List of ``NotebookArtifact`` objects to upload.
+        pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
+        secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
+        inner_workflow: Additional workflow settings created for nested ForEach tasks.
+    """
+
+    task: dict[str, Any]
+    notebooks: list[NotebookArtifact] | None = None
+    pipelines: list[PipelineInstruction] | None = None
+    secrets: list[SecretInstruction] | None = None
+    inner_workflow: "PreparedWorkflow" | None = None
 
 
 @dataclass(slots=True)
@@ -39,45 +103,3 @@ class NotebookArtifact:
     file_path: str
     content: str
     language: str = "python"
-
-
-@dataclass(slots=True)
-class PreparedWorkflow:
-    """
-    Artifacts generated while preparing a workflow.
-
-    Attributes:
-        job_settings: Databricks Jobs payload describing the workflow to be created.
-        notebooks: List of ``NotebookArtifact`` objects to upload.
-        pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
-        secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
-        unsupported: Collection of entries describing properties or nodes that could not be translated.
-        inner_jobs: Additional job settings created for nested ForEach tasks.
-    """
-
-    job_settings: dict[str, Any]
-    notebooks: list[NotebookArtifact] | None = None
-    pipelines: list[PipelineInstruction] | None = None
-    secrets: list[SecretInstruction] | None = None
-    unsupported: list[dict] | None = None
-    inner_jobs: list[dict] | None = None
-
-
-@dataclass(slots=True)
-class PreparedActivity:
-    """
-    Artifacts generated while preparing a workflow task.
-
-    Attributes:
-        task: Task configuration as a dictionary.
-        notebooks: List of ``NotebookArtifact`` objects to upload.
-        pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
-        secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
-        inner_jobs: Additional job settings created for nested ForEach tasks.
-    """
-
-    task: dict[str, Any]
-    notebooks: list[NotebookArtifact] | None = None
-    pipelines: list[PipelineInstruction] | None = None
-    secrets: list[SecretInstruction] | None = None
-    inner_jobs: list[dict] | None = None

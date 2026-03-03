@@ -13,8 +13,8 @@ and nested activity tasks and artifacts.
 
 ```python
 def prepare_for_each_activity(
-    activity: ForEachActivity, default_files_to_delta_sinks: bool | None
-) -> tuple[PreparedActivity, PreparedWorkflow | None]
+        activity: ForEachActivity,
+        default_files_to_delta_sinks: bool | None) -> PreparedActivity
 ```
 
 Builds the task payload for a ForEach activity.
@@ -27,5 +27,5 @@ Builds the task payload for a ForEach activity.
 
 **Returns**:
 
-  Prepared activity and workflow containing the ForEach task configuration.
+  Prepared activity containing the ForEach task configuration.
 
