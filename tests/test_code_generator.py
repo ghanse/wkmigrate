@@ -55,10 +55,10 @@ def test_web_activity_notebook_contains_request_call() -> None:
     assert "response_body" in content
 
 
-def test_web_activity_notebook_with_unsupported_auth_type(caplog) -> None:
+def test_web_activity_notebook_with_unsupported_auth_type() -> None:
     """get_web_activity_notebook_content raises NotTranslatableWarning for unsupported auth type."""
-    with pytest.raises(NotTranslatableWarning):
-        content = get_web_activity_notebook_content(
+    with pytest.raises(NotTranslatableWarning) as exc_info:
+        get_web_activity_notebook_content(
             activity_name="test_web_activity_invalid_auth",
             activity_type="WebActivity",
             url="https://api.example.com/data",
@@ -67,6 +67,4 @@ def test_web_activity_notebook_with_unsupported_auth_type(caplog) -> None:
             headers=None,
             authentication=Authentication(auth_type="UNSUPPORTED_AUTH_TYPE"),
         )
-        assert "Unsupported authentication type 'UNSUPPORTED_AUTH_TYPE'" in caplog.text
-        assert "test_web_activity_invalid_auth" in content
-        assert "WebActivity" in content
+    assert "UNSUPPORTED_AUTH_TYPE" in str(exc_info.value)

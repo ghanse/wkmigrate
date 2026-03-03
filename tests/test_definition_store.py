@@ -1,6 +1,7 @@
 """Tests for definition store contracts and asset bundle generation."""
 
 import os
+import warnings
 
 import pytest
 import yaml
@@ -13,6 +14,7 @@ from wkmigrate.models.ir.pipeline import (
     ForEachActivity,
     Pipeline,
     RunJobActivity,
+    WebActivity,
 )
 
 
@@ -192,3 +194,39 @@ def test_asset_bundle_manifest_written(mock_workspace_client, tmp_path) -> None:
 
     manifest = os.path.join(bundle_dir, "databricks.yml")
     assert os.path.isfile(manifest)
+
+
+def test_to_job_web_activity_notebook_uploaded_and_dependency_checked(mock_workspace_client) -> None:
+    """to_job with a Web activity uploads the generated notebook and checks it as a dependency."""
+    store = _make_workspace_store(mock_workspace_client)
+    pipeline = Pipeline(
+        name="web_pipeline",
+        parameters=None,
+        schedule=None,
+        tasks=[WebActivity(name="web_call", task_key="web_call", url="https://api.example.com", method="GET")],
+        tags={},
+    )
+    job_id = store.to_job(pipeline)
+    assert job_id is not None
+    assert any("web_call" in path for path in mock_workspace_client.workspace._files)
+
+
+def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_workspace_client) -> None:
+    """to_job with a ForEach containing a notebook task recurses to check the inner notebook dependency."""
+    store = _make_workspace_store(mock_workspace_client)
+    pipeline = Pipeline(
+        name="foreach_notebook_pipeline",
+        parameters=None,
+        schedule=None,
+        tasks=[
+            ForEachActivity(
+                name="loop",
+                task_key="loop",
+                items_string='["x"]',
+                for_each_task=DatabricksNotebookActivity(name="inner", task_key="inner", notebook_path="/notebooks/inner"),
+            )
+        ],
+        tags={},
+    )
+    job_id = store.to_job(pipeline)
+    assert job_id is not None
