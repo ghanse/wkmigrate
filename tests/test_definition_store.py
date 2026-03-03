@@ -1,7 +1,6 @@
 """Tests for definition store contracts and asset bundle generation."""
 
 import os
-import warnings
 
 import pytest
 import yaml
@@ -223,7 +222,9 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
                 name="loop",
                 task_key="loop",
                 items_string='["x"]',
-                for_each_task=DatabricksNotebookActivity(name="inner", task_key="inner", notebook_path="/notebooks/inner"),
+                for_each_task=DatabricksNotebookActivity(
+                    name="inner", task_key="inner", notebook_path="/notebooks/inner"
+                ),
             )
         ],
         tags={},
