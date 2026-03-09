@@ -16,7 +16,7 @@ def get_set_variable_notebook_content(variable_name: str,
                                       variable_value: str) -> str
 ```
 
-Generates code to set a pipeline parameter . The notebook evaluates ``variable_value`` and sets a Databricks task
+Generates code to set a task value parameter. The notebook evaluates ``variable_value`` and sets a Databricks task
 value parameter.
 
 **Arguments**:

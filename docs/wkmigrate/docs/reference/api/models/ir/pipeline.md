@@ -83,7 +83,6 @@ Copy activity metadata including datasets and mappings.
 - `source_properties` - Parsed dataset properties associated with the source.
 - `sink_properties` - Parsed dataset properties associated with the sink.
 - `column_mapping` - Column-level mappings from source to sink, if provided.
-- `column_mapping_options` - Column-level mapping options, if provided.
 
 ## ForEachActivity Objects
 

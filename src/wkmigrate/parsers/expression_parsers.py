@@ -20,7 +20,7 @@ def parse_variable_value(value: str | dict) -> str | UnsupportedValue:
 
     * Static string (no leading ``@``) → Python string literal (e.g. ``'hello'``).
     * ADF expression object ``{"value": "@...", "type": "Expression"}`` → inner expression is extracted and parsed.
-    * ``@activity('X').output.Y`` → ``dbutils.jobs.taskValues.get(taskKey='X', key='Y')``.
+    * ``@activity('X').output.Y`` → ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
     * ``@pipeline().Pipeline`` / ``@pipeline().RunId`` / other supported system variables → ``spark.conf`` or
         ``dbutils.jobs.getContext()`` lookups.
 
@@ -65,7 +65,7 @@ def _parse_expression_string(expression: str) -> str | UnsupportedValue:
     if expression.startswith("{") and expression.endswith("}"):
         expression = expression[1:-1].strip()
 
-    if match := re.match(r"activity\('([\w\s-]+)'\)\.output\.([\w.]+)", expression):
+    if match := re.match(r"activity\('([\w\s-]+)'\)\.output\.([\w.]+)$", expression):
         task_key, output_key = match.group(1), match.group(2)
         if output_key in _SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES:
             return f"dbutils.jobs.taskValues.get(taskKey={task_key!r}, key='result')"

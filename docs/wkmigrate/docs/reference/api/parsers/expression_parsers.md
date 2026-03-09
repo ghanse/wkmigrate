@@ -16,7 +16,7 @@ The following cases are supported:
 
 * Static string (no leading ``@``) → Python string literal (e.g. ``'hello'``).
 * ADF expression object ``{"value": "@...", "type": "Expression"}`` → inner expression is extracted and parsed.
-* ``@activity('X').output.Y`` → ``dbutils.jobs.taskValues.get(taskKey='X', key='Y')``.
+* ``@activity('X').output.Y`` → ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
 * ``@pipeline().Pipeline`` / ``@pipeline().RunId`` / other supported system variables → ``spark.conf`` or
 ``dbutils.jobs.getContext()`` lookups.
 
