@@ -1,5 +1,6 @@
 [
   {
+    "id": "databricks_autoscaling",
     "description": "Azure Databricks linked service with autoscaling cluster",
     "input": {
       "name": "databricks-autoscale-cluster",
@@ -39,7 +40,10 @@
       "node_type_id": "Standard_DS3_v2",
       "spark_version": "13.3.x-scala2.12",
       "driver_node_type_id": "Standard_DS4_v2",
-      "autoscale": {"min_workers": 2, "max_workers": 10},
+      "autoscale": {
+        "min_workers": 2,
+        "max_workers": 10
+      },
       "custom_tags": {
         "environment": "production",
         "team": "data-engineering",
@@ -54,14 +58,31 @@
         "ENV": "prod"
       },
       "init_scripts": [
-        {"workspace": {"destination": "/Users/admin@company.com/init_scripts/setup.sh"}},
-        {"dbfs": {"destination": "dbfs:/FileStore/scripts/common_init.sh"}},
-        {"volumes": {"destination": "/Volumes/main/scripts/volume_init.sh"}}
+        {
+          "workspace": {
+            "destination": "/Users/admin@company.com/init_scripts/setup.sh"
+          }
+        },
+        {
+          "dbfs": {
+            "destination": "dbfs:/FileStore/scripts/common_init.sh"
+          }
+        },
+        {
+          "volumes": {
+            "destination": "/Volumes/main/scripts/volume_init.sh"
+          }
+        }
       ],
-      "cluster_log_conf": {"dbfs": {"destination": "dbfs:/cluster-logs/production"}}
+      "cluster_log_conf": {
+        "dbfs": {
+          "destination": "dbfs:/cluster-logs/production"
+        }
+      }
     }
   },
   {
+    "id": "databricks_fixed",
     "description": "Azure Databricks linked service with fixed cluster size",
     "input": {
       "name": "databricks-fixed-cluster",
@@ -81,10 +102,13 @@
       "node_type_id": "Standard_D4s_v3",
       "spark_version": "14.0.x-scala2.12",
       "num_workers": 4,
-      "custom_tags": {"CREATED_BY_WKMIGRATE": ""}
+      "custom_tags": {
+        "CREATED_BY_WKMIGRATE": ""
+      }
     }
   },
   {
+    "id": "databricks_minimal",
     "description": "Azure Databricks linked service - minimal configuration",
     "input": {
       "name": "databricks-minimal",
@@ -100,10 +124,13 @@
       "host_name": "https://adb-111111111.3.azuredatabricks.net",
       "node_type_id": "Standard_DS3_v2",
       "spark_version": "12.2.x-scala2.12",
-      "custom_tags": {"CREATED_BY_WKMIGRATE": ""}
+      "custom_tags": {
+        "CREATED_BY_WKMIGRATE": ""
+      }
     }
   },
   {
+    "id": "databricks_invalid_workers",
     "description": "Azure Databricks linked service with invalid worker count",
     "input": {
       "name": "databricks-invalid-workers",
@@ -118,12 +145,14 @@
     "expected_message": "Invalid number of workers"
   },
   {
+    "id": "databricks_null",
     "description": "Empty/null Databricks linked service",
     "input": null,
     "expected_unsupported": true,
     "expected_message": "Missing Databricks linked service definition"
   },
   {
+    "id": "sql_full",
     "description": "SQL Server linked service - full configuration",
     "input": {
       "name": "sql-server-production",
@@ -146,6 +175,7 @@
     }
   },
   {
+    "id": "sql_minimal",
     "description": "SQL Server linked service - minimal configuration",
     "input": {
       "name": "sql-server-minimal",
@@ -162,12 +192,14 @@
     }
   },
   {
+    "id": "sql_null",
     "description": "Empty/null SQL Server linked service",
     "input": null,
     "expected_unsupported": true,
     "expected_message": "Missing SQL Server linked service definition"
   },
   {
+    "id": "abfs_full",
     "description": "ABFS linked service - full configuration",
     "input": {
       "name": "abfs-storage-account",
@@ -186,6 +218,7 @@
     }
   },
   {
+    "id": "abfs_invalid",
     "description": "ABFS linked service - invalid connection string",
     "input": {
       "name": "abfs-invalid",
@@ -198,6 +231,7 @@
     "expected_message": "Could not parse"
   },
   {
+    "id": "abfs_null",
     "description": "Empty/null ABFS linked service",
     "input": null,
     "expected_unsupported": true,

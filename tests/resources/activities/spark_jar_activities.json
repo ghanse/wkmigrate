@@ -1,5 +1,6 @@
 [
   {
+    "id": "basic",
     "description": "Basic Spark JAR activity with minimal configuration",
     "input": {
       "name": "run_basic_jar",
@@ -27,6 +28,7 @@
     }
   },
   {
+    "id": "with_parameters",
     "description": "Spark JAR activity with parameters",
     "input": {
       "name": "run_parameterized_jar",
@@ -40,9 +42,12 @@
       },
       "main_class_name": "com.example.ETLJob",
       "parameters": [
-        "--input", "/data/input",
-        "--output", "/data/output",
-        "--date", "2024-01-01"
+        "--input",
+        "/data/input",
+        "--output",
+        "/data/output",
+        "--date",
+        "2024-01-01"
       ]
     },
     "expected": {
@@ -54,11 +59,19 @@
       "max_retries": 2,
       "min_retry_interval_millis": 120000,
       "main_class_name": "com.example.ETLJob",
-      "parameters": ["--input", "/data/input", "--output", "/data/output", "--date", "2024-01-01"],
+      "parameters": [
+        "--input",
+        "/data/input",
+        "--output",
+        "/data/output",
+        "--date",
+        "2024-01-01"
+      ],
       "libraries": null
     }
   },
   {
+    "id": "with_libraries",
     "description": "Spark JAR activity with libraries",
     "input": {
       "name": "run_jar_with_libraries",
@@ -71,15 +84,38 @@
         "retry_interval_in_seconds": 30
       },
       "main_class_name": "com.example.DataProcessor",
-      "parameters": ["arg1", "arg2"],
+      "parameters": [
+        "arg1",
+        "arg2"
+      ],
       "libraries": [
-        {"jar": "dbfs:/FileStore/jars/main-library.jar"},
-        {"jar": "dbfs:/FileStore/jars/dependency.jar"},
-        {"maven": {"coordinates": "org.apache.spark:spark-sql_2.12:3.4.0"}},
-        {"pypi": {"package": "pandas==1.5.0"}},
-        {"whl": "dbfs:/FileStore/wheels/custom-wheel.whl"},
-        {"egg": "dbfs:/FileStore/eggs/legacy-egg.egg"},
-        {"cran": {"package": "ggplot2"}}
+        {
+          "jar": "dbfs:/FileStore/jars/main-library.jar"
+        },
+        {
+          "jar": "dbfs:/FileStore/jars/dependency.jar"
+        },
+        {
+          "maven": {
+            "coordinates": "org.apache.spark:spark-sql_2.12:3.4.0"
+          }
+        },
+        {
+          "pypi": {
+            "package": "pandas==1.5.0"
+          }
+        },
+        {
+          "whl": "dbfs:/FileStore/wheels/custom-wheel.whl"
+        },
+        {
+          "egg": "dbfs:/FileStore/eggs/legacy-egg.egg"
+        },
+        {
+          "cran": {
+            "package": "ggplot2"
+          }
+        }
       ]
     },
     "expected": {
@@ -91,19 +127,43 @@
       "max_retries": 3,
       "min_retry_interval_millis": 30000,
       "main_class_name": "com.example.DataProcessor",
-      "parameters": ["arg1", "arg2"],
+      "parameters": [
+        "arg1",
+        "arg2"
+      ],
       "libraries": [
-        {"jar": "dbfs:/FileStore/jars/main-library.jar"},
-        {"jar": "dbfs:/FileStore/jars/dependency.jar"},
-        {"maven": {"coordinates": "org.apache.spark:spark-sql_2.12:3.4.0"}},
-        {"pypi": {"package": "pandas==1.5.0"}},
-        {"whl": "dbfs:/FileStore/wheels/custom-wheel.whl"},
-        {"egg": "dbfs:/FileStore/eggs/legacy-egg.egg"},
-        {"cran": {"package": "ggplot2"}}
+        {
+          "jar": "dbfs:/FileStore/jars/main-library.jar"
+        },
+        {
+          "jar": "dbfs:/FileStore/jars/dependency.jar"
+        },
+        {
+          "maven": {
+            "coordinates": "org.apache.spark:spark-sql_2.12:3.4.0"
+          }
+        },
+        {
+          "pypi": {
+            "package": "pandas==1.5.0"
+          }
+        },
+        {
+          "whl": "dbfs:/FileStore/wheels/custom-wheel.whl"
+        },
+        {
+          "egg": "dbfs:/FileStore/eggs/legacy-egg.egg"
+        },
+        {
+          "cran": {
+            "package": "ggplot2"
+          }
+        }
       ]
     }
   },
   {
+    "id": "with_dependency",
     "description": "Spark JAR activity with dependency on upstream task",
     "input": {
       "name": "run_dependent_jar",
@@ -112,7 +172,9 @@
       "depends_on": [
         {
           "activity": "prepare_data",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "policy": {
@@ -133,10 +195,16 @@
       "main_class_name": "com.example.ProcessData",
       "parameters": null,
       "libraries": null,
-      "depends_on": [{"task_key": "prepare_data", "outcome": null}]
+      "depends_on": [
+        {
+          "task_key": "prepare_data",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "missing_main_class",
     "description": "Spark JAR activity missing main_class_name (should return UnsupportedValue)",
     "input": {
       "name": "invalid_jar",

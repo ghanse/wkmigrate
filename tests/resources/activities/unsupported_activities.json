@@ -1,30 +1,43 @@
 [
   {
+    "id": "unsupported_type",
     "description": "Unsupported activity type creates placeholder notebook",
     "input": {
-      "name": "web_activity",
-      "type": "WebActivity",
-      "description": "Call external API",
-      "depends_on": [],
-      "policy": {
-        "timeout": "0.00:10:00",
-        "retry": 3,
-        "retry_interval_in_seconds": 30
-      },
-      "method": "POST",
-      "url": "https://api.example.com/webhook"
+      "name": "some_unsupported_activity",
+      "type": "SomeUnsupportedType",
+      "description": "An activity type that is not supported"
     },
     "expected": {
-      "name": "web_activity",
-      "task_key": "web_activity",
-      "activity_type": "WebActivity",
-      "timeout_seconds": 600,
-      "max_retries": 3,
-      "min_retry_interval_millis": 30000,
+      "name": "some_unsupported_activity",
+      "task_key": "some_unsupported_activity",
+      "activity_type": "SomeUnsupportedType",
       "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"
     }
   },
   {
+    "id": "set_variable",
+    "description": "Set Variable activity creates placeholder",
+    "input": {
+      "name": "set_variable",
+      "type": "SetVariable",
+      "description": "Set pipeline variable",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.00:05:00"
+      },
+      "variable_name": "current_date",
+      "value": "2024-01-01"
+    },
+    "expected": {
+      "name": "set_variable",
+      "task_key": "set_variable",
+      "activity_type": "SetVariable",
+      "timeout_seconds": 300,
+      "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"
+    }
+  },
+  {
+    "id": "execute_pipeline",
     "description": "Execute Pipeline activity creates placeholder",
     "input": {
       "name": "call_child_pipeline",
@@ -48,6 +61,7 @@
     }
   },
   {
+    "id": "wait_activity",
     "description": "Wait activity creates placeholder",
     "input": {
       "name": "wait_task",
@@ -56,7 +70,9 @@
       "depends_on": [
         {
           "activity": "previous_task",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "wait_time_in_seconds": 300
@@ -66,10 +82,16 @@
       "task_key": "wait_task",
       "activity_type": "Wait",
       "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY",
-      "depends_on": [{"task_key": "previous_task", "outcome": null}]
+      "depends_on": [
+        {
+          "task_key": "previous_task",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "no_name",
     "description": "Activity with no name gets default name",
     "input": {
       "type": "CustomActivity",
@@ -83,6 +105,7 @@
     }
   },
   {
+    "id": "dependency_failed",
     "description": "Activity with dependency on failed task creates UnsupportedValue",
     "input": {
       "name": "failure_handler",
@@ -91,7 +114,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Failed"]
+          "dependency_conditions": [
+            "Failed"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/error_handler",
@@ -102,6 +127,7 @@
     "expected_dependency_unsupported": true
   },
   {
+    "id": "dependency_skipped",
     "description": "Activity with dependency on skipped task creates UnsupportedValue",
     "input": {
       "name": "skip_handler",
@@ -110,7 +136,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Skipped"]
+          "dependency_conditions": [
+            "Skipped"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/skip_handler",
@@ -121,6 +149,7 @@
     "expected_dependency_unsupported": true
   },
   {
+    "id": "multiple_conditions",
     "description": "Activity with multiple dependency conditions creates UnsupportedValue",
     "input": {
       "name": "multi_condition",
@@ -129,7 +158,10 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Succeeded", "Failed"]
+          "dependency_conditions": [
+            "Succeeded",
+            "Failed"
+          ]
         }
       ],
       "notebook_path": "/Workspace/notebooks/handler",

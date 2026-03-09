@@ -67,7 +67,8 @@ Appends the ``CREATED_BY_WKMIGRATE`` system tag to a set of job tags.
 #### parse\_activity\_timeout\_string
 
 ```python
-def parse_activity_timeout_string(timeout_string: str) -> int
+def parse_activity_timeout_string(timeout_string: str,
+                                  prefix: str = "") -> int
 ```
 
 Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
@@ -75,11 +76,32 @@ Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
 **Arguments**:
 
 - `timeout_string` - Timeout string from the activity policy.
+- `prefix` - Prefix to add to the timeout string to align with the format 'd.hh:mm:ss'.
   
 
 **Returns**:
 
   Total seconds represented by the timeout.
+
+#### parse\_authentication
+
+```python
+def parse_authentication(
+        secret_key: str, authentication: dict | None
+) -> Authentication | UnsupportedValue | None
+```
+
+Parses an ADF authentication configuration into an ``Authentication`` object.
+
+**Arguments**:
+
+- `secret_key` - Secret scope key for the password.
+- `authentication` - Authentication dictionary from the ADF activity, or ``None``.
+  
+
+**Returns**:
+
+  Parsed ``Authentication`` or ``None`` when no auth is configured.
 
 #### extract\_group
 

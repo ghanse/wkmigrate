@@ -1,5 +1,6 @@
 [
   {
+    "id": "sql_first_row",
     "description": "Lookup activity - SQL source with first row only",
     "input": {
       "name": "lookup_config",
@@ -46,6 +47,7 @@
     }
   },
   {
+    "id": "sql_all_rows",
     "description": "Lookup activity - SQL source with all rows",
     "input": {
       "name": "lookup_all_records",
@@ -90,6 +92,7 @@
     }
   },
   {
+    "id": "csv_source",
     "description": "Lookup activity - CSV file source with first row only",
     "input": {
       "name": "lookup_csv_config",
@@ -147,6 +150,7 @@
     }
   },
   {
+    "id": "parquet_source",
     "description": "Lookup activity - Parquet file source all rows",
     "input": {
       "name": "lookup_parquet_ref",
@@ -197,6 +201,7 @@
     }
   },
   {
+    "id": "json_source",
     "description": "Lookup activity - JSON file source first row only",
     "input": {
       "name": "lookup_json_settings",
@@ -246,6 +251,7 @@
     }
   },
   {
+    "id": "delta_source",
     "description": "Lookup activity - Delta table source",
     "input": {
       "name": "lookup_delta_ref",
@@ -289,6 +295,7 @@
     }
   },
   {
+    "id": "sql_no_query",
     "description": "Lookup activity - SQL source with no query (uses table)",
     "input": {
       "name": "lookup_sql_table",
@@ -297,7 +304,9 @@
       "depends_on": [
         {
           "activity": "prepare_data",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "policy": {
@@ -338,6 +347,7 @@
     }
   },
   {
+    "id": "default_first_row_only",
     "description": "Lookup activity - default first_row_only (not specified, defaults to true)",
     "input": {
       "name": "lookup_default_first_row",
@@ -381,6 +391,7 @@
     }
   },
   {
+    "id": "missing_dataset",
     "description": "Lookup activity - missing input dataset returns UnsupportedValue",
     "input": {
       "name": "lookup_missing_dataset",
@@ -399,6 +410,7 @@
     "expected_message": "input_dataset_definitions"
   },
   {
+    "id": "missing_source",
     "description": "Lookup activity - missing source returns UnsupportedValue",
     "input": {
       "name": "lookup_missing_source",
@@ -434,6 +446,7 @@
     "expected_message": "source"
   },
   {
+    "id": "unsupported_dataset_type",
     "description": "Lookup activity - unsupported dataset type returns UnsupportedValue",
     "input": {
       "name": "lookup_unsupported_type",

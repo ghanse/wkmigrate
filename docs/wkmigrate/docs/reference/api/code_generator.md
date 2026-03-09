@@ -6,8 +6,8 @@ title: wkmigrate.code_generator
 This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy, Lookup, and SetVariable activity
-preparers to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy and Lookup activity preparers
+to build Databricks notebooks.
 
 #### get\_option\_expressions
 
@@ -139,4 +139,44 @@ Generates code to read data from a database into a DataFrame.
 **Returns**:
 
   Python source lines that read data into a DataFrame.
+
+#### get\_web\_activity\_notebook\_content
+
+```python
+def get_web_activity_notebook_content(activity_name: str,
+                                      activity_type: str,
+                                      url: str,
+                                      method: str,
+                                      body: Any,
+                                      headers: dict[str, str] | None,
+                                      authentication: Authentication
+                                      | None = None,
+                                      disable_cert_validation: bool = False,
+                                      http_request_timeout_seconds: int
+                                      | None = None,
+                                      turn_off_async: bool = False) -> str
+```
+
+Generates notebook source for a Web activity.
+
+The generated notebook submits an HTTP request using the ``requests`` library
+and publishes the response body and status code as Databricks task values.
+
+**Arguments**:
+
+- `activity_name` - Logical name of the activity being translated.
+- `activity_type` - Activity type string emitted by ADF.
+- `url` - Target URL for the HTTP request.
+- `method` - HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
+- `body` - Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
+- `headers` - Optional HTTP headers dictionary.
+- `authentication` - Parsed authentication configuration, or ``None``.
+- `disable_cert_validation` - When ``True``, TLS certificate verification is skipped.
+- `http_request_timeout_seconds` - Optional HTTP request timeout in seconds.
+- `turn_off_async` - When ``True``, noted in the notebook as a comment for visibility.
+  
+
+**Returns**:
+
+  Formatted Python notebook source as a ``str``.
 

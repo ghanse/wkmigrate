@@ -1,5 +1,6 @@
 [
   {
+    "id": "csv_to_delta",
     "description": "Copy activity - CSV to Delta Lake",
     "input": {
       "name": "copy_csv_to_delta",
@@ -77,16 +78,31 @@
         "type": "TabularTranslator",
         "mappings": [
           {
-            "source": {"name": "id"},
-            "sink": {"name": "record_id", "type": "String"}
+            "source": {
+              "name": "id"
+            },
+            "sink": {
+              "name": "record_id",
+              "type": "String"
+            }
           },
           {
-            "source": {"name": "timestamp"},
-            "sink": {"name": "event_time", "type": "Timestamp"}
+            "source": {
+              "name": "timestamp"
+            },
+            "sink": {
+              "name": "event_time",
+              "type": "Timestamp"
+            }
           },
           {
-            "source": {"name": "value"},
-            "sink": {"name": "amount", "type": "Decimal"}
+            "source": {
+              "name": "value"
+            },
+            "sink": {
+              "name": "amount",
+              "type": "Decimal"
+            }
           }
         ]
       }
@@ -101,6 +117,7 @@
     }
   },
   {
+    "id": "parquet_to_parquet",
     "description": "Copy activity - Parquet to Parquet",
     "input": {
       "name": "copy_parquet",
@@ -181,6 +198,7 @@
     }
   },
   {
+    "id": "json_to_delta",
     "description": "Copy activity - JSON to Delta",
     "input": {
       "name": "copy_json_to_delta",
@@ -213,7 +231,9 @@
               "file_name": "events.json"
             },
             "encoding_name": "UTF-8",
-            "compression_codec": {"type": "gzip"}
+            "compression_codec": {
+              "type": "gzip"
+            }
           },
           "linked_service_definition": {
             "name": "json-storage",
@@ -255,6 +275,7 @@
     }
   },
   {
+    "id": "sql_to_delta",
     "description": "Copy activity - SQL to Delta with column mapping",
     "input": {
       "name": "copy_sql_to_delta",
@@ -321,20 +342,40 @@
         "type": "TabularTranslator",
         "mappings": [
           {
-            "source": {"name": "customer_id"},
-            "sink": {"name": "id", "type": "Long"}
+            "source": {
+              "name": "customer_id"
+            },
+            "sink": {
+              "name": "id",
+              "type": "Long"
+            }
           },
           {
-            "source": {"name": "full_name"},
-            "sink": {"name": "name", "type": "String"}
+            "source": {
+              "name": "full_name"
+            },
+            "sink": {
+              "name": "name",
+              "type": "String"
+            }
           },
           {
-            "source": {"name": "email_address"},
-            "sink": {"name": "email", "type": "String"}
+            "source": {
+              "name": "email_address"
+            },
+            "sink": {
+              "name": "email",
+              "type": "String"
+            }
           },
           {
-            "source": {"ordinal": 4},
-            "sink": {"name": "created_date", "type": "Date"}
+            "source": {
+              "ordinal": 4
+            },
+            "sink": {
+              "name": "created_date",
+              "type": "Date"
+            }
           }
         ]
       }
@@ -349,15 +390,22 @@
     }
   },
   {
+    "id": "missing_input_dataset",
     "description": "Copy activity missing input dataset",
     "input": {
       "name": "invalid_copy_no_input",
       "type": "Copy",
       "description": "Missing input dataset",
       "depends_on": [],
-      "policy": {"timeout": "0.01:00:00"},
-      "source": {"type": "ParquetSource"},
-      "sink": {"type": "ParquetSink"},
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "source": {
+        "type": "ParquetSource"
+      },
+      "sink": {
+        "type": "ParquetSink"
+      },
       "output_dataset_definitions": [
         {
           "name": "sink",
@@ -384,15 +432,22 @@
     "expected_message": "input_dataset_definitions"
   },
   {
+    "id": "missing_output_dataset",
     "description": "Copy activity missing output dataset",
     "input": {
       "name": "invalid_copy_no_output",
       "type": "Copy",
       "description": "Missing output dataset",
       "depends_on": [],
-      "policy": {"timeout": "0.01:00:00"},
-      "source": {"type": "ParquetSource"},
-      "sink": {"type": "ParquetSink"},
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "source": {
+        "type": "ParquetSource"
+      },
+      "sink": {
+        "type": "ParquetSink"
+      },
       "input_dataset_definitions": [
         {
           "name": "source",
@@ -419,15 +474,22 @@
     "expected_message": "output_dataset_definitions"
   },
   {
+    "id": "unsupported_dataset_type",
     "description": "Copy activity with unsupported dataset type",
     "input": {
       "name": "invalid_copy_unsupported_type",
       "type": "Copy",
       "description": "Unsupported dataset type",
       "depends_on": [],
-      "policy": {"timeout": "0.01:00:00"},
-      "source": {"type": "CosmosDbSqlApiSource"},
-      "sink": {"type": "ParquetSink"},
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "source": {
+        "type": "CosmosDbSqlApiSource"
+      },
+      "sink": {
+        "type": "ParquetSink"
+      },
       "input_dataset_definitions": [
         {
           "name": "source",
@@ -436,7 +498,9 @@
           },
           "linked_service_definition": {
             "name": "cosmos",
-            "properties": {"type": "CosmosDb"}
+            "properties": {
+              "type": "CosmosDb"
+            }
           }
         }
       ],

@@ -13,8 +13,8 @@ and tasks of the job to be run.
 
 ```python
 def prepare_run_job_activity(
-    activity: RunJobActivity, default_files_to_delta_sinks: bool | None
-) -> tuple[PreparedActivity, PreparedWorkflow | None]
+        activity: RunJobActivity,
+        default_files_to_delta_sinks: bool | None) -> PreparedActivity
 ```
 
 Builds the task payload for a Run Job activity.
@@ -27,5 +27,5 @@ Builds the task payload for a Run Job activity.
 
 **Returns**:
 
-  Spark Run Job task configuration
+  Prepared activity containing the Run Job task configuration.
 

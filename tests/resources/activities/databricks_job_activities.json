@@ -1,5 +1,6 @@
 [
   {
+    "id": "basic",
     "description": "Basic Databricks Job activity with existing job ID",
     "input": {
       "name": "run_existing_job",
@@ -25,6 +26,7 @@
     }
   },
   {
+    "id": "with_parameters",
     "description": "Databricks Job activity with job parameters",
     "input": {
       "name": "run_parameterized_job",
@@ -55,6 +57,7 @@
     }
   },
   {
+    "id": "with_dependency",
     "description": "Databricks Job activity with upstream dependency",
     "input": {
       "name": "run_dependent_job",
@@ -63,7 +66,9 @@
       "depends_on": [
         {
           "activity": "upstream_task",
-          "dependency_conditions": ["Succeeded"]
+          "dependency_conditions": [
+            "Succeeded"
+          ]
         }
       ],
       "policy": {
@@ -80,10 +85,16 @@
       "max_retries": 1,
       "min_retry_interval_millis": 60000,
       "existing_job_id": "67890",
-      "depends_on": [{"task_key": "upstream_task", "outcome": null}]
+      "depends_on": [
+        {
+          "task_key": "upstream_task",
+          "outcome": null
+        }
+      ]
     }
   },
   {
+    "id": "missing_job_id",
     "description": "Databricks Job activity missing existing_job_id (should return UnsupportedValue)",
     "input": {
       "name": "invalid_job_activity",

@@ -1,0 +1,176 @@
+[
+  {
+    "id": "post_with_body_and_headers",
+    "description": "Web activity - POST with body and headers",
+    "input": {
+      "name": "call_api_post",
+      "type": "WebActivity",
+      "description": "Submit a POST request to an external API",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.00:10:00",
+        "retry": 3,
+        "retry_interval_in_seconds": 30
+      },
+      "url": "https://api.example.com/webhook",
+      "method": "POST",
+      "body": {
+        "event": "pipeline_started",
+        "status": "running"
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Api-Key": "secret-key"
+      }
+    },
+    "expected": {
+      "name": "call_api_post",
+      "task_key": "call_api_post",
+      "activity_type": "WebActivity",
+      "url": "https://api.example.com/webhook",
+      "method": "POST",
+      "timeout_seconds": 600,
+      "max_retries": 3,
+      "min_retry_interval_millis": 30000
+    }
+  },
+  {
+    "id": "get_no_body",
+    "description": "Web activity - GET with no body",
+    "input": {
+      "name": "health_check",
+      "type": "WebActivity",
+      "description": "Check the health of an external service",
+      "depends_on": [],
+      "url": "https://api.example.com/health",
+      "method": "GET"
+    },
+    "expected": {
+      "name": "health_check",
+      "task_key": "health_check",
+      "activity_type": "WebActivity",
+      "url": "https://api.example.com/health",
+      "method": "GET"
+    }
+  },
+  {
+    "id": "put_with_body",
+    "description": "Web activity - PUT with body, no headers",
+    "input": {
+      "name": "update_record",
+      "type": "WebActivity",
+      "description": "Update a record via PUT",
+      "depends_on": [],
+      "url": "https://api.example.com/records/1",
+      "method": "put",
+      "body": {
+        "status": "completed"
+      }
+    },
+    "expected": {
+      "name": "update_record",
+      "task_key": "update_record",
+      "activity_type": "WebActivity",
+      "url": "https://api.example.com/records/1",
+      "method": "PUT"
+    }
+  },
+  {
+    "id": "post_with_auth",
+    "description": "Web activity - POST with authentication and advanced options",
+    "input": {
+      "name": "authenticated_post",
+      "type": "WebActivity",
+      "description": "Submit a POST request with basic auth and advanced options",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.12:00:00",
+        "retry": 0,
+        "retry_interval_in_seconds": 30
+      },
+      "url": "https://api.example.com/secure",
+      "method": "POST",
+      "headers": {
+        "header_key": "header_value"
+      },
+      "body": {
+        "data": "payload"
+      },
+      "disable_cert_validation": true,
+      "http_request_timeout": "00:05:30",
+      "turn_off_async": true,
+      "authentication": {
+        "type": "Basic",
+        "username": "atest",
+        "password": {
+          "type": "SecureString",
+          "value": "**********"
+        }
+      }
+    },
+    "expected": {
+      "name": "authenticated_post",
+      "task_key": "authenticated_post",
+      "activity_type": "WebActivity",
+      "url": "https://api.example.com/secure",
+      "method": "POST",
+      "disable_cert_validation": true,
+      "http_request_timeout_seconds": 330,
+      "turn_off_async": true,
+      "authentication_type": "Basic"
+    }
+  },
+  {
+    "id": "unsupported_auth_type",
+    "description": "Web activity - unsupported authentication type returns UnsupportedValue",
+    "input": {
+      "name": "msi_auth_post",
+      "type": "WebActivity",
+      "url": "https://api.example.com/secure",
+      "method": "POST",
+      "authentication": {
+        "type": "MSI",
+        "resource": "https://management.azure.com/"
+      }
+    },
+    "expected_unsupported": true,
+    "expected_message": "Unsupported authentication type 'MSI'"
+  },
+  {
+    "id": "missing_auth_type",
+    "description": "Web activity - missing authentication type returns UnsupportedValue",
+    "input": {
+      "name": "no_auth_type",
+      "type": "WebActivity",
+      "url": "https://api.example.com/secure",
+      "method": "POST",
+      "authentication": {
+        "username": "someuser"
+      }
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing value 'type' for authentication"
+  },
+  {
+    "id": "missing_url",
+    "description": "Web activity - missing URL returns UnsupportedValue",
+    "input": {
+      "name": "missing_url",
+      "type": "WebActivity",
+      "method": "POST"
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing value 'url' for Web activity"
+  },
+  {
+    "id": "missing_method",
+    "description": "Web activity - missing method returns UnsupportedValue",
+    "input": {
+      "name": "missing_method",
+      "type": "WebActivity",
+      "url": "https://api.example.com/webhook"
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing value 'method' for Web activity"
+  }
+]

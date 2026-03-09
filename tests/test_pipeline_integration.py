@@ -7,7 +7,7 @@ sequential tasks, parallel branches, conditional logic, and batch processing.
 
 from __future__ import annotations
 
-
+from tests.conftest import get_fixture
 from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
     ForEachActivity,
@@ -21,7 +21,7 @@ from wkmigrate.translators.pipeline_translators.pipeline_translator import trans
 
 def test_etl_pipeline_sequential_tasks(complex_pipeline_fixtures: list[dict]) -> None:
     """Test ETL pipeline with sequential notebook activities."""
-    fixture = next(f for f in complex_pipeline_fixtures if "ETL pipeline" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "etl_sequential")
     result = translate_pipeline(fixture["input"])
 
     assert isinstance(result, Pipeline)
@@ -48,7 +48,7 @@ def test_etl_pipeline_sequential_tasks(complex_pipeline_fixtures: list[dict]) ->
 
 def test_parallel_pipeline_branches_and_join(complex_pipeline_fixtures: list[dict]) -> None:
     """Test pipeline with parallel branches and join."""
-    fixture = next(f for f in complex_pipeline_fixtures if "parallel branches" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "parallel_branches")
     result = translate_pipeline(fixture["input"])
 
     assert isinstance(result, Pipeline)
@@ -68,7 +68,7 @@ def test_parallel_pipeline_branches_and_join(complex_pipeline_fixtures: list[dic
 
 def test_conditional_pipeline_if_condition(complex_pipeline_fixtures: list[dict]) -> None:
     """Test pipeline with IfCondition branching."""
-    fixture = next(f for f in complex_pipeline_fixtures if "IfCondition branching" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "if_condition_branching")
 
     result = translate_pipeline(fixture["input"])
 
@@ -87,7 +87,7 @@ def test_conditional_pipeline_if_condition(complex_pipeline_fixtures: list[dict]
 
 def test_batch_processing_pipeline_foreach(complex_pipeline_fixtures: list[dict]) -> None:
     """Test pipeline with ForEach for batch processing."""
-    fixture = next(f for f in complex_pipeline_fixtures if "batch processing" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "foreach_batch")
     result = translate_pipeline(fixture["input"])
 
     assert isinstance(result, Pipeline)
@@ -104,7 +104,7 @@ def test_batch_processing_pipeline_foreach(complex_pipeline_fixtures: list[dict]
 
 def test_mixed_activity_pipeline(complex_pipeline_fixtures: list[dict]) -> None:
     """Test pipeline with mixed activity types."""
-    fixture = next(f for f in complex_pipeline_fixtures if "mixed activity types" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "mixed_activity_types")
     result = translate_pipeline(fixture["input"])
 
     assert isinstance(result, Pipeline)
@@ -126,7 +126,7 @@ def test_mixed_activity_pipeline(complex_pipeline_fixtures: list[dict]) -> None:
 
 def test_nested_foreach_creates_run_job(complex_pipeline_fixtures: list[dict]) -> None:
     """Test pipeline with nested ForEach containing multiple activities."""
-    fixture = next(f for f in complex_pipeline_fixtures if "nested ForEach" in f["description"])
+    fixture = get_fixture(complex_pipeline_fixtures, "nested_foreach_run_job")
     result = translate_pipeline(fixture["input"])
 
     assert isinstance(result, Pipeline)
@@ -431,11 +431,9 @@ def test_foreach_with_unsupported_inner_activity() -> None:
                 "items": {"type": "Expression", "value": "@array(['a', 'b'])"},
                 "activities": [
                     {
-                        "name": "web_activity",
-                        "type": "WebActivity",
+                        "name": "unsupported_inner",
+                        "type": "SomeUnsupportedType",
                         "depends_on": [],
-                        "method": "GET",
-                        "url": "https://api.example.com",
                     }
                 ],
             }

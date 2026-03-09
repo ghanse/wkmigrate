@@ -1,15 +1,19 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy, Lookup, and SetVariable activity
-preparers to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy, Lookup, SetVariable, and Web
+activity preparers to build Databricks notebooks.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 import autopep8  # type: ignore
 
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
+from wkmigrate.models.ir.pipeline import Authentication
+from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 
 
 def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
@@ -219,3 +223,120 @@ def get_jdbc_read_expression(source_definition: dict, source_query: str | None =
     lines.append("        .load()")
     lines.append(")")
     return "\n".join(lines) + "\n"
+
+
+def get_web_activity_notebook_content(
+    activity_name: str,
+    activity_type: str,
+    url: str,
+    method: str,
+    body: Any,
+    headers: dict[str, str] | None,
+    authentication: Authentication | None = None,
+    disable_cert_validation: bool = False,
+    http_request_timeout_seconds: int | None = None,
+    turn_off_async: bool = False,
+) -> str:
+    """
+    Generates notebook source for a Web activity.
+
+    The generated notebook submits an HTTP request using the ``requests`` library
+    and publishes the response body and status code as Databricks task values.
+
+    Args:
+        activity_name: Logical name of the activity being translated.
+        activity_type: Activity type string emitted by ADF.
+        url: Target URL for the HTTP request.
+        method: HTTP method (for example ``GET``, ``POST``, ``PUT``, ``DELETE``).
+        body: Optional request body. Passed as JSON when the body is a dict, or as raw data otherwise.
+        headers: Optional HTTP headers dictionary.
+        authentication: Parsed authentication configuration, or ``None``.
+        disable_cert_validation: When ``True``, TLS certificate verification is skipped.
+        http_request_timeout_seconds: Optional HTTP request timeout in seconds.
+        turn_off_async: When ``True``, noted in the notebook as a comment for visibility.
+
+    Returns:
+        Formatted Python notebook source as a ``str``.
+    """
+    script_lines = [
+        "# Databricks notebook source",
+        "import requests",
+        "",
+        f"url = {url!r}",
+        f"method = {method!r}",
+        f"headers = {headers!r}",
+        f"body = {body!r}",
+        "",
+        "kwargs = {}",
+        "if headers:",
+        '    kwargs["headers"] = headers',
+        "if body is not None:",
+        "    if isinstance(body, dict):",
+        '        kwargs["json"] = body',
+        "    else:",
+        '        kwargs["data"] = body',
+    ]
+
+    if disable_cert_validation:
+        script_lines.append('kwargs["verify"] = False')
+
+    if http_request_timeout_seconds is not None:
+        script_lines.append(f'kwargs["timeout"] = {http_request_timeout_seconds}')
+
+    if authentication:
+        script_lines.extend(_get_authentication_lines(activity_name, activity_type, authentication))
+
+    if turn_off_async:
+        script_lines.append("")
+        script_lines.append("# Note: ADF turnOffAsync was enabled — this request runs synchronously.")
+
+    script_lines.extend(
+        [
+            "",
+            "response = requests.request(method, url, **kwargs)",
+            "",
+            "# Publish response as Databricks task values:",
+            'dbutils.jobs.taskValues.set(key="status_code", value=str(response.status_code))',
+            'dbutils.jobs.taskValues.set(key="response_body", value=response.text)',
+            "response.raise_for_status()",
+        ]
+    )
+    return autopep8.fix_code("\n".join(script_lines))
+
+
+def _get_authentication_lines(activity_name: str, activity_type: str, authentication: Authentication) -> list[str]:
+    """
+    Generates notebook source lines for an authentication configuration.
+
+    Args:
+        activity_name: Logical name of the activity being translated.
+        activity_type: Activity type string emitted by ADF.
+        authentication: Parsed authentication configuration.
+
+    Returns:
+        List of Python source lines to append to the notebook script.
+    """
+    with not_translatable_context(activity_name, activity_type):
+        match authentication.auth_type.lower():
+            case "basic":
+                return _get_basic_authentication_lines(authentication)
+            case _:
+                raise NotTranslatableWarning(
+                    "authentication_type", f"Unsupported authentication type '{authentication.auth_type}'"
+                )
+
+
+def _get_basic_authentication_lines(authentication: Authentication) -> list[str]:
+    """
+    Generates notebook source lines for Basic authentication.
+
+    Args:
+        authentication: Parsed authentication configuration.
+
+    Returns:
+        List of Python source lines to append to the notebook script.
+    """
+    return [
+        f'kwargs["auth"] = ({authentication.username!r}, '
+        f'dbutils.secrets.get(scope="wkmigrate_credentials_scope", key="{authentication.password_secret_key}"))'
+    ]
