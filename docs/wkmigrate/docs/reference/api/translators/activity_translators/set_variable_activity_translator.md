@@ -1,0 +1,37 @@
+---
+sidebar_label: set_variable_activity_translator
+title: wkmigrate.translators.activity_translators.set_variable_activity_translator
+---
+
+This module defines a translator for translating Set Variable activities.
+
+Translators in this module normalize Set Variable activity payloads into internal
+representations. The variable name and value are pulled form the Set Variable activity.
+
+If the Set Variable activity references a complex expression (e.g. '@activity("activity_name").output.output_key'),
+the expression is parsed into an equivalent Python expression.
+
+#### translate\_set\_variable\_activity
+
+```python
+def translate_set_variable_activity(
+        activity: dict,
+        base_kwargs: dict) -> SetVariableActivity | UnsupportedValue
+```
+
+Translates an ADF Set Variable activity into a ``SetVariableActivity`` object.
+
+The activity's ``value`` field may be a static string or an ADF expression object. Supported
+expressions are translated into Python code snippets. Any expression that cannot be translated
+produces an ``UnsupportedValue``.
+
+**Arguments**:
+
+- `activity` - SetVariable activity definition as a ``dict``.
+- `base_kwargs` - Common activity metadata.
+  
+
+**Returns**:
+
+  ``SetVariableActivity`` representation of the SetVariable task.
+

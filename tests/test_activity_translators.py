@@ -57,9 +57,10 @@ from wkmigrate.translators.activity_translators.set_variable_activity_translator
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
 )
+from wkmigrate.utils import get_placeholder_activity
 
 
-_NOTEBOOK_ACTIVITY: dict = {
+NOTEBOOK_ACTIVITY: dict = {
     "name": "nb_task",
     "type": "DatabricksNotebook",
     "depends_on": [],
@@ -67,7 +68,7 @@ _NOTEBOOK_ACTIVITY: dict = {
     "notebook_path": "/notebooks/etl",
 }
 
-_SPARK_JAR_ACTIVITY: dict = {
+SPARK_JAR_ACTIVITY: dict = {
     "name": "jar_task",
     "type": "DatabricksSparkJar",
     "depends_on": [{"activity": "nb_task", "dependency_conditions": ["Succeeded"]}],
@@ -411,14 +412,6 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
 
     assert result.task_key == fixture["expected"]["task_key"]
     assert result.notebook_path == fixture["expected"]["notebook_path"]
-
-
-def test_set_variable_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
-    """Test that SetVariable activity creates placeholder."""
-    fixture = get_fixture(unsupported_activity_fixtures, "set_variable")
-    result = translate_activity(fixture["input"])
-
-    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
 
 
 def test_execute_pipeline_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
@@ -832,14 +825,9 @@ def test_web_activity_missing_auth_type_returns_unsupported(web_activity_fixture
     assert fixture["expected_message"] in result.message
 
 
-# ---------------------------------------------------------------------------
-# SetVariable activity tests
-# ---------------------------------------------------------------------------
-
-
 def test_set_variable_static_string(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with a static string value."""
-    fixture = next(f for f in set_variable_activity_fixtures if "static string" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "static_string_value")
     result = translate_activity(fixture["input"])
 
     assert isinstance(result, SetVariableActivity)
@@ -851,7 +839,7 @@ def test_set_variable_static_string(set_variable_activity_fixtures: list[dict]) 
 
 def test_set_variable_activity_output_expression(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with an activity output expression dict."""
-    fixture = next(f for f in set_variable_activity_fixtures if "activity output expression" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "activity_output_expression")
     result = translate_activity(fixture["input"])
 
     assert isinstance(result, SetVariableActivity)
@@ -861,7 +849,7 @@ def test_set_variable_activity_output_expression(set_variable_activity_fixtures:
 
 def test_set_variable_pipeline_run_id(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with @pipeline().RunId system variable."""
-    fixture = next(f for f in set_variable_activity_fixtures if "pipeline RunId" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "pipeline_run_id")
     result = translate_activity(fixture["input"])
 
     assert isinstance(result, SetVariableActivity)
@@ -870,7 +858,7 @@ def test_set_variable_pipeline_run_id(set_variable_activity_fixtures: list[dict]
 
 def test_set_variable_pipeline_name(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with @pipeline().Pipeline system variable."""
-    fixture = next(f for f in set_variable_activity_fixtures if "pipeline Pipeline name" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "pipeline_name")
     result = translate_activity(fixture["input"])
 
     assert isinstance(result, SetVariableActivity)
@@ -879,7 +867,7 @@ def test_set_variable_pipeline_name(set_variable_activity_fixtures: list[dict]) 
 
 def test_set_variable_bare_expression_string(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with a bare expression string (no wrapper dict)."""
-    fixture = next(f for f in set_variable_activity_fixtures if "bare expression string" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "bare_expression_string")
     result = translate_activity(fixture["input"])
 
     assert isinstance(result, SetVariableActivity)
@@ -888,15 +876,15 @@ def test_set_variable_bare_expression_string(set_variable_activity_fixtures: lis
 
 def test_set_variable_unsupported_expression_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with unsupported expression produces an UNSUPPORTED_ADF_ACTIVITY placeholder."""
-    fixture = next(f for f in set_variable_activity_fixtures if "unsupported expression" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "unsupported_expression_string")
+    placeholder = get_placeholder_activity({"name": fixture["input"]["name"], "task_key": fixture["input"]["name"]})
     result = translate_activity(fixture["input"])
-
-    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
+    assert result == placeholder
 
 
 def test_set_variable_missing_variable_name_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
     """Test SetVariable with missing variable_name returns UnsupportedValue."""
-    fixture = next(f for f in set_variable_activity_fixtures if "missing variable_name" in f["description"])
+    fixture = get_fixture(set_variable_activity_fixtures, "missing_variable_name")
     base_kwargs = get_base_kwargs(fixture["input"])
     result = translate_set_variable_activity(fixture["input"], base_kwargs)
 
@@ -907,7 +895,7 @@ def test_set_variable_missing_variable_name_returns_unsupported(set_variable_act
 def test_context_cache_visit_populates_cache() -> None:
     """Visiting a named activity stores it in the returned context."""
     ctx = default_context()
-    translated, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    translated, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert ctx.get_activity("nb_task") is translated
     assert isinstance(translated, DatabricksNotebookActivity)
@@ -916,8 +904,8 @@ def test_context_cache_visit_populates_cache() -> None:
 def test_context_cache_returns_cached_on_second_call() -> None:
     """A second visit for the same name returns the identical cached object."""
     ctx = default_context()
-    first, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
-    second, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    first, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
+    second, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert first is second
 
@@ -925,16 +913,16 @@ def test_context_cache_returns_cached_on_second_call() -> None:
 def test_context_cache_does_not_grow_on_duplicate() -> None:
     """Visiting the same activity twice does not add a second cache entry."""
     ctx = default_context()
-    _, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    _, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
     cache_size_after_first = len(ctx.activity_cache)
-    _, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    _, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert len(ctx.activity_cache) == cache_size_after_first
 
 
 def test_context_cache_populates_all_activities() -> None:
     """All translated activities appear in the final context cache."""
-    activities = [_NOTEBOOK_ACTIVITY, _SPARK_JAR_ACTIVITY]
+    activities = [NOTEBOOK_ACTIVITY, SPARK_JAR_ACTIVITY]
     result, ctx = translate_activities_with_context(activities)
 
     assert result is not None
@@ -966,9 +954,9 @@ def test_context_cache_empty_input() -> None:
 def test_context_cache_returns_pre_populated() -> None:
     """When the context already contains an activity, visit_activity returns it."""
     ctx = default_context()
-    first, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    first, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
-    second, ctx2 = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    second, ctx2 = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert second is first
     assert ctx2 is ctx
@@ -1010,8 +998,8 @@ def test_context_cache_threads_through_if_condition() -> None:
 def test_context_cache_threads_through_dependency_chain() -> None:
     """Upstream activities are cached before their dependents during topological visit."""
     activities = [
-        _SPARK_JAR_ACTIVITY,
-        _NOTEBOOK_ACTIVITY,
+        SPARK_JAR_ACTIVITY,
+        NOTEBOOK_ACTIVITY,
     ]
     result, ctx = translate_activities_with_context(activities)
 
@@ -1027,7 +1015,7 @@ def test_context_cache_threads_through_dependency_chain() -> None:
 def test_context_cache_immutability() -> None:
     """The original context is not mutated when a new activity is added."""
     ctx_before = default_context()
-    _, ctx_after = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx_before)
+    _, ctx_after = visit_activity(NOTEBOOK_ACTIVITY, False, ctx_before)
 
     assert len(ctx_before.activity_cache) == 0
     assert len(ctx_after.activity_cache) == 1

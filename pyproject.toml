@@ -418,6 +418,9 @@ max-statements = 50
 # Minimum number of public methods for a class (see R0903).
 min-public-methods = 2
 
+# Maximum McCabe complexity rating
+max-complexity = 12
+
 [tool.pylint.exceptions]
 # Exceptions that will emit a warning when caught.
 overgeneral-exceptions = ["builtins.Exception"]

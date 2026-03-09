@@ -18,18 +18,15 @@ from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_
 
 def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
     """
-    Generates notebook source for a SetVariable activity.
-
-    The notebook evaluates ``variable_value`` and publishes the result as a
-    Databricks task value under ``key=variable_name`` so that downstream tasks
-    can retrieve it with ``dbutils.jobs.taskValues.get()``.
+    Generates code to set a pipeline parameter . The notebook evaluates ``variable_value`` and sets a Databricks task
+    value parameter.
 
     Args:
         variable_name: ADF variable name (used as the task-value key).
         variable_value: Python expression string produced by the expression parser.
 
     Returns:
-        Formatted Python notebook source string.
+        Python notebook source string.
     """
     script_lines = [
         "# Databricks notebook source",

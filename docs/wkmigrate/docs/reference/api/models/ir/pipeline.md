@@ -83,6 +83,7 @@ Copy activity metadata including datasets and mappings.
 - `source_properties` - Parsed dataset properties associated with the source.
 - `sink_properties` - Parsed dataset properties associated with the sink.
 - `column_mapping` - Column-level mappings from source to sink, if provided.
+- `column_mapping_options` - Column-level mapping options, if provided.
 
 ## ForEachActivity Objects
 
@@ -201,6 +202,20 @@ If Condition activity metadata.
 - `left` - Left-hand operand used in the conditional expression.
 - `right` - Right-hand operand used in the conditional expression.
 - `child_activities` - Activities that form the body of the conditional branch.
+
+## SetVariableActivity Objects
+
+```python
+@dataclass(slots=True, kw_only=True)
+class SetVariableActivity(Activity)
+```
+
+SetVariable activity metadata.
+
+**Attributes**:
+
+- `variable_name` - Variable name to set.
+- `variable_value` - Python expression string that evaluates to the variable value.
 
 ## ColumnMapping Objects
 

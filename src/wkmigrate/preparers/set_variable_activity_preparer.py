@@ -1,9 +1,9 @@
-"""Preparer for SetVariable activities.
+"""
+This module defines a preparer for SetVariable activities.
 
-The preparer emits a single notebook task that evaluates the translated
-variable expression and publishes the result as a Databricks task value via
-``dbutils.jobs.taskValues.set()``.  Downstream tasks can retrieve the value
-with ``dbutils.jobs.taskValues.get(taskKey=<this_task_key>, key=<variable_name>)``.
+The preparer builds a Databricks notebook task that evaluates the translated variable
+expression and sets a Databricks task value via ``dbutils.jobs.taskValues.set()``.
+Downstream tasks can retrieve the value from ``dbutils.jobs.taskValues``.
 """
 
 from __future__ import annotations
@@ -18,13 +18,6 @@ from wkmigrate.utils import parse_mapping
 def prepare_set_variable_activity(activity: SetVariableActivity) -> PreparedActivity:
     """
     Builds tasks and artifacts for a SetVariable activity.
-
-    The resulting notebook:
-
-    1. Evaluates the translated variable expression (static literal, task-value
-       lookup, or pipeline-context call).
-    2. Publishes the result as a Databricks task value under ``key=variable_name``
-       so that downstream tasks can reference it.
 
     Args:
         activity: :class:`SetVariableActivity` IR instance produced by the translator.

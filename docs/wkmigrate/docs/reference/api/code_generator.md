@@ -6,8 +6,28 @@ title: wkmigrate.code_generator
 This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy and Lookup activity preparers
-to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy, Lookup, SetVariable, and Web
+activity preparers to build Databricks notebooks.
+
+#### get\_set\_variable\_notebook\_content
+
+```python
+def get_set_variable_notebook_content(variable_name: str,
+                                      variable_value: str) -> str
+```
+
+Generates code to set a pipeline parameter . The notebook evaluates ``variable_value`` and sets a Databricks task
+value parameter.
+
+**Arguments**:
+
+- `variable_name` - ADF variable name (used as the task-value key).
+- `variable_value` - Python expression string produced by the expression parser.
+  
+
+**Returns**:
+
+  Python notebook source string.
 
 #### get\_option\_expressions
 

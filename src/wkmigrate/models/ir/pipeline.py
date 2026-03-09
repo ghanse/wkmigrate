@@ -92,6 +92,7 @@ class CopyActivity(Activity):
         source_properties: Parsed dataset properties associated with the source.
         sink_properties: Parsed dataset properties associated with the sink.
         column_mapping: Column-level mappings from source to sink, if provided.
+        column_mapping_options: Column-level mapping options, if provided.
     """
 
     source_dataset: Dataset | None = None
@@ -99,6 +100,7 @@ class CopyActivity(Activity):
     source_properties: dict[str, Any] | None = None
     sink_properties: dict[str, Any] | None = None
     column_mapping: list[ColumnMapping] | None = None
+    column_mapping_options: dict[str, Any] | None = None
 
 
 @dataclass(slots=True, kw_only=True)
@@ -239,8 +241,8 @@ class SetVariableActivity(Activity):
     SetVariable activity metadata.
 
     Attributes:
-        variable_name: ADF variable name to set; also used as the Databricks task-value key.
-        variable_value: Python expression string that evaluates to the value to publish.
+        variable_name: Variable name to set.
+        variable_value: Python expression string that evaluates to the variable value.
     """
 
     variable_name: str

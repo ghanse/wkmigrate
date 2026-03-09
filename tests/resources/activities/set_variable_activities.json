@@ -1,5 +1,6 @@
 [
   {
+    "id": "static_string_value",
     "description": "SetVariable with a static string value",
     "input": {
       "name": "set_customer_name",
@@ -18,6 +19,7 @@
     }
   },
   {
+    "id": "activity_output_expression",
     "description": "SetVariable with an activity output expression",
     "input": {
       "name": "set_from_lookup",
@@ -33,10 +35,11 @@
       "name": "set_from_lookup",
       "task_key": "set_from_lookup",
       "variable_name": "lookupResult",
-      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='firstRow')"
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='result')"
     }
   },
   {
+    "id": "pipeline_run_id",
     "description": "SetVariable with pipeline RunId system variable",
     "input": {
       "name": "set_run_id",
@@ -56,6 +59,7 @@
     }
   },
   {
+    "id": "pipeline_name",
     "description": "SetVariable with pipeline Pipeline name system variable",
     "input": {
       "name": "set_pipeline_name",
@@ -75,6 +79,7 @@
     }
   },
   {
+    "id": "bare_expression_string",
     "description": "SetVariable with a bare expression string (no wrapper dict)",
     "input": {
       "name": "set_from_bare_expr",
@@ -87,10 +92,11 @@
       "name": "set_from_bare_expr",
       "task_key": "set_from_bare_expr",
       "variable_name": "outputVal",
-      "variable_value": "dbutils.jobs.taskValues.get(taskKey='FetchData', key='value')"
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='FetchData', key='result')"
     }
   },
   {
+    "id": "unsupported_expression_string",
     "description": "SetVariable with unsupported expression returns placeholder",
     "input": {
       "name": "set_unsupported",
@@ -103,10 +109,13 @@
       }
     },
     "expected": {
-      "unsupported": true
+      "unsupported": true,
+      "name": "set_unsupported",
+      "task_key": "set_unsupported"
     }
   },
   {
+    "id": "missing_variable_name",
     "description": "SetVariable missing variable_name returns placeholder",
     "input": {
       "name": "set_missing_name",

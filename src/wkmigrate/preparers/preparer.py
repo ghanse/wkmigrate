@@ -84,5 +84,5 @@ def prepare_activity(
     if isinstance(activity, WebActivity):
         return prepare_web_activity(activity)
     if isinstance(activity, SetVariableActivity):
-        return prepare_set_variable_activity(activity), None
+        return prepare_set_variable_activity(activity)
     raise ValueError(f"Unsupported activity type '{type(activity)}'")

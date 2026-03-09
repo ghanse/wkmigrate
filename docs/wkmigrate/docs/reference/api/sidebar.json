@@ -58,7 +58,8 @@
         },
         {
           "items": [
-            "reference/api/wkmigrate/parsers/dataset_parsers"
+            "reference/api/wkmigrate/parsers/dataset_parsers",
+            "reference/api/wkmigrate/parsers/expression_parsers"
           ],
           "label": "wkmigrate.parsers",
           "type": "category"
@@ -72,6 +73,7 @@
             "reference/api/wkmigrate/preparers/notebook_activity_preparer",
             "reference/api/wkmigrate/preparers/preparer",
             "reference/api/wkmigrate/preparers/run_job_activity_preparer",
+            "reference/api/wkmigrate/preparers/set_variable_activity_preparer",
             "reference/api/wkmigrate/preparers/spark_jar_activity_preparer",
             "reference/api/wkmigrate/preparers/spark_python_activity_preparer",
             "reference/api/wkmigrate/preparers/utils",
@@ -91,6 +93,7 @@
                 "reference/api/wkmigrate/translators/activity_translators/if_condition_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/lookup_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/notebook_activity_translator",
+                "reference/api/wkmigrate/translators/activity_translators/set_variable_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/spark_jar_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/spark_python_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/web_activity_translator"
