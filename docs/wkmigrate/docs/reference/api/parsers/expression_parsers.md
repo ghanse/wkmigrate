@@ -7,7 +7,7 @@ title: wkmigrate.parsers.expression_parsers
 
 ```python
 def parse_variable_value(
-        value: str | dict,
+        value: str | dict | int | float | bool,
         context: TranslationContext) -> str | UnsupportedValue
 ```
 
@@ -17,6 +17,7 @@ Parses an ADF variable value or expression into a Python code snippet. Unsupport
 The following cases are supported:
 
 * Static string values -> Python string literal (e.g. ``'hello'``).
+* Numeric / boolean literals -> Python literal (e.g. ``42``, ``True``).
 * Expressions (e.g. ``{"value": "@...", "type": "Expression"}``) -> inner expression is extracted and parsed.
 * Activity output references (e.g. ``@activity('X').output.Y``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
 * Pipeline system variables (e.g. ``@pipeline().Pipeline`` or ``@pipeline().RunId``) -> ``spark.conf`` or ``dbutils.jobs.getContext()`` lookups.
@@ -24,7 +25,8 @@ The following cases are supported:
 
 **Arguments**:
 
-- `value` - Variable value. Can be a plain string or an expression object with ``"type": "Expression"``.
+- `value` - Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with
+- ```"type"` - "Expression"``.
 - `context` - Translation context.
   
 

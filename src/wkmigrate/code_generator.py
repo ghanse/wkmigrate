@@ -28,15 +28,19 @@ def get_set_variable_notebook_content(variable_name: str, variable_value: str) -
     Returns:
         Python notebook source string.
     """
-    script_lines = [
-        "# Databricks notebook source",
-        "",
-        f"# Set variable: {variable_name}",
-        f"value = {variable_value}",
-        "",
-        "# Publish as a Databricks task value:",
-        f"dbutils.jobs.taskValues.set(key={variable_name!r}, value=str(value))",
-    ]
+    script_lines = ["# Databricks notebook source"]
+    if "json.loads(" in variable_value:
+        script_lines.append("import json")
+    script_lines.extend(
+        [
+            "",
+            f"# Set variable: {variable_name}",
+            f"value = {variable_value}",
+            "",
+            "# Publish as a Databricks task value:",
+            f"dbutils.jobs.taskValues.set(key={variable_name!r}, value=str(value))",
+        ]
+    )
     return autopep8.fix_code("\n".join(script_lines))
 
 

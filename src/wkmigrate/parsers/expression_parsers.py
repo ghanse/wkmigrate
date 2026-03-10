@@ -15,7 +15,7 @@ _ACTIVITY_OUTPUT_PATTERN = r"activity\(['\"]([^'\"]+)['\"]\)\.output\.([\w.]+)$"
 _NAMED_VARIABLE_PATTERN = r"variables\(['\"]([^'\"]+)['\"]\)$"
 
 
-def parse_variable_value(value: str | dict, context: TranslationContext) -> str | UnsupportedValue:
+def parse_variable_value(value: str | dict | int | float | bool, context: TranslationContext) -> str | UnsupportedValue:
     """
     Parses an ADF variable value or expression into a Python code snippet. Unsupported dynamic expressions return
     `UnsupportedValue`.
@@ -23,13 +23,15 @@ def parse_variable_value(value: str | dict, context: TranslationContext) -> str 
     The following cases are supported:
 
     * Static string values -> Python string literal (e.g. ``'hello'``).
+    * Numeric / boolean literals -> Python literal (e.g. ``42``, ``True``).
     * Expressions (e.g. ``{"value": "@...", "type": "Expression"}``) -> inner expression is extracted and parsed.
     * Activity output references (e.g. ``@activity('X').output.Y``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
     * Pipeline system variables (e.g. ``@pipeline().Pipeline`` or ``@pipeline().RunId``) -> ``spark.conf`` or ``dbutils.jobs.getContext()`` lookups.
     * Variables (e.g. ``@variables('X')``) -> ``dbutils.jobs.taskValues.get(taskKey='set_my_variable', key='X')``.
 
     Args:
-        value: Variable value. Can be a plain string or an expression object with ``"type": "Expression"``.
+        value: Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with
+            ``"type": "Expression"``.
         context: Translation context.
 
     Returns:
@@ -43,6 +45,9 @@ def parse_variable_value(value: str | dict, context: TranslationContext) -> str 
         if not expression:
             return UnsupportedValue(value=value, message="Missing property 'value' of expression")
         return _parse_expression_string(expression, context)
+
+    if not isinstance(value, str):
+        return repr(value)
 
     return _parse_expression_string(value, context)
 
@@ -68,8 +73,15 @@ def _parse_expression_string(expression: str, context: TranslationContext) -> st
 
     if match := re.match(_ACTIVITY_OUTPUT_PATTERN, expression):
         task_key, output_key = match.group(1), match.group(2)
-        if output_key in _SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES:
-            return f"dbutils.jobs.taskValues.get(taskKey={task_key!r}, key='result')"
+        output_parts = output_key.split(".")
+        output_root = output_parts[0]
+        if output_root in _SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES:
+            base = f"dbutils.jobs.taskValues.get(taskKey={task_key!r}, key='result')"
+            if len(output_parts) > 1:
+                property_path = output_parts[1:]
+                accessors = "".join(f"[{p!r}]" for p in property_path)
+                return f"json.loads({base}){accessors}"
+            return base
         return UnsupportedValue(
             value=expression,
             message=f"Unsupported activity output reference type '@activity({task_key!r}).output.{output_key!r}'",

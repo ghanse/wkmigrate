@@ -1297,6 +1297,66 @@ def test_parse_variable_value_variables_reference_not_found() -> None:
     assert "unknown" in result.message
 
 
+def test_set_variable_integer_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with an integer value produces a Python int literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "integer_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_boolean_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a boolean value produces a Python bool literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "boolean_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_float_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a float value produces a Python float literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "float_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_nested_activity_output(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with nested activity output path like firstRow.columnName."""
+    fixture = get_fixture(set_variable_activity_fixtures, "nested_activity_output")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_parse_variable_value_integer() -> None:
+    """parse_variable_value handles integer values directly."""
+    ctx = TranslationContext()
+    assert parse_variable_value(42, ctx) == "42"
+
+
+def test_parse_variable_value_boolean() -> None:
+    """parse_variable_value handles boolean values directly."""
+    ctx = TranslationContext()
+    assert parse_variable_value(True, ctx) == "True"
+    assert parse_variable_value(False, ctx) == "False"
+
+
+def test_parse_variable_value_nested_output_property() -> None:
+    """parse_variable_value resolves nested activity output like firstRow.myColumn."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": "@activity('Lookup').output.firstRow.col1", "type": "Expression"}, ctx)
+    assert result == "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['col1']"
+
+
 def test_parse_variable_value_static_string() -> None:
     """parse_variable_value wraps static strings as Python literals."""
     ctx = TranslationContext()

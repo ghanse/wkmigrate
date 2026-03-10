@@ -211,5 +211,76 @@
       "name": "set_from_unknown_var",
       "task_key": "set_from_unknown_var"
     }
+  },
+  {
+    "id": "integer_value",
+    "description": "SetVariable with an integer value",
+    "input": {
+      "name": "set_retry_count",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "retryCount",
+      "value": 42
+    },
+    "expected": {
+      "name": "set_retry_count",
+      "task_key": "set_retry_count",
+      "variable_name": "retryCount",
+      "variable_value": "42"
+    }
+  },
+  {
+    "id": "boolean_value",
+    "description": "SetVariable with a boolean value",
+    "input": {
+      "name": "set_is_enabled",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "isEnabled",
+      "value": true
+    },
+    "expected": {
+      "name": "set_is_enabled",
+      "task_key": "set_is_enabled",
+      "variable_name": "isEnabled",
+      "variable_value": "True"
+    }
+  },
+  {
+    "id": "float_value",
+    "description": "SetVariable with a float value",
+    "input": {
+      "name": "set_threshold",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "threshold",
+      "value": 0.95
+    },
+    "expected": {
+      "name": "set_threshold",
+      "task_key": "set_threshold",
+      "variable_name": "threshold",
+      "variable_value": "0.95"
+    }
+  },
+  {
+    "id": "nested_activity_output",
+    "description": "SetVariable with nested activity output property access (e.g. firstRow.columnName)",
+    "input": {
+      "name": "set_from_column",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "columnVal",
+      "value": {
+        "value": "@activity('LookupConfig').output.firstRow.myColumn",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_column",
+      "task_key": "set_from_column",
+      "variable_name": "columnVal",
+      "variable_value": "json.loads(dbutils.jobs.taskValues.get(taskKey='LookupConfig', key='result'))['myColumn']"
+    }
   }
 ]
