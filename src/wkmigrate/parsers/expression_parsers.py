@@ -11,6 +11,8 @@ _PIPELINE_VARS: dict[str, str] = {
     "GroupId": "dbutils.jobs.getContext().tags().get('multitaskParentRunId', '')",
 }
 _SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES: set[str] = {"firstRow", "value"}
+_ACTIVITY_OUTPUT_PATTERN = r"activity\(['\"]([^'\"]+)['\"]\)\.output\.([\w.]+)$"
+_NAMED_VARIABLE_PATTERN = r"variables\(['\"]([^'\"]+)['\"]\)$"
 
 
 def parse_variable_value(value: str | dict, context: TranslationContext) -> str | UnsupportedValue:
@@ -64,7 +66,7 @@ def _parse_expression_string(expression: str, context: TranslationContext) -> st
     if expression.startswith("{") and expression.endswith("}"):
         expression = expression[1:-1].strip()
 
-    if match := re.match(r"activity\('([\w\s-]+)'\)\.output\.([\w.]+)$", expression):
+    if match := re.match(_ACTIVITY_OUTPUT_PATTERN, expression):
         task_key, output_key = match.group(1), match.group(2)
         if output_key in _SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES:
             return f"dbutils.jobs.taskValues.get(taskKey={task_key!r}, key='result')"
@@ -82,7 +84,7 @@ def _parse_expression_string(expression: str, context: TranslationContext) -> st
             message=f"Unsupported pipeline system variable '@pipeline().{var_name}'",
         )
 
-    if match := re.match(r"variables\('([\w\s-]+)'\)$", expression):
+    if match := re.match(_NAMED_VARIABLE_PATTERN, expression):
         variable_name = match.group(1)
         task_key = context.get_variable_task_key(variable_name)
         if task_key is not None:

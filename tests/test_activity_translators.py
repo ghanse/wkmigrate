@@ -1240,6 +1240,46 @@ def test_variable_cache_available_to_downstream_set_variable() -> None:
     assert downstream_activity.variable_value == "dbutils.jobs.taskValues.get(taskKey='set_source', key='sourceVar')"
 
 
+def test_set_variable_activity_output_double_quotes(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with double-quoted activity output expression."""
+    fixture = get_fixture(set_variable_activity_fixtures, "activity_output_double_quotes")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_resolves_double_quoted_variable_reference(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with double-quoted @variables() resolves when variable is in context."""
+    fixture = get_fixture(set_variable_activity_fixtures, "variables_reference_double_quotes")
+    ctx = default_context()
+    for var_name, task_key in fixture["context_variables"].items():
+        ctx = ctx.with_variable(var_name, task_key)
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result, _ = translate_set_variable_activity(fixture["input"], base_kwargs, ctx)
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_parse_variable_value_activity_output_double_quotes() -> None:
+    """parse_variable_value resolves double-quoted @activity() output references."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": '@activity("LookupTask").output.firstRow', "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='LookupTask', key='result')"
+
+
+def test_parse_variable_value_variables_reference_double_quotes() -> None:
+    """parse_variable_value resolves double-quoted @variables() when variable is in context."""
+    ctx = TranslationContext().with_variable("myVar", "set_my_var")
+    result = parse_variable_value({"value": '@variables("myVar")', "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='set_my_var', key='myVar')"
+
+
 def test_parse_variable_value_variables_reference_found() -> None:
     """parse_variable_value resolves @variables() when the variable is in the context."""
     ctx = TranslationContext().with_variable("myVar", "set_my_var")

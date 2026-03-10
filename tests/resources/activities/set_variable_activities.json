@@ -151,6 +151,49 @@
     }
   },
   {
+    "id": "activity_output_double_quotes",
+    "description": "SetVariable with double-quoted activity output expression",
+    "input": {
+      "name": "set_from_lookup_dq",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "lookupResult",
+      "value": {
+        "value": "@activity(\"GetConfig\").output.firstRow",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_lookup_dq",
+      "task_key": "set_from_lookup_dq",
+      "variable_name": "lookupResult",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='result')"
+    }
+  },
+  {
+    "id": "variables_reference_double_quotes",
+    "description": "SetVariable referencing a known variable via double-quoted @variables()",
+    "input": {
+      "name": "set_from_variable_dq",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "copiedVar",
+      "value": {
+        "value": "@variables(\"sourceVar\")",
+        "type": "Expression"
+      }
+    },
+    "context_variables": {
+      "sourceVar": "set_source_var"
+    },
+    "expected": {
+      "name": "set_from_variable_dq",
+      "task_key": "set_from_variable_dq",
+      "variable_name": "copiedVar",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='set_source_var', key='sourceVar')"
+    }
+  },
+  {
     "id": "variables_reference_unknown",
     "description": "SetVariable referencing an unknown pipeline variable returns unsupported",
     "input": {
