@@ -47,7 +47,6 @@ _default_type_translators: dict[str, TypeTranslator] = {
     "DatabricksSparkPython": translate_spark_python_activity,
     "Copy": translate_copy_activity,
     "Lookup": translate_lookup_activity,
-    "SetVariable": translate_set_variable_activity,
     "WebActivity": translate_web_activity,
 }
 
@@ -187,6 +186,8 @@ def _dispatch_activity(
             return translate_if_condition_activity(activity, base_kwargs, context)
         case "ForEach":
             return translate_for_each_activity(activity, base_kwargs, context)
+        case "SetVariable":
+            return translate_set_variable_activity(activity, base_kwargs, context)
         case _:
             translator = context.registry.get(activity_type)
             if translator is not None:

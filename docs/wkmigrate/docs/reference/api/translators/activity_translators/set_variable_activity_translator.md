@@ -8,15 +8,17 @@ This module defines a translator for translating Set Variable activities.
 Translators in this module normalize Set Variable activity payloads into internal
 representations. The variable name and value are pulled from the Set Variable activity.
 
-If the Set Variable activity references a complex expression (e.g. '@activity("activity_name").output.output_key'),
+If the Set Variable activity references a complex expression (e.g. '@activity("activity_name").output.value'),
 the expression is parsed into an equivalent Python expression.
 
 #### translate\_set\_variable\_activity
 
 ```python
 def translate_set_variable_activity(
-        activity: dict,
-        base_kwargs: dict) -> SetVariableActivity | UnsupportedValue
+    activity: dict,
+    base_kwargs: dict,
+    context: TranslationContext | None = None
+) -> tuple[SetVariableActivity | UnsupportedValue, TranslationContext]
 ```
 
 Translates an ADF Set Variable activity into a ``SetVariableActivity`` object.
@@ -29,9 +31,10 @@ produces an ``UnsupportedValue``.
 
 - `activity` - SetVariable activity definition as a ``dict``.
 - `base_kwargs` - Common activity metadata.
+- `context` - Translation context.  When ``None`` a fresh default context is created.
   
 
 **Returns**:
 
-  ``SetVariableActivity`` representation of the SetVariable task.
+  A tuple with the translated result and the updated context.
 

@@ -126,5 +126,47 @@
     "expected": {
       "unsupported": true
     }
+  },
+  {
+    "id": "variables_reference_known",
+    "description": "SetVariable referencing a known pipeline variable via @variables()",
+    "input": {
+      "name": "set_from_variable",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "copiedVar",
+      "value": {
+        "value": "@variables('sourceVar')",
+        "type": "Expression"
+      }
+    },
+    "context_variables": {
+      "sourceVar": "set_source_var"
+    },
+    "expected": {
+      "name": "set_from_variable",
+      "task_key": "set_from_variable",
+      "variable_name": "copiedVar",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='set_source_var', key='sourceVar')"
+    }
+  },
+  {
+    "id": "variables_reference_unknown",
+    "description": "SetVariable referencing an unknown pipeline variable returns unsupported",
+    "input": {
+      "name": "set_from_unknown_var",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "result",
+      "value": {
+        "value": "@variables('missingVar')",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "unsupported": true,
+      "name": "set_from_unknown_var",
+      "task_key": "set_from_unknown_var"
+    }
   }
 ]

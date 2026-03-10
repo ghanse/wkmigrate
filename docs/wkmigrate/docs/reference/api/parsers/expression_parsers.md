@@ -6,7 +6,9 @@ title: wkmigrate.parsers.expression_parsers
 #### parse\_variable\_value
 
 ```python
-def parse_variable_value(value: str | dict) -> str | UnsupportedValue
+def parse_variable_value(
+        value: str | dict,
+        context: TranslationContext) -> str | UnsupportedValue
 ```
 
 Parses an ADF variable value or expression into a Python code snippet. Unsupported dynamic expressions return
@@ -14,15 +16,17 @@ Parses an ADF variable value or expression into a Python code snippet. Unsupport
 
 The following cases are supported:
 
-* Static string (no leading ``@``) → Python string literal (e.g. ``'hello'``).
-* ADF expression object ``{"value": "@...", "type": "Expression"}`` → inner expression is extracted and parsed.
-* ``@activity('X').output.Y`` → ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
-* ``@pipeline().Pipeline`` / ``@pipeline().RunId`` / other supported system variables → ``spark.conf`` or
+* Static string values -> Python string literal (e.g. ``'hello'``).
+* Expressions (e.g. ``{"value": "@...", "type": "Expression"}``) -> inner expression is extracted and parsed.
+* Activity output references (e.g. ``@activity('X').output.Y``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
+* Pipeline system variables (e.g. ``@pipeline().Pipeline`` or ``@pipeline().RunId``) -> ``spark.conf`` or
 ``dbutils.jobs.getContext()`` lookups.
+* Variables (e.g. ``@variables('X')``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
 
 **Arguments**:
 
-- `value` - ADF variable value. Can be a plain string or an expression object with ``"type": "Expression"``.
+- `value` - Variable value. Can be a plain string or an expression object with ``"type": "Expression"``.
+- `context` - Translation context.
   
 
 **Returns**:
