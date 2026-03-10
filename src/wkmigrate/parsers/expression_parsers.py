@@ -30,8 +30,7 @@ def parse_variable_value(value: str | dict | int | float | bool, context: Transl
     * Variables (e.g. ``@variables('X')``) -> ``dbutils.jobs.taskValues.get(taskKey='set_my_variable', key='X')``.
 
     Args:
-        value: Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with
-            ``"type": "Expression"``.
+        value: Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with ``"type": "Expression"``.
         context: Translation context.
 
     Returns:
@@ -84,7 +83,7 @@ def _parse_expression_string(expression: str, context: TranslationContext) -> st
             return base
         return UnsupportedValue(
             value=expression,
-            message=f"Unsupported activity output reference type '@activity({task_key!r}).output.{output_key!r}'",
+            message=f"Unsupported activity output reference type '@activity('{task_key}').output.{output_key}'",
         )
 
     if match := re.match(r"pipeline\(\)\.(\w+)$", expression):

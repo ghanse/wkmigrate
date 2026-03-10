@@ -25,8 +25,7 @@ The following cases are supported:
 
 **Arguments**:
 
-- `value` - Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with
-- ```"type"` - "Expression"``.
+- `value` - Variable value. Can be a plain string, a numeric/boolean literal, or an expression object with ``"type": "Expression"``.
 - `context` - Translation context.
   
 
