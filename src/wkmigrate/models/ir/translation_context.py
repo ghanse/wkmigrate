@@ -26,7 +26,7 @@ class TranslationContext:
     Attributes:
         activity_cache: Read-only mapping of activity names to translated ``Activity`` objects.
         registry: Read-only mapping of activity type strings to their translator callables.
-        variable_cache: Read-only mapping of variable names to their translated task value keys.
+        variable_cache: Read-only mapping of variable names to the task keys of the task that sets the variable value.
     """
 
     activity_cache: MappingProxyType[str, Activity] = field(default_factory=lambda: MappingProxyType({}))

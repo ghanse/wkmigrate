@@ -9,6 +9,7 @@ the expression is parsed into an equivalent Python expression.
 """
 
 from __future__ import annotations
+from importlib import import_module
 
 from wkmigrate.models.ir.pipeline import SetVariableActivity
 from wkmigrate.models.ir.translation_context import TranslationContext
@@ -35,7 +36,8 @@ def translate_set_variable_activity(
         A tuple with the translated result and the updated context.
     """
     if context is None:
-        context = TranslationContext()
+        activity_translator = import_module("wkmigrate.translators.activity_translators.activity_translator")
+        context = activity_translator.default_context()
 
     variable_name = activity.get("variable_name")
     if not variable_name:

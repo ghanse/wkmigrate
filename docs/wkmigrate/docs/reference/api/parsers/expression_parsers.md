@@ -19,9 +19,8 @@ The following cases are supported:
 * Static string values -> Python string literal (e.g. ``'hello'``).
 * Expressions (e.g. ``{"value": "@...", "type": "Expression"}``) -> inner expression is extracted and parsed.
 * Activity output references (e.g. ``@activity('X').output.Y``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
-* Pipeline system variables (e.g. ``@pipeline().Pipeline`` or ``@pipeline().RunId``) -> ``spark.conf`` or
-``dbutils.jobs.getContext()`` lookups.
-* Variables (e.g. ``@variables('X')``) -> ``dbutils.jobs.taskValues.get(taskKey='X', key='result')``.
+* Pipeline system variables (e.g. ``@pipeline().Pipeline`` or ``@pipeline().RunId``) -> ``spark.conf`` or ``dbutils.jobs.getContext()`` lookups.
+* Variables (e.g. ``@variables('X')``) -> ``dbutils.jobs.taskValues.get(taskKey='set_my_variable', key='X')``.
 
 **Arguments**:
 
