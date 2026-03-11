@@ -105,7 +105,9 @@ class TestDockerCompose:
         assert "output" in self.content
 
     def test_no_fixed_container_name(self) -> None:
-        assert "container_name" not in self.content, "Avoid fixed container_name to prevent collisions and allow scaling"
+        assert (
+            "container_name" not in self.content
+        ), "Avoid fixed container_name to prevent collisions and allow scaling"
 
     def test_env_file_not_required(self) -> None:
         assert "required: false" in self.content, "env_file should use required: false so compose works without .env"
