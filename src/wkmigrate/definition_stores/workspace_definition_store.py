@@ -137,10 +137,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
             bundle_directory: Parent directory for all generated bundles.
             download_notebooks: If True, downloads referenced notebooks from the workspace.
         """
-        bundle_directory_abs = os.path.abspath(bundle_directory)
+        bundle_dir = os.path.abspath(bundle_directory)
         for pipeline_definition in pipeline_definitions:
             safe_name = re.sub(r"[^A-Za-z0-9_]", "_", pipeline_definition.name)
-            sub_directory = os.path.join(bundle_directory_abs, safe_name)
+            sub_directory = os.path.join(bundle_dir, safe_name)
             try:
                 self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
             except Exception:
