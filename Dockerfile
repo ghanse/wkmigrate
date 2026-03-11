@@ -1,7 +1,6 @@
 # ---------- build stage ----------
 FROM python:3.12-slim AS builder
 
-# Avoid interactive prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN pip install --no-cache-dir poetry==2.2.1
@@ -16,7 +15,6 @@ RUN poetry config virtualenvs.create true --local \
     && poetry config virtualenvs.in-project true --local \
     && poetry install --only main --no-root --no-interaction
 
-# Copy the rest of the source code and install the project itself
 COPY src/ src/
 COPY README.md ./
 RUN poetry install --only main --no-interaction
@@ -39,12 +37,10 @@ COPY --from=builder --chown=appuser:appuser /app/README.md .
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv"
 
-# Smoke-test: make sure the CLI entry-point is importable
+# Fail the build early if the package wasn't installed correctly
 RUN python -c "import wkmigrate"
 
-# Switch to non-root user
 USER appuser
 
-# Default command – use the CLI entry point defined in pyproject.toml
 ENTRYPOINT ["wkmigrate"]
 CMD []

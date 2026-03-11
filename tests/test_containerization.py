@@ -12,7 +12,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
 def _read(filename: str) -> str:
     """Read a file from the project root."""
-    with open(os.path.join(PROJECT_ROOT, filename)) as fh:
+    with open(os.path.join(PROJECT_ROOT, filename), encoding="utf-8") as fh:
         return fh.read()
 
 
