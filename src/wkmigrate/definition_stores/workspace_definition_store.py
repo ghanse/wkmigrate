@@ -92,6 +92,43 @@ class WorkspaceDefinitionStore(DefinitionStore):
             raise ValueError('"host_name" must be provided when creating a WorkspaceDefinitionStore')
         self.workspace_client = self._login_workspace_client()
 
+    def to_jobs(self, pipeline_definitions: list[Pipeline]) -> list[int]:
+        """
+        Uploads artifacts and creates a Databricks job for each pipeline.
+
+        Args:
+            pipeline_definitions: List of ``Pipeline`` dataclasses to deploy.
+
+        Returns:
+            List of job identifiers registered in the workspace.
+        """
+        job_ids: list[int] = []
+        for pipeline_definition in pipeline_definitions:
+            job_id = self.to_job(pipeline_definition)
+            if job_id is not None:
+                job_ids.append(job_id)
+        return job_ids
+
+    def to_asset_bundles(
+        self,
+        pipeline_definitions: list[Pipeline],
+        bundle_directory: str,
+        download_notebooks: bool = True,
+    ) -> None:
+        """
+        Creates a Databricks asset bundle for each pipeline inside a shared parent directory.
+
+        Each pipeline is written to a subdirectory named after the pipeline.
+
+        Args:
+            pipeline_definitions: List of ``Pipeline`` dataclasses to export.
+            bundle_directory: Parent directory for all generated bundles.
+            download_notebooks: If True, downloads referenced notebooks from the workspace.
+        """
+        for pipeline_definition in pipeline_definitions:
+            sub_directory = os.path.join(bundle_directory, pipeline_definition.name)
+            self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
+
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
         Uploads artifacts and creates a Databricks job.

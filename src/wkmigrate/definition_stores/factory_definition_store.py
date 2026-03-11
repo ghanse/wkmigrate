@@ -21,12 +21,15 @@ Example:
     ```
 """
 
+import logging
 from dataclasses import dataclass, field
 from collections.abc import Callable
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -87,6 +90,50 @@ class FactoryDefinitionStore(DefinitionStore):
             resource_group_name=self.resource_group_name,
             factory_name=self.factory_name,
         )
+
+    def list_pipelines(self) -> list[str]:
+        """
+        Returns the names of all pipelines available in the Data Factory.
+
+        Returns:
+            Pipeline names as a ``list[str]``.
+
+        Raises:
+            ValueError: If the factory client is not initialized.
+        """
+        if self.factory_client is None:
+            raise ValueError("factory_client is not initialized")
+        return self.factory_client.list_pipelines()
+
+    def load_all(self, pipeline_names: list[str] | None = None) -> list[Pipeline]:
+        """
+        Loads and translates multiple ADF pipelines.
+
+        When ``pipeline_names`` is ``None`` all pipelines in the factory are
+        loaded. Individual pipeline failures are logged and skipped so that
+        one broken pipeline does not prevent the rest from being translated.
+
+        Args:
+            pipeline_names: Optional list of pipeline names to translate. When
+                ``None``, every pipeline in the factory is included.
+
+        Returns:
+            Translated ``Pipeline`` objects as a ``list[Pipeline]``.
+
+        Raises:
+            ValueError: If the factory client is not initialized.
+        """
+        if self.factory_client is None:
+            raise ValueError("factory_client is not initialized")
+        if pipeline_names is None:
+            pipeline_names = self.list_pipelines()
+        results: list[Pipeline] = []
+        for name in pipeline_names:
+            try:
+                results.append(self.load(name))
+            except Exception:
+                logger.warning("Failed to load pipeline '%s', skipping", name, exc_info=True)
+        return results
 
     def load(self, pipeline_name: str) -> Pipeline:
         """

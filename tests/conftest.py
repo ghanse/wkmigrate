@@ -134,6 +134,16 @@ class MockFactoryClient:
 
     test_json_path: str = JSON_PATH
 
+    def list_pipelines(self) -> list[str]:
+        """Return all pipeline names from the fixture file.
+
+        Returns:
+            Pipeline names as a ``list[str]``.
+        """
+        with open(f"{self.test_json_path}/test_pipelines.json", "rb") as file:
+            pipelines = json.load(file)
+        return [pipeline["name"] for pipeline in pipelines if "name" in pipeline]
+
     def get_pipeline(self, pipeline_name: str) -> dict:
         """Return a pipeline definition.
 
@@ -242,6 +252,9 @@ def mock_factory_client(monkeypatch: pytest.MonkeyPatch) -> MockFactoryClient:
     class _FakeFactoryClient:
         def __init__(self, **_: Any) -> None:
             self._delegate = delegate
+
+        def list_pipelines(self) -> list[str]:
+            return self._delegate.list_pipelines()
 
         def get_pipeline(self, pipeline_name: str) -> dict:
             return self._delegate.get_pipeline(pipeline_name)
