@@ -1,5 +1,6 @@
 """Tests for batch pipeline translation methods (load_all, to_jobs, to_asset_bundles)."""
 
+import logging
 import os
 
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
@@ -8,22 +9,6 @@ from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
     Pipeline,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_factory_store() -> FactoryDefinitionStore:
-    return FactoryDefinitionStore(
-        tenant_id="TENANT_ID",
-        client_id="CLIENT_ID",
-        client_secret="SECRET",
-        subscription_id="SUBSCRIPTION_ID",
-        resource_group_name="RESOURCE_GROUP",
-        factory_name="FACTORY_NAME",
-    )
 
 
 def _make_workspace_store(mock_workspace_client) -> WorkspaceDefinitionStore:
@@ -51,31 +36,17 @@ def _simple_pipeline(name: str = "test_pipeline") -> Pipeline:
     )
 
 
-# ---------------------------------------------------------------------------
-# FactoryDefinitionStore.list_pipelines
-# ---------------------------------------------------------------------------
-
-
-def test_list_pipelines_returns_all_pipeline_names(mock_factory_client) -> None:
+def test_list_pipelines_returns_all_pipeline_names(mock_factory_store: FactoryDefinitionStore) -> None:
     """list_pipelines should return every pipeline name from the factory."""
-    store = _make_factory_store()
-
-    names = store.list_pipelines()
+    names = mock_factory_store.list_pipelines()
     assert isinstance(names, list)
     assert len(names) > 0
     assert "TEST_PIPELINE_NAME" in names
 
 
-# ---------------------------------------------------------------------------
-# FactoryDefinitionStore.load_all
-# ---------------------------------------------------------------------------
-
-
-def test_load_all_with_explicit_names(mock_factory_client) -> None:
+def test_load_all_with_explicit_names(mock_factory_store: FactoryDefinitionStore) -> None:
     """load_all with an explicit list should return one Pipeline per name."""
-    store = _make_factory_store()
-
-    pipelines = store.load_all(pipeline_names=["TEST_PIPELINE_NAME", "test_adf_pipeline_2"])
+    pipelines = mock_factory_store.load_all(pipeline_names=["TEST_PIPELINE_NAME", "test_adf_pipeline_2"])
     assert len(pipelines) == 2
     assert all(isinstance(pipeline, Pipeline) for pipeline in pipelines)
     names = {pipeline.name for pipeline in pipelines}
@@ -83,36 +54,27 @@ def test_load_all_with_explicit_names(mock_factory_client) -> None:
     assert "test_adf_pipeline_2" in names
 
 
-def test_load_all_defaults_to_all_pipelines(mock_factory_client) -> None:
+def test_load_all_defaults_to_all_pipelines(mock_factory_store: FactoryDefinitionStore) -> None:
     """load_all without arguments should translate every pipeline available."""
-    store = _make_factory_store()
-
-    pipelines = store.load_all()
+    pipelines = mock_factory_store.load_all()
     assert isinstance(pipelines, list)
     assert len(pipelines) >= 1
     assert all(isinstance(pipeline, Pipeline) for pipeline in pipelines)
 
 
-def test_load_all_skips_failing_pipelines(mock_factory_client) -> None:
-    """load_all should skip pipelines that fail to translate and return the rest."""
-    store = _make_factory_store()
-
-    pipelines = store.load_all(pipeline_names=["TEST_PIPELINE_NAME", "DOES_NOT_EXIST"])
+def test_load_all_skips_failing_pipelines(mock_factory_store: FactoryDefinitionStore, caplog) -> None:
+    """load_all should skip pipelines that fail to translate and log a warning."""
+    with caplog.at_level(logging.WARNING):
+        pipelines = mock_factory_store.load_all(pipeline_names=["TEST_PIPELINE_NAME", "DOES_NOT_EXIST"])
     assert len(pipelines) == 1
     assert pipelines[0].name == "TEST_PIPELINE_NAME"
+    assert "DOES_NOT_EXIST" in caplog.text
 
 
-def test_load_all_returns_empty_when_all_fail(mock_factory_client) -> None:
+def test_load_all_returns_empty_when_all_fail(mock_factory_store: FactoryDefinitionStore) -> None:
     """load_all should return an empty list when every pipeline fails."""
-    store = _make_factory_store()
-
-    pipelines = store.load_all(pipeline_names=["DOES_NOT_EXIST_1", "DOES_NOT_EXIST_2"])
+    pipelines = mock_factory_store.load_all(pipeline_names=["DOES_NOT_EXIST_1", "DOES_NOT_EXIST_2"])
     assert pipelines == []
-
-
-# ---------------------------------------------------------------------------
-# WorkspaceDefinitionStore.to_jobs
-# ---------------------------------------------------------------------------
 
 
 def test_to_jobs_creates_multiple_jobs(mock_workspace_client) -> None:
@@ -133,11 +95,6 @@ def test_to_jobs_empty_list(mock_workspace_client) -> None:
 
     job_ids = store.to_jobs([])
     assert job_ids == []
-
-
-# ---------------------------------------------------------------------------
-# WorkspaceDefinitionStore.to_asset_bundles
-# ---------------------------------------------------------------------------
 
 
 def test_to_asset_bundles_creates_subdirectories(mock_workspace_client, tmp_path) -> None:

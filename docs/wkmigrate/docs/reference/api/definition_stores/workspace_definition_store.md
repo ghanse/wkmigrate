@@ -55,6 +55,41 @@ Validates credentials and initializes the Databricks workspace client.
 
 - `ValueError` - If the authentication type is invalid or the host name is not provided.
 
+#### to\_jobs
+
+```python
+def to_jobs(pipeline_definitions: list[Pipeline]) -> list[int]
+```
+
+Uploads artifacts and creates a Databricks job for each pipeline.
+
+**Arguments**:
+
+- `pipeline_definitions` - List of ``Pipeline`` dataclasses to deploy.
+  
+
+**Returns**:
+
+  List of job identifiers registered in the workspace.
+
+#### to\_asset\_bundles
+
+```python
+def to_asset_bundles(pipeline_definitions: list[Pipeline],
+                     bundle_directory: str,
+                     download_notebooks: bool = True) -> None
+```
+
+Creates a Databricks asset bundle for each pipeline inside a shared parent directory.
+
+Each pipeline is written to a subdirectory named after the pipeline.
+
+**Arguments**:
+
+- `pipeline_definitions` - List of ``Pipeline`` dataclasses to export.
+- `bundle_directory` - Parent directory for all generated bundles.
+- `download_notebooks` - If True, downloads referenced notebooks from the workspace.
+
 #### to\_job
 
 ```python

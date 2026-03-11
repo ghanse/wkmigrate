@@ -140,7 +140,7 @@ class MockFactoryClient:
         Returns:
             Pipeline names as a ``list[str]``.
         """
-        with open(f"{self.test_json_path}/test_pipelines.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_pipelines.json"), "rb") as file:
             pipelines = json.load(file)
         return [pipeline["name"] for pipeline in pipelines if "name" in pipeline]
 
@@ -270,6 +270,19 @@ def mock_factory_client(monkeypatch: pytest.MonkeyPatch) -> MockFactoryClient:
 
     monkeypatch.setattr(factory_definition_store, "FactoryClient", _FakeFactoryClient)
     return delegate
+
+
+@pytest.fixture
+def mock_factory_store(mock_factory_client: MockFactoryClient) -> factory_definition_store.FactoryDefinitionStore:
+    """Return a ``FactoryDefinitionStore`` wired to the mock factory client."""
+    return factory_definition_store.FactoryDefinitionStore(
+        tenant_id="TENANT_ID",
+        client_id="CLIENT_ID",
+        client_secret="SECRET",
+        subscription_id="SUBSCRIPTION_ID",
+        resource_group_name="RESOURCE_GROUP",
+        factory_name="FACTORY_NAME",
+    )
 
 
 @dataclass

@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
+import re
 from typing import Any
 import warnings
 from collections.abc import Iterable
@@ -39,6 +41,8 @@ from typing_extensions import deprecated
 
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
+
+logger = logging.getLogger(__name__)
 from wkmigrate.models.workflows.artifacts import NotebookArtifact
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
@@ -104,7 +108,15 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         job_ids: list[int] = []
         for pipeline_definition in pipeline_definitions:
-            job_id = self.to_job(pipeline_definition)
+            try:
+                job_id = self.to_job(pipeline_definition)
+            except Exception:
+                logger.warning(
+                    "Failed to create job for pipeline '%s', skipping",
+                    pipeline_definition.name,
+                    exc_info=True,
+                )
+                continue
             if job_id is not None:
                 job_ids.append(job_id)
         return job_ids
@@ -125,9 +137,18 @@ class WorkspaceDefinitionStore(DefinitionStore):
             bundle_directory: Parent directory for all generated bundles.
             download_notebooks: If True, downloads referenced notebooks from the workspace.
         """
+        bundle_directory_abs = os.path.abspath(bundle_directory)
         for pipeline_definition in pipeline_definitions:
-            sub_directory = os.path.join(bundle_directory, pipeline_definition.name)
-            self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
+            safe_name = re.sub(r"[^A-Za-z0-9_]", "_", pipeline_definition.name)
+            sub_directory = os.path.join(bundle_directory_abs, safe_name)
+            try:
+                self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
+            except Exception:
+                logger.warning(
+                    "Failed to create asset bundle for pipeline '%s', skipping",
+                    pipeline_definition.name,
+                    exc_info=True,
+                )
 
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
