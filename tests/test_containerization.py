@@ -47,6 +47,13 @@ class TestDockerfile:
     def test_no_dev_dependencies_in_runtime(self) -> None:
         assert "--only main" in self.content
 
+    def test_runs_as_non_root_user(self) -> None:
+        assert "useradd" in self.content, "Expected a non-root user to be created"
+        assert "USER appuser" in self.content, "Expected USER directive for non-root execution"
+
+    def test_entrypoint_uses_cli_script(self) -> None:
+        assert 'ENTRYPOINT ["wkmigrate"]' in self.content, "Entrypoint should use the CLI script entry point"
+
 
 class TestDockerignore:
     """Validate that the .dockerignore excludes non-essential paths."""
@@ -92,6 +99,23 @@ class TestDockerCompose:
 
     def test_mounts_output_volume(self) -> None:
         assert "output" in self.content
+
+    def test_env_file_not_required(self) -> None:
+        assert "required: false" in self.content, "env_file should use required: false so compose works without .env"
+
+    def test_has_restart_policy(self) -> None:
+        assert "restart:" in self.content, "Expected an explicit restart policy"
+
+
+class TestEnvExample:
+    """Validate that .env.example exists to document required environment variables."""
+
+    def test_env_example_exists(self) -> None:
+        assert os.path.isfile(os.path.join(PROJECT_ROOT, ".env.example"))
+
+    def test_env_example_has_content(self) -> None:
+        content = _read(".env.example")
+        assert len(content.strip()) > 0, ".env.example should not be empty"
 
 
 class TestMakefile:

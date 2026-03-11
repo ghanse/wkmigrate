@@ -24,13 +24,16 @@ RUN poetry install --only main --no-interaction
 # ---------- runtime stage ----------
 FROM python:3.12-slim AS runtime
 
+# Create a non-root user for runtime security
+RUN useradd --create-home appuser
+
 WORKDIR /app
 
 # Copy the virtual-env and source from the builder
-COPY --from=builder /app/.venv .venv
-COPY --from=builder /app/src src
-COPY --from=builder /app/pyproject.toml .
-COPY --from=builder /app/README.md .
+COPY --from=builder --chown=appuser:appuser /app/.venv .venv
+COPY --from=builder --chown=appuser:appuser /app/src src
+COPY --from=builder --chown=appuser:appuser /app/pyproject.toml .
+COPY --from=builder --chown=appuser:appuser /app/README.md .
 
 # Put the virtual-env on the PATH so `wkmigrate` and `python` resolve there
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -39,6 +42,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Smoke-test: make sure the CLI entry-point is importable
 RUN python -c "import wkmigrate"
 
-# Default command – users can override with their own script / arguments
-ENTRYPOINT ["python"]
-CMD ["-m", "wkmigrate"]
+# Switch to non-root user
+USER appuser
+
+# Default command – use the CLI entry point defined in pyproject.toml
+ENTRYPOINT ["wkmigrate"]
+CMD []
