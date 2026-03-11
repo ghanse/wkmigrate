@@ -54,6 +54,10 @@ class TestDockerfile:
     def test_entrypoint_uses_cli_script(self) -> None:
         assert 'ENTRYPOINT ["wkmigrate"]' in self.content, "Entrypoint should use the CLI script entry point"
 
+    def test_output_directory_created_with_correct_ownership(self) -> None:
+        assert "mkdir -p /app/output" in self.content, "Output directory should be created before USER directive"
+        assert "chown appuser:appuser /app/output" in self.content, "Output directory should be owned by appuser"
+
 
 class TestDockerignore:
     """Validate that the .dockerignore excludes non-essential paths."""
@@ -99,6 +103,9 @@ class TestDockerCompose:
 
     def test_mounts_output_volume(self) -> None:
         assert "output" in self.content
+
+    def test_no_fixed_container_name(self) -> None:
+        assert "container_name" not in self.content, "Avoid fixed container_name to prevent collisions and allow scaling"
 
     def test_env_file_not_required(self) -> None:
         assert "required: false" in self.content, "env_file should use required: false so compose works without .env"

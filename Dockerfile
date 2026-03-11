@@ -40,6 +40,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Fail the build early if the package wasn't installed correctly
 RUN python -c "import wkmigrate"
 
+# Ensure the output directory exists and is writable by the non-root user
+RUN mkdir -p /app/output && chown appuser:appuser /app/output
+
 USER appuser
 
 ENTRYPOINT ["wkmigrate"]

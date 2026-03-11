@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wkmigrate
     env_file:
       - path: .env
         required: false
