@@ -2,7 +2,6 @@
 
 import os
 
-import pytest
 
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
