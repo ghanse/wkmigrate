@@ -64,7 +64,7 @@ class FactoryClient:
         pipelines = self.management_client.pipelines.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
-        return [pipeline.name for pipeline in pipelines if pipeline.name is not None]
+        return [pipeline.name for pipeline in pipelines if pipeline.name is not None]  # type: ignore[misc]
 
     def get_pipeline(self, pipeline_name: str) -> dict:
         """
