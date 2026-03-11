@@ -59,6 +59,8 @@ class FactoryClient:
         Returns:
             Pipeline names as a ``list[str]``.
         """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
         pipelines = self.management_client.pipelines.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
