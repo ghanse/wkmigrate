@@ -2,6 +2,7 @@
 
 import logging
 import os
+from unittest.mock import patch
 
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
@@ -119,3 +120,46 @@ def test_to_asset_bundles_empty_list(mock_workspace_client, tmp_path) -> None:
     store.to_asset_bundles([], bundle_dir, download_notebooks=False)
     if os.path.exists(bundle_dir):
         assert os.listdir(bundle_dir) == []
+
+
+def test_to_jobs_skips_failing_pipeline(mock_workspace_client, caplog) -> None:
+    """to_jobs should skip a pipeline whose to_job call raises and log a warning."""
+    store = _make_workspace_store(mock_workspace_client)
+    pipelines = [_simple_pipeline("good_a"), _simple_pipeline("bad_one"), _simple_pipeline("good_b")]
+
+    original_to_job = WorkspaceDefinitionStore.to_job
+
+    def _patched_to_job(self, pipeline_definition):
+        if pipeline_definition.name == "bad_one":
+            raise RuntimeError("simulated failure")
+        return original_to_job(self, pipeline_definition)
+
+    with patch.object(WorkspaceDefinitionStore, "to_job", _patched_to_job):
+        with caplog.at_level(logging.WARNING):
+            job_ids = store.to_jobs(pipelines)
+
+    assert len(job_ids) == 2
+    assert all(isinstance(jid, int) for jid in job_ids)
+    assert "bad_one" in caplog.text
+
+
+def test_to_asset_bundles_skips_failing_pipeline(mock_workspace_client, tmp_path, caplog) -> None:
+    """to_asset_bundles should skip a pipeline whose to_asset_bundle call raises and log a warning."""
+    store = _make_workspace_store(mock_workspace_client)
+    bundle_dir = str(tmp_path / "bundles")
+    pipelines = [_simple_pipeline("ok_pipeline"), _simple_pipeline("broken_pipeline")]
+
+    original_to_asset_bundle = WorkspaceDefinitionStore.to_asset_bundle
+
+    def _patched_to_asset_bundle(self, pipeline_definition, sub_directory, download_notebooks=True):
+        if pipeline_definition.name == "broken_pipeline":
+            raise RuntimeError("simulated failure")
+        return original_to_asset_bundle(self, pipeline_definition, sub_directory, download_notebooks=download_notebooks)
+
+    with patch.object(WorkspaceDefinitionStore, "to_asset_bundle", _patched_to_asset_bundle):
+        with caplog.at_level(logging.WARNING):
+            store.to_asset_bundles(pipelines, bundle_dir, download_notebooks=False)
+
+    assert os.path.isdir(os.path.join(bundle_dir, "ok_pipeline"))
+    assert not os.path.exists(os.path.join(bundle_dir, "broken_pipeline"))
+    assert "broken_pipeline" in caplog.text

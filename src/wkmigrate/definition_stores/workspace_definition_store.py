@@ -41,12 +41,12 @@ from typing_extensions import deprecated
 
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
+from wkmigrate.models.workflows.artifacts import NotebookArtifact
+from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
+from wkmigrate.preparers.preparer import prepare_workflow
 
 logger = logging.getLogger(__name__)
-from wkmigrate.models.workflows.artifacts import NotebookArtifact
-from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
-from wkmigrate.preparers.preparer import prepare_workflow
 
 
 @dataclasses.dataclass(slots=True)

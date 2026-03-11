@@ -156,7 +156,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If no pipeline matches the provided name.
         """
-        with open(f"{self.test_json_path}/test_pipelines.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_pipelines.json"), "rb") as file:
             pipelines = json.load(file)
         for pipeline in pipelines:
             if pipeline.get("name") == pipeline_name:
@@ -175,7 +175,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If no trigger is associated with the pipeline.
         """
-        with open(f"{self.test_json_path}/test_triggers.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_triggers.json"), "rb") as file:
             triggers = json.load(file)
         for trigger in triggers:
             properties = trigger.get("properties")
@@ -205,7 +205,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If no dataset matches ``dataset_name``.
         """
-        with open(f"{self.test_json_path}/test_datasets.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_datasets.json"), "rb") as file:
             datasets = json.load(file)
         for dataset in datasets:
             properties = dataset.get("properties")
@@ -232,7 +232,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If the linked service does not exist in fixtures.
         """
-        with open(f"{self.test_json_path}/test_linked_services.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_linked_services.json"), "rb") as file:
             linked_services = json.load(file)
         for linked_service in linked_services:
             if linked_service.get("name") == linked_service_name:
