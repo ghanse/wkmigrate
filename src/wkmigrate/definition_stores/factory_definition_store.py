@@ -132,7 +132,9 @@ class FactoryDefinitionStore(DefinitionStore):
             try:
                 results.append(self.load(name))
             except Exception:
-                logger.warning("Failed to load pipeline '%s', skipping", name, exc_info=True)
+                logger.warning(  # pylint: disable=logging-too-many-args
+                    "Failed to load pipeline '%s', skipping", name, exc_info=True
+                )
         return results
 
     def load(self, pipeline_name: str) -> Pipeline:

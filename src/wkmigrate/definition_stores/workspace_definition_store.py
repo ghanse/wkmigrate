@@ -111,7 +111,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             try:
                 job_id = self.to_job(pipeline_definition)
             except Exception:
-                logger.warning(
+                logger.warning(  # pylint: disable=logging-too-many-args
                     "Failed to create job for pipeline '%s', skipping",
                     pipeline_definition.name,
                     exc_info=True,
@@ -144,7 +144,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             try:
                 self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
             except Exception:
-                logger.warning(
+                logger.warning(  # pylint: disable=logging-too-many-args
                     "Failed to create asset bundle for pipeline '%s', skipping",
                     pipeline_definition.name,
                     exc_info=True,
