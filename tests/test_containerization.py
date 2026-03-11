@@ -122,7 +122,7 @@ class TestEnvExample:
 
     def test_env_example_has_content(self) -> None:
         content = _read(".env.example")
-        assert len(content.strip()) > 0, ".env.example should not be empty"
+        assert content.strip(), ".env.example should not be empty"
 
 
 class TestMakefile:
