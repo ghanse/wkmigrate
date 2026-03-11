@@ -38,9 +38,7 @@ class TestDockerfile:
     def test_copies_dependency_manifests_before_source(self) -> None:
         manifest_pos = self.content.index("COPY pyproject.toml")
         source_pos = self.content.index("COPY src/")
-        assert manifest_pos < source_pos, (
-            "Dependency manifests should be copied before source for better layer caching"
-        )
+        assert manifest_pos < source_pos, "Dependency manifests should be copied before source for better layer caching"
 
     def test_sets_virtualenv_on_path(self) -> None:
         assert ".venv" in self.content
