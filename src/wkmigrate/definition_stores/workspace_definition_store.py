@@ -61,6 +61,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         client_id: Application (client) ID used for client-secret authentication.
         client_secret: Secret associated with the client ID for client-secret authentication.
         files_to_delta_sinks: Overrides default behavior when generating DLT sinks from copy tasks.
+        overrides: Dictionary of override options that customize translation behaviour. Supported keys are
+            ``root_path``, ``files_to_delta_sinks``, ``compute_type``, ``catalog``, and ``schema``.
         workspace_client: Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
     """
 
@@ -74,15 +76,18 @@ class WorkspaceDefinitionStore(DefinitionStore):
     client_id: str | None = None
     client_secret: str | None = None
     files_to_delta_sinks: bool | None = None
+    overrides: dict[str, Any] = dataclasses.field(default_factory=dict)
     workspace_client: WorkspaceClient | None = dataclasses.field(init=False, default=None)
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
+    _valid_override_keys = frozenset({"root_path", "files_to_delta_sinks", "compute_type", "catalog", "schema"})
 
     def __post_init__(self) -> None:
         """
-        Validates credentials and initializes the Databricks workspace client.
+        Validates credentials, override keys, and initializes the Databricks workspace client.
 
         Raises:
             ValueError: If the authentication type is invalid or the host name is not provided.
+            ValueError: If any override key is not a recognised option.
         """
         if self.authentication_type not in self._valid_authentication_types:
             raise ValueError(
@@ -90,7 +95,97 @@ class WorkspaceDefinitionStore(DefinitionStore):
             )
         if self.host_name is None:
             raise ValueError('"host_name" must be provided when creating a WorkspaceDefinitionStore')
+        invalid_keys = set(self.overrides) - self._valid_override_keys
+        if invalid_keys:
+            raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
         self.workspace_client = self._login_workspace_client()
+
+    # ------------------------------------------------------------------
+    # Override option accessors
+    # ------------------------------------------------------------------
+
+    def get_override(self, key: str) -> Any:
+        """
+        Returns the value of a single override option.
+
+        Args:
+            key: Override option name. Must be one of the recognised override keys.
+
+        Returns:
+            The current value for *key*, or ``None`` if it has not been set.
+
+        Raises:
+            ValueError: If *key* is not a recognised override option.
+        """
+        if key not in self._valid_override_keys:
+            raise ValueError(f'"{key}" is not a valid override option')
+        return self.overrides.get(key)
+
+    def set_override(self, key: str, value: Any) -> None:
+        """
+        Sets the value of a single override option.
+
+        Args:
+            key: Override option name. Must be one of the recognised override keys.
+            value: New value for the option.
+
+        Raises:
+            ValueError: If *key* is not a recognised override option.
+        """
+        if key not in self._valid_override_keys:
+            raise ValueError(f'"{key}" is not a valid override option')
+        self.overrides[key] = value
+
+    def get_all_overrides(self) -> dict[str, Any]:
+        """
+        Returns a shallow copy of all currently set override options.
+
+        Returns:
+            Dictionary of override key-value pairs.
+        """
+        return dict(self.overrides)
+
+    def set_all_overrides(self, overrides: dict[str, Any]) -> None:
+        """
+        Replaces all override options with the provided dictionary.
+
+        Args:
+            overrides: Dictionary of override key-value pairs. All keys must be recognised options.
+
+        Raises:
+            ValueError: If any key is not a recognised override option.
+        """
+        invalid_keys = set(overrides) - self._valid_override_keys
+        if invalid_keys:
+            raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
+        self.overrides = dict(overrides)
+
+    # ------------------------------------------------------------------
+    # Effective option helpers
+    # ------------------------------------------------------------------
+
+    def _effective_files_to_delta_sinks(self) -> bool | None:
+        """Returns the files_to_delta_sinks value, preferring overrides over the field."""
+        override = self.overrides.get('files_to_delta_sinks')
+        if override is not None:
+            return override
+        return self.files_to_delta_sinks
+
+    def _effective_root_path(self) -> str | None:
+        """Returns the root_path override, or None if not set."""
+        return self.overrides.get('root_path')
+
+    def _effective_compute_type(self) -> str | None:
+        """Returns the compute_type override, or None if not set."""
+        return self.overrides.get('compute_type')
+
+    def _effective_catalog(self) -> str | None:
+        """Returns the catalog override, or None if not set."""
+        return self.overrides.get('catalog')
+
+    def _effective_schema(self) -> str | None:
+        """Returns the schema override, or None if not set."""
+        return self.overrides.get('schema')
 
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
@@ -170,7 +265,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
     def _prepare_workflow(self, pipeline_definition: Pipeline) -> PreparedWorkflow:
         """
-        Translates the pipeline and collects artifacts via ``prepare_workflow``.
+        Translates the pipeline and collects artifacts via ``prepare_workflow``, then applies overrides.
 
         Args:
             pipeline_definition: Pipeline to translate as a ``Pipeline``.
@@ -178,10 +273,106 @@ class WorkspaceDefinitionStore(DefinitionStore):
         Returns:
             PreparedWorkflow: Artifacts required to create the job.
         """
-        return prepare_workflow(
+        prepared = prepare_workflow(
             pipeline=pipeline_definition,
-            files_to_delta_sinks=self.files_to_delta_sinks,
+            files_to_delta_sinks=self._effective_files_to_delta_sinks(),
         )
+        self._apply_overrides(prepared)
+        return prepared
+
+    def _apply_overrides(self, prepared: PreparedWorkflow) -> None:
+        """
+        Mutates a ``PreparedWorkflow`` in place to reflect the currently configured overrides.
+
+        Applies ``root_path`` (rewrites notebook paths), ``compute_type`` (switches tasks to
+        serverless or classic compute), and ``catalog`` / ``schema`` (rewrites DLT pipeline
+        targets).
+
+        Args:
+            prepared: PreparedWorkflow to modify.
+        """
+        root_path = self._effective_root_path()
+        compute_type = self._effective_compute_type()
+        catalog = self._effective_catalog()
+        schema = self._effective_schema()
+
+        if root_path is not None:
+            self._apply_root_path_override(prepared.tasks, root_path)
+            for notebook in prepared.all_notebooks:
+                if not notebook.file_path.startswith(root_path):
+                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
+
+        if compute_type is not None:
+            self._apply_compute_type_override(prepared.tasks, compute_type)
+
+        if catalog is not None or schema is not None:
+            self._apply_catalog_schema_override(prepared.all_pipelines, catalog, schema)
+
+    def _apply_root_path_override(self, tasks: list[dict[str, Any]], root_path: str) -> None:
+        """
+        Rewrites notebook paths in tasks to be rooted under *root_path*.
+
+        Args:
+            tasks: Job task dicts to update.
+            root_path: New root directory for notebook paths.
+        """
+        for task in tasks:
+            notebook_task = task.get('notebook_task')
+            if notebook_task:
+                original = notebook_task.get('notebook_path') or ''
+                if isinstance(notebook_task, dict):
+                    notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
+            for_each_task = task.get('for_each_task')
+            if for_each_task:
+                nested = for_each_task.get('task')
+                if isinstance(nested, dict):
+                    self._apply_root_path_override([nested], root_path)
+                elif isinstance(nested, list):
+                    self._apply_root_path_override(nested, root_path)
+
+    @staticmethod
+    def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> None:
+        """
+        Switches every task to the requested compute type.
+
+        When *compute_type* is ``\"serverless\"``, existing ``new_cluster`` definitions are removed
+        so the task runs on serverless compute. Otherwise the ``new_cluster`` key is left untouched.
+
+        Args:
+            tasks: Job task dicts to update.
+            compute_type: Desired compute type (``\"serverless\"`` or ``\"classic\"``).
+        """
+        for task in tasks:
+            if compute_type == 'serverless':
+                task.pop('new_cluster', None)
+                task.pop('existing_cluster_id', None)
+            for_each_task = task.get('for_each_task')
+            if for_each_task:
+                nested = for_each_task.get('task')
+                if isinstance(nested, dict):
+                    WorkspaceDefinitionStore._apply_compute_type_override([nested], compute_type)
+                elif isinstance(nested, list):
+                    WorkspaceDefinitionStore._apply_compute_type_override(nested, compute_type)
+
+    @staticmethod
+    def _apply_catalog_schema_override(
+        pipelines: list[PipelineInstruction],
+        catalog: str | None,
+        schema: str | None,
+    ) -> None:
+        """
+        Overrides the target catalog and/or schema on DLT pipeline instructions.
+
+        Args:
+            pipelines: Pipeline instructions to update.
+            catalog: New catalog name, or ``None`` to leave unchanged.
+            schema: New schema (target) name, or ``None`` to leave unchanged.
+        """
+        for instruction in pipelines:
+            if catalog is not None:
+                instruction.catalog = catalog
+            if schema is not None:
+                instruction.target = schema
 
     @staticmethod
     def _upload_notebooks(client: WorkspaceClient, notebooks: Iterable[NotebookArtifact]) -> None:
@@ -221,7 +412,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         for instruction in pipelines:
             response = client.pipelines.create(
                 allow_duplicate_names=True,
-                catalog="wkmigrate",
+                catalog=instruction.catalog,
                 channel="CURRENT",
                 continuous=False,
                 development=False,
@@ -229,7 +420,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 name=instruction.name,
                 photon=True,
                 serverless=True,
-                target="wkmigrate",
+                target=instruction.target,
             )
             pipeline_id = response.pipeline_id
             if pipeline_id is None:
@@ -541,12 +732,13 @@ class WorkspaceDefinitionStore(DefinitionStore):
                         instruction.name: {
                             "name": instruction.name,
                             "allow_duplicate_names": True,
+                            "catalog": instruction.catalog,
                             "channel": "CURRENT",
                             "development": False,
                             "continuous": False,
                             "photon": True,
                             "serverless": True,
-                            "target": "wkmigrate",
+                            "target": instruction.target,
                             "libraries": [{"notebook": {"path": instruction.file_path}}],
                         }
                     }
