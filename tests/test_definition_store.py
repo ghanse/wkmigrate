@@ -487,10 +487,8 @@ def test_root_path_override_rewrites_notebook_artifact_file_path(mock_workspace_
     assert '/notebooks/etl.py' in notebook.file_path
 
 
-def test_root_path_override_recurses_into_for_each_task(mock_workspace_client, tmp_path) -> None:
+def test_root_path_override_recurses_into_for_each_task(mock_workspace_client) -> None:
     """root_path override rewrites notebook paths inside for_each_task nested tasks."""
-    store = _make_workspace_store(mock_workspace_client)
-    store.set_override('root_path', '/migrated')
 
     tasks: list[dict] = [
         {
