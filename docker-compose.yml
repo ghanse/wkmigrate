@@ -1,0 +1,12 @@
+services:
+  wkmigrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    restart: "no"
+    volumes:
+      # Mount a local directory for pipeline output
+      - ./output:/app/output
