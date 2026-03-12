@@ -13,7 +13,6 @@ from wkmigrate.models.ir.pipeline import (
 
 
 def _make_workspace_store(mock_workspace_client) -> WorkspaceDefinitionStore:
-    # The fixture patches _login_workspace_client; assert it was activated.
     assert mock_workspace_client is not None
     return WorkspaceDefinitionStore(
         authentication_type="pat",
