@@ -15,6 +15,8 @@ from wkmigrate.models.ir.pipeline import (
     RunJobActivity,
     WebActivity,
 )
+from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
+from wkmigrate.models.workflows.instructions import PipelineInstruction
 
 
 def test_factory_definition_store_requires_mandatory_fields() -> None:
@@ -279,14 +281,14 @@ def test_get_all_overrides_returns_copy(mock_workspace_client) -> None:
 def test_invalid_override_key_raises_on_set(mock_workspace_client) -> None:
     """set_override raises ValueError for an unrecognised key."""
     store = _make_workspace_store(mock_workspace_client)
-    with pytest.raises(ValueError, match='not a valid override'):
+    with pytest.raises(ValueError, match='Invalid override key'):
         store.set_override('nonexistent_key', 'value')
 
 
 def test_invalid_override_key_raises_on_get(mock_workspace_client) -> None:
     """get_override raises ValueError for an unrecognised key."""
     store = _make_workspace_store(mock_workspace_client)
-    with pytest.raises(ValueError, match='not a valid override'):
+    with pytest.raises(ValueError, match='Invalid override key'):
         store.get_override('nonexistent_key')
 
 
@@ -399,3 +401,131 @@ def test_to_job_with_overrides(mock_workspace_client) -> None:
     )
     job_id = store.to_job(_simple_pipeline())
     assert job_id is not None
+
+
+def test_invalid_compute_type_raises_on_set(mock_workspace_client) -> None:
+    """set_override raises ValueError for an unrecognised compute_type value."""
+    store = _make_workspace_store(mock_workspace_client)
+    with pytest.raises(ValueError, match='Invalid compute_type'):
+        store.set_override('compute_type', 'typo')
+
+
+def test_invalid_compute_type_raises_on_init(mock_workspace_client) -> None:
+    """Passing an invalid compute_type value at construction time raises ValueError."""
+    assert mock_workspace_client is not None
+    with pytest.raises(ValueError, match='Invalid compute_type'):
+        WorkspaceDefinitionStore(
+            authentication_type='pat',
+            host_name='https://example.com',
+            pat='DUMMY_TOKEN',
+            overrides={'compute_type': 'invalid_type'},
+        )
+
+
+def test_invalid_compute_type_raises_on_set_all(mock_workspace_client) -> None:
+    """set_all_overrides raises ValueError for an invalid compute_type value."""
+    store = _make_workspace_store(mock_workspace_client)
+    with pytest.raises(ValueError, match='Invalid compute_type'):
+        store.set_all_overrides({'compute_type': 'bad_value'})
+
+
+def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None:
+    """catalog and schema overrides propagate to PipelineInstruction objects."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_all_overrides({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
+
+    task_ref = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
+    instructions = [
+        PipelineInstruction(task_ref=task_ref, file_path='/notebooks/copy', name='copy_pipeline'),
+        PipelineInstruction(task_ref=task_ref, file_path='/notebooks/copy2', name='copy_pipeline_2'),
+    ]
+
+    # Verify defaults before override
+    assert instructions[0].catalog == 'wkmigrate'
+    assert instructions[0].target == 'wkmigrate'
+
+    WorkspaceDefinitionStore._apply_catalog_schema_override(
+        instructions, store.get_override('catalog'), store.get_override('schema')
+    )
+
+    for instr in instructions:
+        assert instr.catalog == 'prod_catalog'
+        assert instr.target == 'prod_schema'
+
+
+def test_catalog_only_override_leaves_schema_unchanged(mock_workspace_client) -> None:
+    """Setting only catalog leaves target (schema) at its default."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('catalog', 'new_catalog')
+
+    instr = PipelineInstruction(task_ref={}, file_path='/notebooks/x', name='p', target='original_schema')
+    WorkspaceDefinitionStore._apply_catalog_schema_override(
+        [instr], store.get_override('catalog'), store.get_override('schema')
+    )
+    assert instr.catalog == 'new_catalog'
+    assert instr.target == 'original_schema'
+
+
+def test_root_path_override_rewrites_notebook_artifact_file_path(mock_workspace_client) -> None:
+    """root_path override rewrites NotebookArtifact.file_path in all_notebooks."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('root_path', '/migrated')
+
+    notebook = NotebookArtifact(file_path='/notebooks/etl.py', content='# etl')
+    activity = PreparedActivity(
+        task={'task_key': 'task1', 'notebook_task': {'notebook_path': '/notebooks/etl'}},
+        notebooks=[notebook],
+    )
+    prepared = PreparedWorkflow(pipeline=_simple_pipeline().tasks[0], activities=[activity])
+    # Manually set pipeline attr for the PreparedWorkflow (it expects a Pipeline but we
+    # only need the shape for _apply_overrides)
+    prepared.pipeline = _simple_pipeline()  # type: ignore[assignment]
+
+    store._apply_overrides(prepared)
+
+    assert notebook.file_path.startswith('/migrated/')
+    assert '/notebooks/etl.py' in notebook.file_path
+
+
+def test_root_path_override_recurses_into_for_each_task(mock_workspace_client, tmp_path) -> None:
+    """root_path override rewrites notebook paths inside for_each_task nested tasks."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('root_path', '/migrated')
+
+    tasks: list[dict] = [
+        {
+            'task_key': 'outer',
+            'for_each_task': {
+                'task': {
+                    'task_key': 'inner',
+                    'notebook_task': {'notebook_path': '/original/notebook'},
+                }
+            },
+        }
+    ]
+
+    WorkspaceDefinitionStore._apply_root_path_override(tasks, '/migrated')
+
+    inner_task = tasks[0]['for_each_task']['task']
+    assert inner_task['notebook_task']['notebook_path'] == '/migrated/original/notebook'
+
+
+def test_compute_type_serverless_recurses_into_for_each_task(mock_workspace_client) -> None:
+    """compute_type=serverless strips new_cluster from tasks inside for_each_task."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'outer',
+            'for_each_task': {
+                'task': {
+                    'task_key': 'inner',
+                    'notebook_task': {'notebook_path': '/notebooks/etl'},
+                    'new_cluster': {'spark_version': '13.3.x-scala2.12', 'num_workers': 2},
+                }
+            },
+        }
+    ]
+
+    WorkspaceDefinitionStore._apply_compute_type_override(tasks, 'serverless')
+
+    inner_task = tasks[0]['for_each_task']['task']
+    assert 'new_cluster' not in inner_task

@@ -80,6 +80,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
     workspace_client: WorkspaceClient | None = dataclasses.field(init=False, default=None)
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
     _valid_override_keys = frozenset({"root_path", "files_to_delta_sinks", "compute_type", "catalog", "schema"})
+    _valid_compute_types = frozenset({"serverless", "classic"})
 
     def __post_init__(self) -> None:
         """
@@ -88,6 +89,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         Raises:
             ValueError: If the authentication type is invalid or the host name is not provided.
             ValueError: If any override key is not a recognised option.
+            ValueError: If the ``compute_type`` override value is not a supported compute type.
         """
         if self.authentication_type not in self._valid_authentication_types:
             raise ValueError(
@@ -95,10 +97,39 @@ class WorkspaceDefinitionStore(DefinitionStore):
             )
         if self.host_name is None:
             raise ValueError('"host_name" must be provided when creating a WorkspaceDefinitionStore')
-        invalid_keys = set(self.overrides) - self._valid_override_keys
+        self._validate_override_keys(self.overrides.keys())
+        self._validate_compute_type_value(self.overrides.get('compute_type'))
+        self.workspace_client = self._login_workspace_client()
+
+    def _validate_override_keys(self, keys: Iterable[str]) -> None:
+        """
+        Validates that all provided keys are recognised override options.
+
+        Args:
+            keys: Override key names to validate.
+
+        Raises:
+            ValueError: If any key is not a recognised override option.
+        """
+        invalid_keys = set(keys) - self._valid_override_keys
         if invalid_keys:
             raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
-        self.workspace_client = self._login_workspace_client()
+
+    def _validate_compute_type_value(self, compute_type: Any) -> None:
+        """
+        Validates that a ``compute_type`` value is one of the supported types.
+
+        Args:
+            compute_type: Value to validate, or ``None`` to skip validation.
+
+        Raises:
+            ValueError: If *compute_type* is not ``None`` and not in the supported set.
+        """
+        if compute_type is not None and compute_type not in self._valid_compute_types:
+            raise ValueError(
+                f'Invalid compute_type "{compute_type}"; must be one of: '
+                f'{", ".join(sorted(self._valid_compute_types))}'
+            )
 
     # ------------------------------------------------------------------
     # Override option accessors
@@ -117,8 +148,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         Raises:
             ValueError: If *key* is not a recognised override option.
         """
-        if key not in self._valid_override_keys:
-            raise ValueError(f'"{key}" is not a valid override option')
+        self._validate_override_keys([key])
         return self.overrides.get(key)
 
     def set_override(self, key: str, value: Any) -> None:
@@ -131,9 +161,11 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
         Raises:
             ValueError: If *key* is not a recognised override option.
+            ValueError: If *key* is ``compute_type`` and *value* is not a supported compute type.
         """
-        if key not in self._valid_override_keys:
-            raise ValueError(f'"{key}" is not a valid override option')
+        self._validate_override_keys([key])
+        if key == 'compute_type':
+            self._validate_compute_type_value(value)
         self.overrides[key] = value
 
     def get_all_overrides(self) -> dict[str, Any]:
@@ -154,10 +186,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
         Raises:
             ValueError: If any key is not a recognised override option.
+            ValueError: If the ``compute_type`` value is not a supported compute type.
         """
-        invalid_keys = set(overrides) - self._valid_override_keys
-        if invalid_keys:
-            raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
+        self._validate_override_keys(overrides.keys())
+        self._validate_compute_type_value(overrides.get('compute_type'))
         self.overrides = dict(overrides)
 
     # ------------------------------------------------------------------
@@ -308,7 +340,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         if catalog is not None or schema is not None:
             self._apply_catalog_schema_override(prepared.all_pipelines, catalog, schema)
 
-    def _apply_root_path_override(self, tasks: list[dict[str, Any]], root_path: str) -> None:
+    @staticmethod
+    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> None:
         """
         Rewrites notebook paths in tasks to be rooted under *root_path*.
 
@@ -320,15 +353,14 @@ class WorkspaceDefinitionStore(DefinitionStore):
             notebook_task = task.get('notebook_task')
             if notebook_task:
                 original = notebook_task.get('notebook_path') or ''
-                if isinstance(notebook_task, dict):
-                    notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
+                notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
             for_each_task = task.get('for_each_task')
             if for_each_task:
                 nested = for_each_task.get('task')
                 if isinstance(nested, dict):
-                    self._apply_root_path_override([nested], root_path)
+                    WorkspaceDefinitionStore._apply_root_path_override([nested], root_path)
                 elif isinstance(nested, list):
-                    self._apply_root_path_override(nested, root_path)
+                    WorkspaceDefinitionStore._apply_root_path_override(nested, root_path)
 
     @staticmethod
     def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> None:
