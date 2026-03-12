@@ -39,7 +39,7 @@ from typing_extensions import deprecated
 
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.models.workflows.artifacts import NotebookArtifact
+from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
 from wkmigrate.preparers.preparer import prepare_workflow
@@ -121,7 +121,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         invalid_keys = set(keys) - self._valid_option_keys
         if invalid_keys:
-            raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
+            raise ValueError(f'Invalid option key(s): {", ".join(sorted(invalid_keys))}')
 
     def _validate_compute_type_value(self, compute_type: Any) -> None:
         """
@@ -334,24 +334,97 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
         if root_path is not None and not defer_root_path:
             tasks = self._apply_root_path_override(tasks, root_path)
-            for notebook in prepared.all_notebooks:
-                if not self._has_root_prefix(notebook.file_path, root_path):
-                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
-            for instruction in prepared.all_pipelines:
-                if not self._has_root_prefix(instruction.file_path, root_path):
-                    instruction.file_path = f'{root_path.rstrip("/")}/{instruction.file_path.lstrip("/")}'
+            activities = self._apply_root_path_to_activities(activities, root_path)
 
         if catalog is not None or schema is not None:
-            pipelines = self._apply_catalog_schema_override(prepared.all_pipelines, catalog, schema)
-            pi_iter = iter(pipelines)
-            for activity in activities:
-                if activity.pipelines:
-                    activity.pipelines = [next(pi_iter) for _ in activity.pipelines]
+            activities = self._apply_catalog_schema_to_activities(activities, catalog, schema)
 
         result = dataclasses.replace(prepared, activities=activities)
         for activity, task in zip(result.activities, tasks):
             activity.task = task
         return result
+
+    @classmethod
+    def _apply_root_path_to_activities(
+        cls,
+        activities: list[PreparedActivity],
+        root_path: str,
+    ) -> list[PreparedActivity]:
+        """Returns new activity list with root_path applied to notebook and pipeline file_paths.
+
+        Creates copies via ``dataclasses.replace`` so the originals are not mutated.
+        Recurses into inner workflows.  Bundle-relative paths (starting with
+        ``./``) are left unchanged.
+        """
+        new_activities: list[PreparedActivity] = []
+        for activity in activities:
+            replacements: dict[str, Any] = {}
+            if activity.notebooks:
+                replacements['notebooks'] = [
+                    (
+                        dataclasses.replace(
+                            nb,
+                            file_path=f'{root_path.rstrip("/")}/{nb.file_path.lstrip("/")}',
+                        )
+                        if not (nb.file_path.startswith('./') or cls._has_root_prefix(nb.file_path, root_path))
+                        else nb
+                    )
+                    for nb in activity.notebooks
+                ]
+            if activity.pipelines:
+                replacements['pipelines'] = [
+                    (
+                        dataclasses.replace(
+                            pi,
+                            file_path=f'{root_path.rstrip("/")}/{pi.file_path.lstrip("/")}',
+                        )
+                        if not (pi.file_path.startswith('./') or cls._has_root_prefix(pi.file_path, root_path))
+                        else pi
+                    )
+                    for pi in activity.pipelines
+                ]
+            if activity.inner_workflow:
+                inner_activities = cls._apply_root_path_to_activities(
+                    list(activity.inner_workflow.activities), root_path
+                )
+                replacements['inner_workflow'] = dataclasses.replace(
+                    activity.inner_workflow, activities=inner_activities
+                )
+            new_activities.append(dataclasses.replace(activity, **replacements))
+        return new_activities
+
+    @staticmethod
+    def _apply_catalog_schema_to_activities(
+        activities: list[PreparedActivity],
+        catalog: str | None,
+        schema: str | None,
+    ) -> list[PreparedActivity]:
+        """Returns new activity list with catalog/schema applied to pipeline instructions.
+
+        Walks into inner workflows recursively so that pipelines from ForEach
+        activities are correctly updated.
+        """
+        new_activities: list[PreparedActivity] = []
+        for activity in activities:
+            replacements: dict[str, Any] = {}
+            if activity.pipelines:
+                replacements['pipelines'] = [
+                    dataclasses.replace(
+                        pi,
+                        catalog=catalog if catalog is not None else pi.catalog,
+                        target=schema if schema is not None else pi.target,
+                    )
+                    for pi in activity.pipelines
+                ]
+            if activity.inner_workflow:
+                inner_activities = WorkspaceDefinitionStore._apply_catalog_schema_to_activities(
+                    list(activity.inner_workflow.activities), catalog, schema
+                )
+                replacements['inner_workflow'] = dataclasses.replace(
+                    activity.inner_workflow, activities=inner_activities
+                )
+            new_activities.append(dataclasses.replace(activity, **replacements))
+        return new_activities
 
     @staticmethod
     def _has_root_prefix(path: str, root_path: str) -> bool:
@@ -391,7 +464,11 @@ class WorkspaceDefinitionStore(DefinitionStore):
             if notebook_task:
                 notebook_task = dict(notebook_task)
                 original = notebook_task.get('notebook_path') or ''
-                if not original.startswith(prefix) and original.rstrip('/') != root_path.rstrip('/'):
+                if (
+                    not original.startswith('./')
+                    and not original.startswith(prefix)
+                    and original.rstrip('/') != root_path.rstrip('/')
+                ):
                     notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
                 task['notebook_task'] = notebook_task
             for_each_task = task.get('for_each_task')
@@ -655,9 +732,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         os.makedirs(bundle_dir, exist_ok=True)
         bundle_name = prepared.pipeline.name or "workflow"
-        resources_dir = os.path.join(bundle_dir, "resources")
-        jobs_dir = os.path.join(resources_dir, "jobs")
-        pipelines_dir = os.path.join(resources_dir, "pipelines")
+        jobs_dir = os.path.join(bundle_dir, "resources", "jobs")
+        pipelines_dir = os.path.join(bundle_dir, "resources", "pipelines")
         notebooks_dir = os.path.join(bundle_dir, "notebooks")
 
         os.makedirs(jobs_dir, exist_ok=True)
@@ -668,24 +744,27 @@ class WorkspaceDefinitionStore(DefinitionStore):
         all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
 
         if download_notebooks:
-            workspace_paths = self._extract_workspace_notebook_paths(all_tasks)
-            workspace_paths = {p for p in workspace_paths if not p.startswith("/wkmigrate/")}
+            workspace_paths = {
+                p for p in self._extract_workspace_notebook_paths(all_tasks) if not p.startswith("/wkmigrate/")
+            }
             if workspace_paths:
-                path_mapping = self._download_workspace_notebooks(workspace_paths, notebooks_dir)
-                self._update_notebook_paths_for_bundle(all_tasks, path_mapping)
+                self._update_notebook_paths_for_bundle(
+                    all_tasks,
+                    self._download_workspace_notebooks(workspace_paths, notebooks_dir),
+                )
 
-        # Apply deferred root_path rewrite after download-path extraction
+        # Apply deferred root_path rewrite after download-path extraction.
+        # Skip bundle-relative paths (starting with './') that were already
+        # rewritten by _update_notebook_paths_for_bundle.
         root_path = self._effective_root_path()
         if root_path is not None and download_notebooks:
-            new_tasks = self._apply_root_path_override(prepared.tasks, root_path)
-            for activity, task in zip(prepared.activities, new_tasks):
+            for activity, task in zip(prepared.activities, self._apply_root_path_override(prepared.tasks, root_path)):
                 activity.task = task
-            for notebook in prepared.all_notebooks:
-                if not self._has_root_prefix(notebook.file_path, root_path):
-                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
-            for instruction in prepared.all_pipelines:
-                if not self._has_root_prefix(instruction.file_path, root_path):
-                    instruction.file_path = f'{root_path.rstrip("/")}/{instruction.file_path.lstrip("/")}'
+            prepared = dataclasses.replace(
+                prepared,
+                activities=self._apply_root_path_to_activities(list(prepared.activities), root_path),
+            )
+            inner_workflows = prepared.inner_workflows
             all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
 
         if inner_workflows:

@@ -263,21 +263,21 @@ def test_options_dict_is_independent_of_caller(mock_workspace_client) -> None:
 def test_invalid_option_key_raises_on_set(mock_workspace_client) -> None:
     """set_option raises ValueError for an unrecognised key."""
     store = _make_workspace_store(mock_workspace_client)
-    with pytest.raises(ValueError, match='Invalid override key'):
+    with pytest.raises(ValueError, match='Invalid option key'):
         store.set_option('nonexistent_key', 'value')
 
 
 def test_invalid_option_key_raises_on_set_all(mock_workspace_client) -> None:
     """set_all_options raises ValueError when dict contains an invalid key."""
     store = _make_workspace_store(mock_workspace_client)
-    with pytest.raises(ValueError, match='Invalid override'):
+    with pytest.raises(ValueError, match='Invalid option key'):
         store.set_all_options({'bad_key': 'value'})
 
 
 def test_invalid_option_key_raises_on_init(mock_workspace_client) -> None:
     """Passing an invalid option key at construction time raises ValueError."""
     assert mock_workspace_client is not None
-    with pytest.raises(ValueError, match='Invalid override'):
+    with pytest.raises(ValueError, match='Invalid option key'):
         WorkspaceDefinitionStore(
             authentication_type='pat',
             host_name='https://example.com',
