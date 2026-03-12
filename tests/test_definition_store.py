@@ -231,3 +231,171 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
     )
     job_id = store.to_job(pipeline)
     assert job_id is not None
+
+
+# ---------------------------------------------------------------------------
+# Override option tests
+# ---------------------------------------------------------------------------
+
+
+def test_overrides_default_to_empty_dict(mock_workspace_client) -> None:
+    """WorkspaceDefinitionStore initialises with an empty overrides dict by default."""
+    store = _make_workspace_store(mock_workspace_client)
+    assert store.overrides == {}
+    assert store.get_all_overrides() == {}
+
+
+def test_set_and_get_override(mock_workspace_client) -> None:
+    """set_override / get_override round-trips a single key."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('root_path', '/migrated')
+    assert store.get_override('root_path') == '/migrated'
+
+
+def test_get_override_returns_none_when_unset(mock_workspace_client) -> None:
+    """get_override returns None for a valid key that has not been set."""
+    store = _make_workspace_store(mock_workspace_client)
+    assert store.get_override('catalog') is None
+
+
+def test_set_all_overrides_replaces_existing(mock_workspace_client) -> None:
+    """set_all_overrides replaces the entire overrides dictionary."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('catalog', 'old_catalog')
+    store.set_all_overrides({'schema': 'new_schema'})
+    assert store.get_override('schema') == 'new_schema'
+    assert store.get_override('catalog') is None
+
+
+def test_get_all_overrides_returns_copy(mock_workspace_client) -> None:
+    """get_all_overrides returns a copy, not a reference to the internal dict."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_override('catalog', 'my_catalog')
+    copy = store.get_all_overrides()
+    copy['catalog'] = 'mutated'
+    assert store.get_override('catalog') == 'my_catalog'
+
+
+def test_invalid_override_key_raises_on_set(mock_workspace_client) -> None:
+    """set_override raises ValueError for an unrecognised key."""
+    store = _make_workspace_store(mock_workspace_client)
+    with pytest.raises(ValueError, match='not a valid override'):
+        store.set_override('nonexistent_key', 'value')
+
+
+def test_invalid_override_key_raises_on_get(mock_workspace_client) -> None:
+    """get_override raises ValueError for an unrecognised key."""
+    store = _make_workspace_store(mock_workspace_client)
+    with pytest.raises(ValueError, match='not a valid override'):
+        store.get_override('nonexistent_key')
+
+
+def test_invalid_override_key_raises_on_set_all(mock_workspace_client) -> None:
+    """set_all_overrides raises ValueError when dict contains an invalid key."""
+    store = _make_workspace_store(mock_workspace_client)
+    with pytest.raises(ValueError, match='Invalid override'):
+        store.set_all_overrides({'bad_key': 'value'})
+
+
+def test_invalid_override_key_raises_on_init(mock_workspace_client) -> None:
+    """Passing an invalid override key at construction time raises ValueError."""
+    assert mock_workspace_client is not None
+    with pytest.raises(ValueError, match='Invalid override'):
+        WorkspaceDefinitionStore(
+            authentication_type='pat',
+            host_name='https://example.com',
+            pat='DUMMY_TOKEN',
+            overrides={'not_a_real_key': True},
+        )
+
+
+def test_overrides_can_be_passed_at_construction(mock_workspace_client) -> None:
+    """Override options can be provided via the constructor."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        overrides={'root_path': '/prod', 'compute_type': 'serverless'},
+    )
+    assert store.get_override('root_path') == '/prod'
+    assert store.get_override('compute_type') == 'serverless'
+
+
+def test_files_to_delta_sinks_override_takes_precedence(mock_workspace_client) -> None:
+    """The files_to_delta_sinks override takes precedence over the field."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        files_to_delta_sinks=False,
+        overrides={'files_to_delta_sinks': True},
+    )
+    assert store._effective_files_to_delta_sinks() is True
+
+
+def test_root_path_override_rewrites_notebook_paths(mock_workspace_client, tmp_path) -> None:
+    """The root_path override rewrites notebook paths in the generated asset bundle."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        overrides={'root_path': '/migrated'},
+    )
+    bundle_dir = str(tmp_path / 'bundle')
+    store.to_asset_bundle(_simple_pipeline(), bundle_dir, download_notebooks=False)
+
+    job_file = os.path.join(bundle_dir, 'resources', 'jobs', 'test_pipeline.yml')
+    with open(job_file) as f:
+        content = yaml.safe_load(f)
+    tasks = content['resources']['jobs']['test_pipeline']['tasks']
+    notebook_path = tasks[0]['notebook_task']['notebook_path']
+    assert notebook_path.startswith('/migrated/')
+
+
+def test_compute_type_serverless_removes_new_cluster(mock_workspace_client, tmp_path) -> None:
+    """The compute_type=serverless override strips new_cluster from tasks."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        overrides={'compute_type': 'serverless'},
+    )
+    pipeline = Pipeline(
+        name='serverless_pipeline',
+        parameters=None,
+        schedule=None,
+        tasks=[
+            DatabricksNotebookActivity(
+                name='task1',
+                task_key='task1',
+                notebook_path='/notebooks/etl',
+                new_cluster={'spark_version': '13.3.x-scala2.12', 'num_workers': 2},
+            ),
+        ],
+        tags={},
+    )
+    bundle_dir = str(tmp_path / 'bundle')
+    store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=False)
+
+    job_file = os.path.join(bundle_dir, 'resources', 'jobs', 'serverless_pipeline.yml')
+    with open(job_file) as f:
+        content = yaml.safe_load(f)
+    tasks = content['resources']['jobs']['serverless_pipeline']['tasks']
+    assert 'new_cluster' not in tasks[0]
+
+
+def test_to_job_with_overrides(mock_workspace_client) -> None:
+    """to_job applies overrides and returns a valid job id."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        overrides={'compute_type': 'serverless'},
+    )
+    job_id = store.to_job(_simple_pipeline())
+    assert job_id is not None
