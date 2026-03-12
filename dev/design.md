@@ -90,14 +90,15 @@ src/wkmigrate/
 
 ### Key Abstractions
 
-| Concept | Module | Role |
-|---|---|---|
-| **DefinitionStore** | `definition_stores/definition_store.py` | Abstract source/sink for pipeline definitions. `FactoryDefinitionStore` reads from ADF; `WorkspaceDefinitionStore` writes to Databricks. |
+| Concept                    | Module | Role |
+|----------------------------|---|---|
+| **DefinitionStore**        | `definition_stores/definition_store.py` | Abstract source/sink for pipeline definitions. `FactoryDefinitionStore` reads from ADF; `WorkspaceDefinitionStore` writes to Databricks. |
 | **Pipeline / Activity IR** | `models/ir/pipeline.py` | Immutable dataclass hierarchy representing a translated pipeline. Activity subtypes include `DatabricksNotebookActivity`, `CopyActivity`, `ForEachActivity`, `IfConditionActivity`, etc. |
-| **TranslationContext** | `models/ir/translation_context.py` | Frozen dataclass threaded through translation visitors. Carries the activity cache, type-translator registry, and variable cache. Every mutation returns a new instance. |
-| **PreparedWorkflow** | `models/workflows/artifacts.py` | Collects the Databricks job payload, notebooks, DLT pipelines, and secrets needed to materialize a translated pipeline. |
-| **Translator functions** | `translators/` | Pure functions `(dict, dict) -> TranslationResult` that convert ADF JSON into IR dataclasses. |
-| **Preparer functions** | `preparers/` | Functions that convert IR dataclasses into Databricks-ready task dicts + artifact lists. |
+| **TranslationContext**     | `models/ir/translation_context.py` | Frozen dataclass threaded through translation visitors. Carries the activity cache, type-translator registry, and variable cache. Every mutation returns a new instance. |
+| **PreparedWorkflow**       | `models/workflows/artifacts.py` | Collects the Databricks job payload, notebooks, DLT pipelines, and secrets needed to materialize a translated pipeline. |
+| **Translator functions**   | `translators/` | Functions that convert ADF JSON into IR dataclasses. Simple type translators are pure `(dict, dict) -> TranslationResult`; control-flow translators additionally thread `TranslationContext` and return `(TranslationResult, TranslationContext)`. |
+| **Preparer functions**     | `preparers/` | Functions that convert IR dataclasses into Databricks-ready task dicts + artifact lists. |
+| **Parser functions**       | `parsers/`    | Functions that parse field values from ADF into Databricks equivalents                  |
 
 ### Data Flow
 
@@ -162,7 +163,8 @@ ADF JSON
 
 ### Immutable IR with Dataclasses
 
-All IR models use `@dataclass(slots=True)` for memory efficiency and attribute-access safety. The `frozen=True` variant is used where immutability is required (e.g. `TranslationContext`). Subtypes use `kw_only=True` to prevent positional-argument mistakes in deeply nested hierarchies.
+All IR models use `@dataclass(slots=True)` for memory efficiency and attribute-access safety. The `frozen=True` variant is used where immutability is required (e.g. `TranslationContext`). 
+Some IR subtypes—especially deeply nested or control-flow activities—use `kw_only=True` to prevent positional-argument mistakes in complex hierarchies.
 
 ```python
 @dataclass(slots=True, kw_only=True)
@@ -280,10 +282,6 @@ The primary public API consists of:
 5. **`translate_pipeline(pipeline_dict)`** -- Convert raw ADF JSON into a `Pipeline` IR (used internally by `FactoryDefinitionStore.load`).
 6. **`translate_activities(activities)`** -- Convert a list of ADF activity dicts into `Activity` IR objects.
 7. **`prepare_workflow(pipeline)`** -- Convert a `Pipeline` IR into a `PreparedWorkflow`.
-
-### CLI
-
-The package registers a CLI entry point via `wkmigrate.cli:cli` (Click-based). The CLI is declared in `pyproject.toml` under `[tool.poetry.scripts]`.
 
 ### Deprecation
 
