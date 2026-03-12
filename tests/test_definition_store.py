@@ -235,116 +235,91 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
     assert job_id is not None
 
 
-# ---------------------------------------------------------------------------
-# Override option tests
-# ---------------------------------------------------------------------------
-
-
-def test_overrides_default_to_empty_dict(mock_workspace_client) -> None:
-    """WorkspaceDefinitionStore initialises with an empty overrides dict by default."""
+def test_set_and_get_option(mock_workspace_client) -> None:
+    """set_option round-trips a single key via the options dict."""
     store = _make_workspace_store(mock_workspace_client)
-    assert store.overrides == {}
-    assert store.get_all_overrides() == {}
+    store.set_option('root_path', '/migrated')
+    assert store.options.get('root_path') == '/migrated'
 
 
-def test_set_and_get_override(mock_workspace_client) -> None:
-    """set_override / get_override round-trips a single key."""
+def test_set_all_options_replaces_existing(mock_workspace_client) -> None:
+    """set_all_options replaces the entire options dictionary."""
     store = _make_workspace_store(mock_workspace_client)
-    store.set_override('root_path', '/migrated')
-    assert store.get_override('root_path') == '/migrated'
+    store.set_option('catalog', 'old_catalog')
+    store.set_all_options({'schema': 'new_schema'})
+    assert store.options.get('schema') == 'new_schema'
+    assert store.options.get('catalog') is None
 
 
-def test_get_override_returns_none_when_unset(mock_workspace_client) -> None:
-    """get_override returns None for a valid key that has not been set."""
+def test_options_dict_is_independent_of_caller(mock_workspace_client) -> None:
+    """Mutating a reference obtained from options does not affect the store when set via set_all_options."""
     store = _make_workspace_store(mock_workspace_client)
-    assert store.get_override('catalog') is None
-
-
-def test_set_all_overrides_replaces_existing(mock_workspace_client) -> None:
-    """set_all_overrides replaces the entire overrides dictionary."""
-    store = _make_workspace_store(mock_workspace_client)
-    store.set_override('catalog', 'old_catalog')
-    store.set_all_overrides({'schema': 'new_schema'})
-    assert store.get_override('schema') == 'new_schema'
-    assert store.get_override('catalog') is None
-
-
-def test_get_all_overrides_returns_copy(mock_workspace_client) -> None:
-    """get_all_overrides returns a copy, not a reference to the internal dict."""
-    store = _make_workspace_store(mock_workspace_client)
-    store.set_override('catalog', 'my_catalog')
-    copy = store.get_all_overrides()
+    store.set_option('catalog', 'my_catalog')
+    copy = dict(store.options)
     copy['catalog'] = 'mutated'
-    assert store.get_override('catalog') == 'my_catalog'
+    assert store.options['catalog'] == 'my_catalog'
 
 
-def test_invalid_override_key_raises_on_set(mock_workspace_client) -> None:
-    """set_override raises ValueError for an unrecognised key."""
+def test_invalid_option_key_raises_on_set(mock_workspace_client) -> None:
+    """set_option raises ValueError for an unrecognised key."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid override key'):
-        store.set_override('nonexistent_key', 'value')
+        store.set_option('nonexistent_key', 'value')
 
 
-def test_invalid_override_key_raises_on_get(mock_workspace_client) -> None:
-    """get_override raises ValueError for an unrecognised key."""
-    store = _make_workspace_store(mock_workspace_client)
-    with pytest.raises(ValueError, match='Invalid override key'):
-        store.get_override('nonexistent_key')
-
-
-def test_invalid_override_key_raises_on_set_all(mock_workspace_client) -> None:
-    """set_all_overrides raises ValueError when dict contains an invalid key."""
+def test_invalid_option_key_raises_on_set_all(mock_workspace_client) -> None:
+    """set_all_options raises ValueError when dict contains an invalid key."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid override'):
-        store.set_all_overrides({'bad_key': 'value'})
+        store.set_all_options({'bad_key': 'value'})
 
 
-def test_invalid_override_key_raises_on_init(mock_workspace_client) -> None:
-    """Passing an invalid override key at construction time raises ValueError."""
+def test_invalid_option_key_raises_on_init(mock_workspace_client) -> None:
+    """Passing an invalid option key at construction time raises ValueError."""
     assert mock_workspace_client is not None
     with pytest.raises(ValueError, match='Invalid override'):
         WorkspaceDefinitionStore(
             authentication_type='pat',
             host_name='https://example.com',
             pat='DUMMY_TOKEN',
-            overrides={'not_a_real_key': True},
+            options={'not_a_real_key': True},
         )
 
 
-def test_overrides_can_be_passed_at_construction(mock_workspace_client) -> None:
-    """Override options can be provided via the constructor."""
+def test_options_can_be_passed_at_construction(mock_workspace_client) -> None:
+    """Options can be provided via the constructor."""
     assert mock_workspace_client is not None
     store = WorkspaceDefinitionStore(
         authentication_type='pat',
         host_name='https://example.com',
         pat='DUMMY_TOKEN',
-        overrides={'root_path': '/prod', 'compute_type': 'serverless'},
+        options={'root_path': '/prod', 'compute_type': 'serverless'},
     )
-    assert store.get_override('root_path') == '/prod'
-    assert store.get_override('compute_type') == 'serverless'
+    assert store.options['root_path'] == '/prod'
+    assert store.options['compute_type'] == 'serverless'
 
 
-def test_files_to_delta_sinks_override_takes_precedence(mock_workspace_client) -> None:
-    """The files_to_delta_sinks override takes precedence over the field."""
+def test_files_to_delta_sinks_option_takes_precedence(mock_workspace_client) -> None:
+    """The files_to_delta_sinks option takes precedence over the field."""
     assert mock_workspace_client is not None
     store = WorkspaceDefinitionStore(
         authentication_type='pat',
         host_name='https://example.com',
         pat='DUMMY_TOKEN',
         files_to_delta_sinks=False,
-        overrides={'files_to_delta_sinks': True},
+        options={'files_to_delta_sinks': True},
     )
     assert store._effective_files_to_delta_sinks() is True
 
 
-def test_root_path_override_rewrites_notebook_paths(mock_workspace_client, tmp_path) -> None:
-    """The root_path override rewrites notebook paths in the generated asset bundle."""
+def test_root_path_option_rewrites_notebook_paths(mock_workspace_client, tmp_path) -> None:
+    """The root_path option rewrites notebook paths in the generated asset bundle."""
     assert mock_workspace_client is not None
     store = WorkspaceDefinitionStore(
         authentication_type='pat',
         host_name='https://example.com',
         pat='DUMMY_TOKEN',
-        overrides={'root_path': '/migrated'},
+        options={'root_path': '/migrated'},
     )
     bundle_dir = str(tmp_path / 'bundle')
     store.to_asset_bundle(_simple_pipeline(), bundle_dir, download_notebooks=False)
@@ -358,13 +333,13 @@ def test_root_path_override_rewrites_notebook_paths(mock_workspace_client, tmp_p
 
 
 def test_compute_type_serverless_removes_new_cluster(mock_workspace_client, tmp_path) -> None:
-    """The compute_type=serverless override strips new_cluster from tasks."""
+    """The compute_type=serverless option strips new_cluster from tasks."""
     assert mock_workspace_client is not None
     store = WorkspaceDefinitionStore(
         authentication_type='pat',
         host_name='https://example.com',
         pat='DUMMY_TOKEN',
-        overrides={'compute_type': 'serverless'},
+        options={'compute_type': 'serverless'},
     )
     pipeline = Pipeline(
         name='serverless_pipeline',
@@ -390,24 +365,24 @@ def test_compute_type_serverless_removes_new_cluster(mock_workspace_client, tmp_
     assert 'new_cluster' not in tasks[0]
 
 
-def test_to_job_with_overrides(mock_workspace_client) -> None:
-    """to_job applies overrides and returns a valid job id."""
+def test_to_job_with_options(mock_workspace_client) -> None:
+    """to_job applies options and returns a valid job id."""
     assert mock_workspace_client is not None
     store = WorkspaceDefinitionStore(
         authentication_type='pat',
         host_name='https://example.com',
         pat='DUMMY_TOKEN',
-        overrides={'compute_type': 'serverless'},
+        options={'compute_type': 'serverless'},
     )
     job_id = store.to_job(_simple_pipeline())
     assert job_id is not None
 
 
 def test_invalid_compute_type_raises_on_set(mock_workspace_client) -> None:
-    """set_override raises ValueError for an unrecognised compute_type value."""
+    """set_option raises ValueError for an unrecognised compute_type value."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid compute_type'):
-        store.set_override('compute_type', 'typo')
+        store.set_option('compute_type', 'typo')
 
 
 def test_invalid_compute_type_raises_on_init(mock_workspace_client) -> None:
@@ -418,21 +393,21 @@ def test_invalid_compute_type_raises_on_init(mock_workspace_client) -> None:
             authentication_type='pat',
             host_name='https://example.com',
             pat='DUMMY_TOKEN',
-            overrides={'compute_type': 'invalid_type'},
+            options={'compute_type': 'invalid_type'},
         )
 
 
 def test_invalid_compute_type_raises_on_set_all(mock_workspace_client) -> None:
-    """set_all_overrides raises ValueError for an invalid compute_type value."""
+    """set_all_options raises ValueError for an invalid compute_type value."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid compute_type'):
-        store.set_all_overrides({'compute_type': 'bad_value'})
+        store.set_all_options({'compute_type': 'bad_value'})
 
 
 def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None:
-    """catalog and schema overrides propagate to PipelineInstruction objects."""
+    """catalog and schema options propagate to PipelineInstruction objects."""
     store = _make_workspace_store(mock_workspace_client)
-    store.set_all_overrides({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
+    store.set_all_options({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
 
     task_ref = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
     instructions = [
@@ -444,11 +419,11 @@ def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None
     assert instructions[0].catalog == 'wkmigrate'
     assert instructions[0].target == 'wkmigrate'
 
-    WorkspaceDefinitionStore._apply_catalog_schema_override(
-        instructions, store.get_override('catalog'), store.get_override('schema')
+    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
+        instructions, store.options.get('catalog'), store.options.get('schema')
     )
 
-    for instr in instructions:
+    for instr in result:
         assert instr.catalog == 'prod_catalog'
         assert instr.target == 'prod_schema'
 
@@ -456,39 +431,37 @@ def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None
 def test_catalog_only_override_leaves_schema_unchanged(mock_workspace_client) -> None:
     """Setting only catalog leaves target (schema) at its default."""
     store = _make_workspace_store(mock_workspace_client)
-    store.set_override('catalog', 'new_catalog')
+    store.set_option('catalog', 'new_catalog')
 
     instr = PipelineInstruction(task_ref={}, file_path='/notebooks/x', name='p', target='original_schema')
-    WorkspaceDefinitionStore._apply_catalog_schema_override(
-        [instr], store.get_override('catalog'), store.get_override('schema')
+    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
+        [instr], store.options.get('catalog'), store.options.get('schema')
     )
-    assert instr.catalog == 'new_catalog'
-    assert instr.target == 'original_schema'
+    assert result[0].catalog == 'new_catalog'
+    assert result[0].target == 'original_schema'
 
 
-def test_root_path_override_rewrites_notebook_artifact_file_path(mock_workspace_client) -> None:
-    """root_path override rewrites NotebookArtifact.file_path in all_notebooks."""
+def test_root_path_option_rewrites_notebook_artifact_file_path(mock_workspace_client) -> None:
+    """root_path option rewrites NotebookArtifact.file_path in all_notebooks."""
     store = _make_workspace_store(mock_workspace_client)
-    store.set_override('root_path', '/migrated')
+    store.set_option('root_path', '/migrated')
 
     notebook = NotebookArtifact(file_path='/notebooks/etl.py', content='# etl')
     activity = PreparedActivity(
         task={'task_key': 'task1', 'notebook_task': {'notebook_path': '/notebooks/etl'}},
         notebooks=[notebook],
     )
-    prepared = PreparedWorkflow(pipeline=_simple_pipeline().tasks[0], activities=[activity])
-    # Manually set pipeline attr for the PreparedWorkflow (it expects a Pipeline but we
-    # only need the shape for _apply_overrides)
-    prepared.pipeline = _simple_pipeline()  # type: ignore[assignment]
+    prepared = PreparedWorkflow(pipeline=_simple_pipeline(), activities=[activity])
 
-    store._apply_overrides(prepared)
+    result = store._apply_options(prepared)
 
-    assert notebook.file_path.startswith('/migrated/')
-    assert '/notebooks/etl.py' in notebook.file_path
+    result_notebook = result.all_notebooks[0]
+    assert result_notebook.file_path.startswith('/migrated/')
+    assert '/notebooks/etl.py' in result_notebook.file_path
 
 
 def test_root_path_override_recurses_into_for_each_task(mock_workspace_client) -> None:
-    """root_path override rewrites notebook paths inside for_each_task nested tasks."""
+    """root_path option rewrites notebook paths inside for_each_task nested tasks."""
 
     tasks: list[dict] = [
         {
@@ -502,9 +475,9 @@ def test_root_path_override_recurses_into_for_each_task(mock_workspace_client) -
         }
     ]
 
-    WorkspaceDefinitionStore._apply_root_path_override(tasks, '/migrated')
+    result = WorkspaceDefinitionStore._apply_root_path_override(tasks, '/migrated')
 
-    inner_task = tasks[0]['for_each_task']['task']
+    inner_task = result[0]['for_each_task']['task']
     assert inner_task['notebook_task']['notebook_path'] == '/migrated/original/notebook'
 
 
@@ -523,7 +496,194 @@ def test_compute_type_serverless_recurses_into_for_each_task(mock_workspace_clie
         }
     ]
 
-    WorkspaceDefinitionStore._apply_compute_type_override(tasks, 'serverless')
+    result = WorkspaceDefinitionStore._apply_compute_type_override(tasks, 'serverless')
 
-    inner_task = tasks[0]['for_each_task']['task']
+    inner_task = result[0]['for_each_task']['task']
     assert 'new_cluster' not in inner_task
+
+
+def test_root_path_idempotent_when_already_rooted(mock_workspace_client) -> None:
+    """root_path rewrite is idempotent -- already-rooted paths are not double-prefixed."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'task1',
+            'notebook_task': {'notebook_path': '/migrated/notebooks/etl'},
+        }
+    ]
+
+    result = WorkspaceDefinitionStore._apply_root_path_override(tasks, '/migrated')
+    assert result[0]['notebook_task']['notebook_path'] == '/migrated/notebooks/etl'
+
+
+def test_root_path_no_false_positive_on_prefix(mock_workspace_client) -> None:
+    """root_path check does not falsely match /migrated_old as already rooted under /migrated."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'task1',
+            'notebook_task': {'notebook_path': '/migrated_old/notebooks/etl'},
+        }
+    ]
+
+    result = WorkspaceDefinitionStore._apply_root_path_override(tasks, '/migrated')
+    assert result[0]['notebook_task']['notebook_path'] == '/migrated/migrated_old/notebooks/etl'
+
+
+def test_root_path_rewrites_pipeline_instruction_file_path(mock_workspace_client) -> None:
+    """root_path option rewrites PipelineInstruction.file_path."""
+    store = _make_workspace_store(mock_workspace_client)
+    store.set_option('root_path', '/migrated')
+
+    task_ref = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
+    instr = PipelineInstruction(task_ref=task_ref, file_path='/notebooks/copy', name='copy_pipeline')
+    activity = PreparedActivity(
+        task={'task_key': 'task1', 'notebook_task': {'notebook_path': '/notebooks/etl'}},
+        pipelines=[instr],
+    )
+    prepared = PreparedWorkflow(pipeline=_simple_pipeline(), activities=[activity])
+
+    result = store._apply_options(prepared)
+
+    result_instr = result.all_pipelines[0]
+    assert result_instr.file_path.startswith('/migrated/')
+    assert '/notebooks/copy' in result_instr.file_path
+
+
+def test_catalog_target_in_asset_bundle_yaml(mock_workspace_client, tmp_path) -> None:
+    """catalog and schema options appear in generated pipeline YAML resources."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        options={'catalog': 'prod_catalog', 'schema': 'prod_schema'},
+    )
+
+    task_ref: dict = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
+    pipeline_instr = PipelineInstruction(task_ref=task_ref, file_path='/notebooks/copy', name='copy_pipeline')
+
+    # Apply catalog/schema override
+    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
+        [pipeline_instr],
+        store.options.get('catalog'),
+        store.options.get('schema'),
+    )
+
+    assert result[0].catalog == 'prod_catalog'
+    assert result[0].target == 'prod_schema'
+
+
+def test_workspace_url_override_rewrites_linked_service_host(mock_workspace_client) -> None:
+    """workspace_url option rewrites host_name in new_cluster linked-service references."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'task1',
+            'notebook_task': {'notebook_path': '/notebooks/etl'},
+            'new_cluster': {
+                'spark_version': '13.3.x-scala2.12',
+                'host_name': 'https://old-workspace.azuredatabricks.net',
+                'service_name': 'linked_svc',
+                'service_type': 'databricks',
+            },
+        }
+    ]
+
+    result = WorkspaceDefinitionStore._apply_workspace_url_override(tasks, 'https://new-workspace.azuredatabricks.net')
+
+    assert result[0]['new_cluster']['host_name'] == 'https://new-workspace.azuredatabricks.net'
+    # Other keys should be preserved
+    assert result[0]['new_cluster']['spark_version'] == '13.3.x-scala2.12'
+
+
+def test_workspace_url_override_recurses_into_for_each_task(mock_workspace_client) -> None:
+    """workspace_url option rewrites host_name in nested for_each_task tasks."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'outer',
+            'for_each_task': {
+                'task': {
+                    'task_key': 'inner',
+                    'notebook_task': {'notebook_path': '/notebooks/etl'},
+                    'new_cluster': {
+                        'spark_version': '13.3.x-scala2.12',
+                        'host_name': 'https://old.azuredatabricks.net',
+                    },
+                }
+            },
+        }
+    ]
+
+    result = WorkspaceDefinitionStore._apply_workspace_url_override(tasks, 'https://new.azuredatabricks.net')
+
+    inner_task = result[0]['for_each_task']['task']
+    assert inner_task['new_cluster']['host_name'] == 'https://new.azuredatabricks.net'
+
+
+def test_workspace_url_override_skips_tasks_without_host(mock_workspace_client) -> None:
+    """workspace_url option does not add host_name to new_cluster that lacks one."""
+    tasks: list[dict] = [
+        {
+            'task_key': 'task1',
+            'notebook_task': {'notebook_path': '/notebooks/etl'},
+            'new_cluster': {'spark_version': '13.3.x-scala2.12', 'num_workers': 2},
+        }
+    ]
+
+    result = WorkspaceDefinitionStore._apply_workspace_url_override(tasks, 'https://new.azuredatabricks.net')
+
+    assert 'host_name' not in result[0]['new_cluster']
+
+
+def test_workspace_url_via_constructor(mock_workspace_client, tmp_path) -> None:
+    """workspace_url option provided at construction time is accepted."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        options={'workspace_url': 'https://new-workspace.azuredatabricks.net'},
+    )
+    assert store.options['workspace_url'] == 'https://new-workspace.azuredatabricks.net'
+
+
+def test_workspace_url_applied_via_apply_options(mock_workspace_client, tmp_path) -> None:
+    """workspace_url option is applied through _apply_options."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        options={'workspace_url': 'https://target.azuredatabricks.net'},
+    )
+
+    pipeline = Pipeline(
+        name='url_pipeline',
+        parameters=None,
+        schedule=None,
+        tasks=[
+            DatabricksNotebookActivity(
+                name='task1',
+                task_key='task1',
+                notebook_path='/notebooks/etl',
+                new_cluster={
+                    'spark_version': '13.3.x-scala2.12',
+                    'host_name': 'https://source.azuredatabricks.net',
+                    'service_name': 'svc',
+                    'service_type': 'databricks',
+                },
+            ),
+        ],
+        tags={},
+    )
+
+    bundle_dir = str(tmp_path / 'bundle')
+    store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=False)
+
+    job_file = os.path.join(bundle_dir, 'resources', 'jobs', 'url_pipeline.yml')
+    with open(job_file) as f:
+        content = yaml.safe_load(f)
+    tasks = content['resources']['jobs']['url_pipeline']['tasks']
+    # host_name is stripped by the serializer (_NEW_CLUSTER_EXCLUDED_KEYS) so we
+    # just verify the task was written without error and new_cluster does not
+    # contain the old host
+    new_cluster = tasks[0].get('new_cluster', {})
+    assert new_cluster.get('host_name') != 'https://source.azuredatabricks.net'

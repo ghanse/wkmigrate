@@ -61,8 +61,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         client_id: Application (client) ID used for client-secret authentication.
         client_secret: Secret associated with the client ID for client-secret authentication.
         files_to_delta_sinks: Overrides default behavior when generating DLT sinks from copy tasks.
-        overrides: Dictionary of override options that customize translation behaviour. Supported keys are
-            ``root_path``, ``files_to_delta_sinks``, ``compute_type``, ``catalog``, and ``schema``.
+        options: Dictionary of options that customize workflow generation and deployment behaviour.
         workspace_client: Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
     """
 
@@ -76,42 +75,51 @@ class WorkspaceDefinitionStore(DefinitionStore):
     client_id: str | None = None
     client_secret: str | None = None
     files_to_delta_sinks: bool | None = None
-    overrides: dict[str, Any] = dataclasses.field(default_factory=dict)
+    options: dict[str, Any] = dataclasses.field(default_factory=dict)
     workspace_client: WorkspaceClient | None = dataclasses.field(init=False, default=None)
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
-    _valid_override_keys = frozenset({"root_path", "files_to_delta_sinks", "compute_type", "catalog", "schema"})
+    _valid_option_keys = frozenset(
+        {
+            "root_path",
+            "files_to_delta_sinks",
+            "compute_type",
+            "catalog",
+            "schema",
+            "workspace_url",
+        }
+    )
     _valid_compute_types = frozenset({"serverless", "classic"})
 
     def __post_init__(self) -> None:
         """
-        Validates credentials, override keys, and initializes the Databricks workspace client.
+        Validates credentials, option keys, and initializes the Databricks workspace client.
 
         Raises:
             ValueError: If the authentication type is invalid or the host name is not provided.
-            ValueError: If any override key is not a recognised option.
-            ValueError: If the ``compute_type`` override value is not a supported compute type.
+            ValueError: If any option key is not a recognised key.
+            ValueError: If the ``compute_type`` option value is not a supported compute type.
         """
         if self.authentication_type not in self._valid_authentication_types:
             raise ValueError(
                 'Invalid value for "authentication_type"; must be "pat", "basic", or "azure-client-secret"'
             )
         if self.host_name is None:
-            raise ValueError('"host_name" must be provided when creating a WorkspaceDefinitionStore')
-        self._validate_override_keys(self.overrides.keys())
-        self._validate_compute_type_value(self.overrides.get('compute_type'))
+            raise ValueError("'host_name' must be provided when creating a WorkspaceDefinitionStore")
+        self._validate_option_keys(self.options.keys())
+        self._validate_compute_type_value(self.options.get('compute_type'))
         self.workspace_client = self._login_workspace_client()
 
-    def _validate_override_keys(self, keys: Iterable[str]) -> None:
+    def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
-        Validates that all provided keys are recognised override options.
+        Validates that all provided keys are recognised option keys.
 
         Args:
-            keys: Override key names to validate.
+            keys: Option key names to validate.
 
         Raises:
-            ValueError: If any key is not a recognised override option.
+            ValueError: If any key is not a recognised option.
         """
-        invalid_keys = set(keys) - self._valid_override_keys
+        invalid_keys = set(keys) - self._valid_option_keys
         if invalid_keys:
             raise ValueError(f'Invalid override key(s): {", ".join(sorted(invalid_keys))}')
 
@@ -131,93 +139,64 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 f'{", ".join(sorted(self._valid_compute_types))}'
             )
 
-    # ------------------------------------------------------------------
-    # Override option accessors
-    # ------------------------------------------------------------------
-
-    def get_override(self, key: str) -> Any:
+    def set_option(self, key: str, value: Any) -> None:
         """
-        Returns the value of a single override option.
+        Sets the value of a single option.
 
         Args:
-            key: Override option name. Must be one of the recognised override keys.
-
-        Returns:
-            The current value for *key*, or ``None`` if it has not been set.
-
-        Raises:
-            ValueError: If *key* is not a recognised override option.
-        """
-        self._validate_override_keys([key])
-        return self.overrides.get(key)
-
-    def set_override(self, key: str, value: Any) -> None:
-        """
-        Sets the value of a single override option.
-
-        Args:
-            key: Override option name. Must be one of the recognised override keys.
+            key: Option name. Must be one of the recognised option keys.
             value: New value for the option.
 
         Raises:
-            ValueError: If *key* is not a recognised override option.
+            ValueError: If *key* is not a recognised option.
             ValueError: If *key* is ``compute_type`` and *value* is not a supported compute type.
         """
-        self._validate_override_keys([key])
+        self._validate_option_keys([key])
         if key == 'compute_type':
             self._validate_compute_type_value(value)
-        self.overrides[key] = value
+        self.options[key] = value
 
-    def get_all_overrides(self) -> dict[str, Any]:
+    def set_all_options(self, options: dict[str, Any]) -> None:
         """
-        Returns a shallow copy of all currently set override options.
-
-        Returns:
-            Dictionary of override key-value pairs.
-        """
-        return dict(self.overrides)
-
-    def set_all_overrides(self, overrides: dict[str, Any]) -> None:
-        """
-        Replaces all override options with the provided dictionary.
+        Replaces all options with the provided dictionary.
 
         Args:
-            overrides: Dictionary of override key-value pairs. All keys must be recognised options.
+            options: Dictionary of option key-value pairs. All keys must be recognised.
 
         Raises:
-            ValueError: If any key is not a recognised override option.
+            ValueError: If any key is not a recognised option.
             ValueError: If the ``compute_type`` value is not a supported compute type.
         """
-        self._validate_override_keys(overrides.keys())
-        self._validate_compute_type_value(overrides.get('compute_type'))
-        self.overrides = dict(overrides)
-
-    # ------------------------------------------------------------------
-    # Effective option helpers
-    # ------------------------------------------------------------------
+        self._validate_option_keys(options.keys())
+        self._validate_compute_type_value(options.get('compute_type'))
+        self.options = dict(options)
 
     def _effective_files_to_delta_sinks(self) -> bool | None:
-        """Returns the files_to_delta_sinks value, preferring overrides over the field."""
-        override = self.overrides.get('files_to_delta_sinks')
-        if override is not None:
-            return override
+        """Returns the files_to_delta_sinks value, preferring options over the field."""
+        option = self.options.get('files_to_delta_sinks')
+        if option is not None:
+            return option
         return self.files_to_delta_sinks
 
     def _effective_root_path(self) -> str | None:
-        """Returns the root_path override, or None if not set."""
-        return self.overrides.get('root_path')
+        """Returns the root_path option, or None if not set."""
+        return self.options.get('root_path')
 
     def _effective_compute_type(self) -> str | None:
-        """Returns the compute_type override, or None if not set."""
-        return self.overrides.get('compute_type')
+        """Returns the compute_type option, or None if not set."""
+        return self.options.get('compute_type')
 
     def _effective_catalog(self) -> str | None:
-        """Returns the catalog override, or None if not set."""
-        return self.overrides.get('catalog')
+        """Returns the catalog option, or None if not set."""
+        return self.options.get('catalog')
 
     def _effective_schema(self) -> str | None:
-        """Returns the schema override, or None if not set."""
-        return self.overrides.get('schema')
+        """Returns the schema option, or None if not set."""
+        return self.options.get('schema')
+
+    def _effective_workspace_url(self) -> str | None:
+        """Returns the workspace_url option, or None if not set."""
+        return self.options.get('workspace_url')
 
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
@@ -284,6 +263,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
 
+        When ``download_notebooks`` is True, workspace notebook paths are extracted
+        using the original (pre-rewrite) paths so that downloads succeed.  The
+        ``root_path`` rewrite is applied after the download-path mapping.
+
         Args:
             pipeline_definition: Prepared pipeline as a ``Pipeline`` or raw dictionary payload.
             bundle_directory: Destination directory for the bundle artifacts.
@@ -292,119 +275,235 @@ class WorkspaceDefinitionStore(DefinitionStore):
         pipeline_ir = (
             pipeline_definition if isinstance(pipeline_definition, Pipeline) else Pipeline(**pipeline_definition)
         )
-        prepared = self._prepare_workflow(pipeline_ir)
-        self._write_asset_bundle(prepared, bundle_directory, download_notebooks=download_notebooks)
+        if download_notebooks:
+            prepared = self._prepare_workflow(pipeline_ir, defer_root_path=True)
+            self._write_asset_bundle(prepared, bundle_directory, download_notebooks=True)
+        else:
+            prepared = self._prepare_workflow(pipeline_ir)
+            self._write_asset_bundle(prepared, bundle_directory, download_notebooks=False)
 
-    def _prepare_workflow(self, pipeline_definition: Pipeline) -> PreparedWorkflow:
+    def _prepare_workflow(self, pipeline_definition: Pipeline, *, defer_root_path: bool = False) -> PreparedWorkflow:
         """
-        Translates the pipeline and collects artifacts via ``prepare_workflow``, then applies overrides.
+        Translates the pipeline and collects artifacts via ``prepare_workflow``, then applies options.
 
         Args:
             pipeline_definition: Pipeline to translate as a ``Pipeline``.
+            defer_root_path: When True, skip the root_path rewrite so the caller
+                can apply it after download-path extraction.
 
         Returns:
-            PreparedWorkflow: Artifacts required to create the job.
+            PreparedWorkflow with configured options applied.
         """
         prepared = prepare_workflow(
             pipeline=pipeline_definition,
             files_to_delta_sinks=self._effective_files_to_delta_sinks(),
         )
-        self._apply_overrides(prepared)
-        return prepared
+        return self._apply_options(prepared, defer_root_path=defer_root_path)
 
-    def _apply_overrides(self, prepared: PreparedWorkflow) -> None:
+    def _apply_options(self, prepared: PreparedWorkflow, *, defer_root_path: bool = False) -> PreparedWorkflow:
         """
-        Mutates a ``PreparedWorkflow`` in place to reflect the currently configured overrides.
+        Returns a new ``PreparedWorkflow`` with all configured options applied.
 
-        Applies ``root_path`` (rewrites notebook paths), ``compute_type`` (switches tasks to
-        serverless or classic compute), and ``catalog`` / ``schema`` (rewrites DLT pipeline
-        targets).
+        Applies ``root_path`` (rewrites notebook and pipeline instruction paths),
+        ``compute_type`` (switches tasks to serverless or classic compute),
+        ``catalog`` / ``schema`` (rewrites DLT pipeline targets), and
+        ``workspace_url`` (overrides Databricks linked-service hosts).
 
         Args:
-            prepared: PreparedWorkflow to modify.
+            prepared: Source PreparedWorkflow.
+            defer_root_path: When True, skip the root_path rewrite so it can be
+                applied later (e.g. after download-path extraction).
+
+        Returns:
+            A new PreparedWorkflow reflecting the current options.
         """
         root_path = self._effective_root_path()
         compute_type = self._effective_compute_type()
         catalog = self._effective_catalog()
         schema = self._effective_schema()
+        workspace_url = self._effective_workspace_url()
 
-        if root_path is not None:
-            self._apply_root_path_override(prepared.tasks, root_path)
-            for notebook in prepared.all_notebooks:
-                if not notebook.file_path.startswith(root_path):
-                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
+        tasks = [dict(t) for t in prepared.tasks]
+        activities = list(prepared.activities)
 
         if compute_type is not None:
-            self._apply_compute_type_override(prepared.tasks, compute_type)
+            tasks = self._apply_compute_type_override(tasks, compute_type)
+
+        if workspace_url is not None:
+            tasks = self._apply_workspace_url_override(tasks, workspace_url)
+
+        if root_path is not None and not defer_root_path:
+            tasks = self._apply_root_path_override(tasks, root_path)
+            for notebook in prepared.all_notebooks:
+                if not self._has_root_prefix(notebook.file_path, root_path):
+                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
+            for instruction in prepared.all_pipelines:
+                if not self._has_root_prefix(instruction.file_path, root_path):
+                    instruction.file_path = f'{root_path.rstrip("/")}/{instruction.file_path.lstrip("/")}'
 
         if catalog is not None or schema is not None:
-            self._apply_catalog_schema_override(prepared.all_pipelines, catalog, schema)
+            pipelines = self._apply_catalog_schema_override(prepared.all_pipelines, catalog, schema)
+            pi_iter = iter(pipelines)
+            for activity in activities:
+                if activity.pipelines:
+                    activity.pipelines = [next(pi_iter) for _ in activity.pipelines]
+
+        result = dataclasses.replace(prepared, activities=activities)
+        for activity, task in zip(result.activities, tasks):
+            activity.task = task
+        return result
 
     @staticmethod
-    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> None:
+    def _has_root_prefix(path: str, root_path: str) -> bool:
         """
-        Rewrites notebook paths in tasks to be rooted under *root_path*.
+        Checks whether *path* already starts with the *root_path* directory prefix.
+
+        Uses a normalised form ``root_path + '/'`` so that ``/migrated`` does not
+        falsely match ``/migrated_old/notebook``.
 
         Args:
-            tasks: Job task dicts to update.
-            root_path: New root directory for notebook paths.
+            path: File path to test.
+            root_path: Expected root directory prefix.
+
+        Returns:
+            True when *path* is already rooted under *root_path*.
         """
+        prefix = root_path.rstrip('/') + '/'
+        return path.startswith(prefix) or path.rstrip('/') == root_path.rstrip('/')
+
+    @staticmethod
+    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> list[dict[str, Any]]:
+        """
+        Returns a new tasks list with notebook paths rooted under *root_path*.
+
+        Args:
+            tasks: Job task dicts to rewrite.
+            root_path: New root directory for notebook paths.
+
+        Returns:
+            New list of task dicts with rewritten paths.
+        """
+        prefix = root_path.rstrip('/') + '/'
+        result: list[dict[str, Any]] = []
         for task in tasks:
+            task = dict(task)
             notebook_task = task.get('notebook_task')
             if notebook_task:
+                notebook_task = dict(notebook_task)
                 original = notebook_task.get('notebook_path') or ''
-                notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
+                if not original.startswith(prefix) and original.rstrip('/') != root_path.rstrip('/'):
+                    notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
+                task['notebook_task'] = notebook_task
             for_each_task = task.get('for_each_task')
             if for_each_task:
+                for_each_task = dict(for_each_task)
                 nested = for_each_task.get('task')
                 if isinstance(nested, dict):
-                    WorkspaceDefinitionStore._apply_root_path_override([nested], root_path)
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_root_path_override([nested], root_path)[0]
                 elif isinstance(nested, list):
-                    WorkspaceDefinitionStore._apply_root_path_override(nested, root_path)
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_root_path_override(nested, root_path)
+                task['for_each_task'] = for_each_task
+            result.append(task)
+        return result
 
     @staticmethod
-    def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> None:
+    def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> list[dict[str, Any]]:
         """
-        Switches every task to the requested compute type.
+        Returns a new tasks list switched to the requested compute type.
 
-        When *compute_type* is ``\"serverless\"``, existing ``new_cluster`` definitions are removed
-        so the task runs on serverless compute. Otherwise the ``new_cluster`` key is left untouched.
+        When *compute_type* is ``"serverless"``, existing ``new_cluster`` definitions are
+        removed so the task runs on serverless compute.
 
         Args:
-            tasks: Job task dicts to update.
-            compute_type: Desired compute type (``\"serverless\"`` or ``\"classic\"``).
+            tasks: Job task dicts to process.
+            compute_type: Desired compute type (``"serverless"`` or ``"classic"``).
+
+        Returns:
+            New list of task dicts with compute settings applied.
         """
+        result: list[dict[str, Any]] = []
         for task in tasks:
+            task = dict(task)
             if compute_type == 'serverless':
                 task.pop('new_cluster', None)
                 task.pop('existing_cluster_id', None)
             for_each_task = task.get('for_each_task')
             if for_each_task:
+                for_each_task = dict(for_each_task)
                 nested = for_each_task.get('task')
                 if isinstance(nested, dict):
-                    WorkspaceDefinitionStore._apply_compute_type_override([nested], compute_type)
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_compute_type_override(
+                        [nested], compute_type
+                    )[0]
                 elif isinstance(nested, list):
-                    WorkspaceDefinitionStore._apply_compute_type_override(nested, compute_type)
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_compute_type_override(nested, compute_type)
+                task['for_each_task'] = for_each_task
+            result.append(task)
+        return result
 
     @staticmethod
     def _apply_catalog_schema_override(
         pipelines: list[PipelineInstruction],
         catalog: str | None,
         schema: str | None,
-    ) -> None:
+    ) -> list[PipelineInstruction]:
         """
-        Overrides the target catalog and/or schema on DLT pipeline instructions.
+        Returns new pipeline instructions with the target catalog and/or schema overridden.
 
         Args:
-            pipelines: Pipeline instructions to update.
+            pipelines: Pipeline instructions to process.
             catalog: New catalog name, or ``None`` to leave unchanged.
             schema: New schema (target) name, or ``None`` to leave unchanged.
+
+        Returns:
+            New list of PipelineInstruction objects with updated values.
         """
+        result: list[PipelineInstruction] = []
         for instruction in pipelines:
-            if catalog is not None:
-                instruction.catalog = catalog
-            if schema is not None:
-                instruction.target = schema
+            new_catalog = catalog if catalog is not None else instruction.catalog
+            new_target = schema if schema is not None else instruction.target
+            result.append(dataclasses.replace(instruction, catalog=new_catalog, target=new_target))
+        return result
+
+    @staticmethod
+    def _apply_workspace_url_override(tasks: list[dict[str, Any]], workspace_url: str) -> list[dict[str, Any]]:
+        """
+        Returns a new tasks list with all Databricks linked-service hosts set to *workspace_url*.
+
+        Scans each task's ``new_cluster`` for a ``host_name`` key (set by translated
+        ``DatabricksClusterLinkedService`` definitions) and replaces it with the
+        specified URL.
+
+        Args:
+            tasks: Job task dicts to process.
+            workspace_url: Databricks workspace URL to set on every linked service.
+
+        Returns:
+            New list of task dicts with workspace URLs applied.
+        """
+        result: list[dict[str, Any]] = []
+        for task in tasks:
+            task = dict(task)
+            new_cluster = task.get('new_cluster')
+            if isinstance(new_cluster, dict) and 'host_name' in new_cluster:
+                new_cluster = dict(new_cluster)
+                new_cluster['host_name'] = workspace_url
+                task['new_cluster'] = new_cluster
+            for_each_task = task.get('for_each_task')
+            if for_each_task:
+                for_each_task = dict(for_each_task)
+                nested = for_each_task.get('task')
+                if isinstance(nested, dict):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_workspace_url_override(
+                        [nested], workspace_url
+                    )[0]
+                elif isinstance(nested, list):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_workspace_url_override(
+                        nested, workspace_url
+                    )
+                task['for_each_task'] = for_each_task
+            result.append(task)
+        return result
 
     @staticmethod
     def _upload_notebooks(client: WorkspaceClient, notebooks: Iterable[NotebookArtifact]) -> None:
@@ -544,6 +643,11 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         Writes an asset bundle layout containing job configuration and related artifacts.
 
+        When *download_notebooks* is True the workflow is expected to have been
+        prepared with ``defer_root_path=True`` so that workspace paths are still
+        in their original form for downloading.  After extraction the root_path
+        rewrite is applied to the prepared workflow.
+
         Args:
             prepared: Prepared workflow artifacts.
             bundle_dir: Destination directory for the bundle.
@@ -569,6 +673,20 @@ class WorkspaceDefinitionStore(DefinitionStore):
             if workspace_paths:
                 path_mapping = self._download_workspace_notebooks(workspace_paths, notebooks_dir)
                 self._update_notebook_paths_for_bundle(all_tasks, path_mapping)
+
+        # Apply deferred root_path rewrite after download-path extraction
+        root_path = self._effective_root_path()
+        if root_path is not None and download_notebooks:
+            new_tasks = self._apply_root_path_override(prepared.tasks, root_path)
+            for activity, task in zip(prepared.activities, new_tasks):
+                activity.task = task
+            for notebook in prepared.all_notebooks:
+                if not self._has_root_prefix(notebook.file_path, root_path):
+                    notebook.file_path = f'{root_path.rstrip("/")}/{notebook.file_path.lstrip("/")}'
+            for instruction in prepared.all_pipelines:
+                if not self._has_root_prefix(instruction.file_path, root_path):
+                    instruction.file_path = f'{root_path.rstrip("/")}/{instruction.file_path.lstrip("/")}'
+            all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
 
         if inner_workflows:
             self._assign_inner_job_refs(prepared.tasks)
