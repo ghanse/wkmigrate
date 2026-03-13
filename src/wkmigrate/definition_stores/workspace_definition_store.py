@@ -138,8 +138,21 @@ class WorkspaceDefinitionStore(DefinitionStore):
             download_notebooks: If True, downloads referenced notebooks from the workspace.
         """
         bundle_dir = os.path.abspath(bundle_directory)
+        seen_names: set[str] = set()
         for pipeline_definition in pipeline_definitions:
-            safe_name = re.sub(r"[^A-Za-z0-9_]", "_", pipeline_definition.name)
+            safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", pipeline_definition.name)
+            if not safe_name:
+                raise ValueError(f"Pipeline name {pipeline_definition.name!r} is empty after sanitization")
+            if safe_name in seen_names:
+                suffix = 1
+                while f"{safe_name}_{suffix}" in seen_names:
+                    suffix += 1
+                safe_name = f"{safe_name}_{suffix}"
+                logger.warning(  # pylint: disable=logging-too-many-args
+                    "Sanitized pipeline name collides with a previous pipeline; renaming to '%s'",
+                    safe_name,
+                )
+            seen_names.add(safe_name)
             sub_directory = os.path.join(bundle_dir, safe_name)
             try:
                 self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)

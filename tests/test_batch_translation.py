@@ -163,3 +163,52 @@ def test_to_asset_bundles_skips_failing_pipeline(mock_workspace_client, tmp_path
     assert os.path.isdir(os.path.join(bundle_dir, "ok_pipeline"))
     assert not os.path.exists(os.path.join(bundle_dir, "broken_pipeline"))
     assert "broken_pipeline" in caplog.text
+
+
+def test_to_asset_bundles_sanitizes_special_characters(mock_workspace_client, tmp_path) -> None:
+    """to_asset_bundles should replace special characters in pipeline names with underscores."""
+    store = _make_workspace_store(mock_workspace_client)
+    bundle_dir = str(tmp_path / "bundles")
+
+    pipelines = [_simple_pipeline("my.pipeline v2")]
+    store.to_asset_bundles(pipelines, bundle_dir, download_notebooks=False)
+
+    assert os.path.isdir(os.path.join(bundle_dir, "my_pipeline_v2"))
+    assert os.path.isfile(os.path.join(bundle_dir, "my_pipeline_v2", "databricks.yml"))
+
+
+def test_to_asset_bundles_preserves_hyphens(mock_workspace_client, tmp_path) -> None:
+    """to_asset_bundles should preserve hyphens in pipeline names."""
+    store = _make_workspace_store(mock_workspace_client)
+    bundle_dir = str(tmp_path / "bundles")
+
+    pipelines = [_simple_pipeline("my-pipeline")]
+    store.to_asset_bundles(pipelines, bundle_dir, download_notebooks=False)
+
+    assert os.path.isdir(os.path.join(bundle_dir, "my-pipeline"))
+
+
+def test_to_asset_bundles_handles_name_collision(mock_workspace_client, tmp_path, caplog) -> None:
+    """to_asset_bundles should append a suffix when sanitized names collide."""
+    store = _make_workspace_store(mock_workspace_client)
+    bundle_dir = str(tmp_path / "bundles")
+
+    pipelines = [_simple_pipeline("my.pipeline"), _simple_pipeline("my pipeline")]
+    with caplog.at_level(logging.WARNING):
+        store.to_asset_bundles(pipelines, bundle_dir, download_notebooks=False)
+
+    assert os.path.isdir(os.path.join(bundle_dir, "my_pipeline"))
+    assert os.path.isdir(os.path.join(bundle_dir, "my_pipeline_1"))
+    assert "collides" in caplog.text
+
+
+def test_to_asset_bundles_empty_name_raises(mock_workspace_client, tmp_path) -> None:
+    """to_asset_bundles should raise ValueError when a pipeline name is empty."""
+    import pytest
+
+    store = _make_workspace_store(mock_workspace_client)
+    bundle_dir = str(tmp_path / "bundles")
+
+    pipelines = [_simple_pipeline("")]
+    with pytest.raises(ValueError, match="empty after sanitization"):
+        store.to_asset_bundles(pipelines, bundle_dir, download_notebooks=False)
