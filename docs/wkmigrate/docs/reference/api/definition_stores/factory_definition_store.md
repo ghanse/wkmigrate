@@ -62,6 +62,50 @@ Validates configuration and initializes the Factory client.
 - `ValueError` - If the resource group name is not provided.
 - `ValueError` - If the factory name is not provided.
 
+#### list\_pipelines
+
+```python
+def list_pipelines() -> list[str]
+```
+
+Returns the names of all pipelines available in the Data Factory.
+
+**Returns**:
+
+  Pipeline names as a ``list[str]``.
+  
+
+**Raises**:
+
+- `ValueError` - If the factory client is not initialized.
+
+#### load\_all
+
+```python
+def load_all(pipeline_names: list[str] | None = None) -> list[Pipeline]
+```
+
+Loads and translates multiple ADF pipelines.
+
+When ``pipeline_names`` is ``None`` all pipelines in the factory are
+loaded. Individual pipeline failures are logged and skipped so that
+one broken pipeline does not prevent the rest from being translated.
+
+**Arguments**:
+
+- `pipeline_names` - Optional list of pipeline names to translate. When
+  ``None``, every pipeline in the factory is included.
+  
+
+**Returns**:
+
+  Translated ``Pipeline`` objects as a ``list[Pipeline]``.
+  
+
+**Raises**:
+
+- `ValueError` - If the factory client is not initialized.
+
 #### load
 
 ```python

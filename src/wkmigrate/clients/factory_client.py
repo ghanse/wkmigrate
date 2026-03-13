@@ -52,6 +52,20 @@ class FactoryClient:
         )
         self.management_client = DataFactoryManagementClient(credential, self.subscription_id)
 
+    def list_pipelines(self) -> list[str]:
+        """
+        Lists the names of all pipelines available in the Data Factory.
+
+        Returns:
+            Pipeline names as a ``list[str]``.
+        """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
+        pipelines = self.management_client.pipelines.list_by_factory(
+            resource_group_name=self.resource_group_name, factory_name=self.factory_name
+        )
+        return [pipeline.name for pipeline in pipelines if pipeline.name is not None]  # type: ignore[misc]
+
     def get_pipeline(self, pipeline_name: str) -> dict:
         """
         Gets a pipeline definition with the specified name.

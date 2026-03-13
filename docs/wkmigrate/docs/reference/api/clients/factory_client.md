@@ -37,6 +37,18 @@ def __post_init__() -> None
 
 Sets up the Data Factory management client for the provided credentials.
 
+#### list\_pipelines
+
+```python
+def list_pipelines() -> list[str]
+```
+
+Lists the names of all pipelines available in the Data Factory.
+
+**Returns**:
+
+  Pipeline names as a ``list[str]``.
+
 #### get\_pipeline
 
 ```python

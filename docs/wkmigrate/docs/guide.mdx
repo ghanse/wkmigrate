@@ -126,7 +126,58 @@ print(f"Created Databricks job with ID: {job_id}")
 Repeatedly calling `to_job` may create multiple identical jobs unless you implement your own idempotency strategy. Consider cleaning up test jobs manually while you iterate.
 </Admonition>
 
-## Override properties with options
+## Translate multiple pipelines
+
+When migrating an entire Data Factory, you can use the batch methods to translate and deploy all pipelines in a single run. Individual pipeline failures are logged and skipped so that one broken pipeline does not prevent the rest from being translated.
+
+### List and load all pipelines
+
+Use `list_pipelines` to list every pipeline in the data factory resource, then `load_all` to translate them in bulk. You can optionally pass a list of pipeline names to translate a subset.
+
+```python
+# List all pipeline names in the factory
+pipeline_names = factory_definition_store.list_pipelines()
+print(f"Found {len(pipeline_names)} pipelines: {pipeline_names}")
+
+# Translate all pipelines (failures are logged and skipped)
+all_pipelines = factory_definition_store.load_all()
+
+# Or translate a specific subset
+selected_pipelines = factory_definition_store.load_all(
+    pipeline_names=["pipeline_a", "pipeline_b"]
+)
+```
+
+### Create Databricks Asset Bundles for multiple pipelines
+
+Use `to_asset_bundles` to generate separate [Databricks Asset Bundle](https://docs.databricks.com/aws/en/dev-tools/bundles/) subdirectories for each translated pipeline. Each bundle is written to a subdirectory named after the pipeline inside the parent directory you specify.
+
+```python
+from pathlib import Path
+
+bundle_dir = Path("/wkmigrate_pipeline/bundles")
+bundle_dir.mkdir(parents=True, exist_ok=True)
+
+# Generate asset bundles for all translated pipelines
+workspace_definition_store.to_asset_bundles(all_pipelines, bundle_directory=str(bundle_dir))
+```
+
+### Create Databricks Lakeflow Jobs for multiple pipelines
+
+Use `to_jobs` to deploy translated pipelines as Databricks Lakeflow Jobs. The method returns a list of job IDs for the successfully created jobs.
+
+```python
+# Deploy all translated pipelines as Databricks jobs
+job_ids = workspace_definition_store.to_jobs(all_pipelines)
+
+print(f"Created {len(job_ids)} jobs: {job_ids}")
+```
+
+<Admonition type="info" title="Error handling in batch methods">
+When using `load_all`, `to_jobs`, and `to_asset_bundles` failures of a single pipeline will raise a warning and skip translation of the failed pipeline. The remaining pipelines will be processed. Check logs for warnings after a batch run to identify any failures.
+</Admonition>
+
+## Customize translation with definition store options
 
 `WorkspaceDefinitionStore` accepts an `options` dictionary that customizes how workflows are generated and deployed. 
 Specifying definition store options will adapt the migration output without modifying the translated pipeline definition.
@@ -142,7 +193,7 @@ Specifying definition store options will adapt the migration output without modi
 | `catalog`              | `str`                         | Overrides the Unity Catalog catalog name used for generated DLT pipelines.                                                                                      |
 | `schema`               | `str`                         | Overrides the Unity Catalog schema name used for generated DLT pipelines.                                                                                       |
 
-### Setting options at construction time
+### Set options at construction time
 
 Pass an `options` dictionary when you create the definition store:
 
@@ -160,7 +211,7 @@ workspace_definition_store = WorkspaceDefinitionStore(
 )
 ```
 
-### Setting options after construction
+### Set options after construction
 
 You can also modify options on an existing store using `set_option` and `set_options`:
 
