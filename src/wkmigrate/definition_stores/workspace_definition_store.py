@@ -139,30 +139,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._validate_compute_type_value(options.get('compute_type'))
         self.options = dict(options)
 
-    def _effective_files_to_delta_sinks(self) -> bool | None:
-        """Returns the files_to_delta_sinks value, preferring options over the field."""
-        return self.options.get('files_to_delta_sinks')
-
-    def _effective_root_path(self) -> str | None:
-        """Returns the root_path option, or None if not set."""
-        return self.options.get('root_path')
-
-    def _effective_compute_type(self) -> str | None:
-        """Returns the compute_type option, or None if not set."""
-        return self.options.get('compute_type')
-
-    def _effective_catalog(self) -> str | None:
-        """Returns the catalog option, or None if not set."""
-        return self.options.get('catalog')
-
-    def _effective_schema(self) -> str | None:
-        """Returns the schema option, or None if not set."""
-        return self.options.get('schema')
-
-    def _effective_workspace_url(self) -> str | None:
-        """Returns the workspace_url option, or None if not set."""
-        return self.options.get('workspace_url')
-
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
         Uploads artifacts and creates a Databricks job.
@@ -192,33 +168,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
             raise ValueError("Failed to create workflow")
         return job_id
 
-    @deprecated("Use 'to_job' as of wkmigrate 0.0.3")
-    def dump(self, pipeline_definition: Pipeline) -> int | None:
-        """
-        This method is deprecated. Use ``to_job`` instead. Uploads artifacts and creates a Databricks job.
-
-        Args:
-            pipeline_definition: Serialized ``Pipeline`` dataclass payload as a ``dict``.
-
-        Returns:
-            Optional job identifier registered in the workspace.
-
-        Raises:
-            ValueError: If the job cannot be created.
-        """
-        return self.to_job(pipeline_definition)
-
-    @deprecated("Use 'to_asset_bundle' as of wkmigrate 0.0.3")
-    def to_local_files(self, pipeline_definition: Pipeline, local_directory: str) -> None:
-        """
-        Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
-
-        Args:
-            pipeline_definition: Prepared pipeline as a ``Pipeline``.
-            local_directory: Destination directory for generated artifacts.
-        """
-        self.to_asset_bundle(pipeline_definition, local_directory, download_notebooks=True)
-
     def to_asset_bundle(
         self,
         pipeline_definition: Pipeline | dict,
@@ -246,6 +195,59 @@ class WorkspaceDefinitionStore(DefinitionStore):
         else:
             prepared = self._prepare_workflow(pipeline_ir)
             self._write_asset_bundle(prepared, bundle_directory, download_notebooks=False)
+
+    
+
+    @deprecated("Use 'to_job' as of wkmigrate 0.0.3")
+    def dump(self, pipeline_definition: Pipeline) -> int | None:
+        """
+        This method is deprecated. Use ``to_job`` instead. Uploads artifacts and creates a Databricks job.
+
+        Args:
+            pipeline_definition: Serialized ``Pipeline`` dataclass payload as a ``dict``.
+
+        Returns:
+            Optional job identifier registered in the workspace.
+
+        Raises:
+            ValueError: If the job cannot be created.
+        """
+        return self.to_job(pipeline_definition)
+
+    @deprecated("Use 'to_asset_bundle' as of wkmigrate 0.0.3")
+    def to_local_files(self, pipeline_definition: Pipeline, local_directory: str) -> None:
+        """
+        Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
+
+        Args:
+            pipeline_definition: Prepared pipeline as a ``Pipeline``.
+            local_directory: Destination directory for generated artifacts.
+        """
+        self.to_asset_bundle(pipeline_definition, local_directory, download_notebooks=True)
+
+    def _effective_files_to_delta_sinks(self) -> bool | None:
+        """Returns the files_to_delta_sinks value, preferring options over the field."""
+        return self.options.get('files_to_delta_sinks')
+
+    def _effective_root_path(self) -> str | None:
+        """Returns the root_path option, or None if not set."""
+        return self.options.get('root_path')
+
+    def _effective_compute_type(self) -> str | None:
+        """Returns the compute_type option, or None if not set."""
+        return self.options.get('compute_type')
+
+    def _effective_catalog(self) -> str | None:
+        """Returns the catalog option, or None if not set."""
+        return self.options.get('catalog')
+
+    def _effective_schema(self) -> str | None:
+        """Returns the schema option, or None if not set."""
+        return self.options.get('schema')
+
+    def _effective_workspace_url(self) -> str | None:
+        """Returns the workspace_url option, or None if not set."""
+        return self.options.get('workspace_url')
 
     def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
