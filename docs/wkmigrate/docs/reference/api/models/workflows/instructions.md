@@ -19,6 +19,8 @@ Represents a declarative pipeline that must be created.
 - `task_ref` - Reference to the Databricks task dictionary that will consume the pipeline.
 - `file_path` - Workspace path where the pipeline's notebook or script is stored.
 - `name` - Name to assign to the Databricks pipeline.
+- `catalog` - Unity Catalog name for the pipeline target. Defaults to ``"wkmigrate"``.
+- `target` - Schema (database) name for the pipeline target. Defaults to ``"wkmigrate"``.
 
 #### local\_identifier
 

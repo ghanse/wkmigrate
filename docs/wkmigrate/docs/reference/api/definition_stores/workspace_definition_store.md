@@ -40,7 +40,7 @@ Definition store implementation that lists, describes, and updates objects in a 
 - `tenant_id` - Azure AD tenant identifier used for client-secret authentication.
 - `client_id` - Application (client) ID used for client-secret authentication.
 - `client_secret` - Secret associated with the client ID for client-secret authentication.
-- `files_to_delta_sinks` - Overrides default behavior when generating DLT sinks from copy tasks.
+- `options` - Dictionary of options that customize workflow generation and deployment behaviour.
 - `workspace_client` - Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
 
 #### \_\_post\_init\_\_
@@ -49,11 +49,50 @@ Definition store implementation that lists, describes, and updates objects in a 
 def __post_init__() -> None
 ```
 
-Validates credentials and initializes the Databricks workspace client.
+Validates credentials, option keys, and initializes the Databricks workspace client.
 
 **Raises**:
 
 - `ValueError` - If the authentication type is invalid or the host name is not provided.
+- `ValueError` - If any option key is not a recognised key.
+- `ValueError` - If the ``compute_type`` option value is not a supported compute type.
+
+#### set\_option
+
+```python
+def set_option(key: str, value: Any) -> None
+```
+
+Sets the value of a single option.
+
+**Arguments**:
+
+- `key` - Option name. Must be one of the recognised option keys.
+- `value` - New value for the option.
+  
+
+**Raises**:
+
+- `ValueError` - If *key* is not a recognised option.
+- `ValueError` - If *key* is ``compute_type`` and *value* is not a supported compute type.
+
+#### set\_options
+
+```python
+def set_options(options: dict[str, Any]) -> None
+```
+
+Replaces all options with the provided dictionary.
+
+**Arguments**:
+
+- `options` - Dictionary of option key-value pairs. All keys must be recognised.
+  
+
+**Raises**:
+
+- `ValueError` - If any key is not a recognised option.
+- `ValueError` - If the ``compute_type`` value is not a supported compute type.
 
 #### to\_job
 
@@ -124,6 +163,10 @@ def to_asset_bundle(pipeline_definition: Pipeline | dict,
 ```
 
 Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
+
+When ``download_notebooks`` is True, workspace notebook paths are extracted
+using the original (pre-rewrite) paths so that downloads succeed.  The
+``root_path`` rewrite is applied after the download-path mapping.
 
 **Arguments**:
 

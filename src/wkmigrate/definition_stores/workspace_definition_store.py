@@ -60,7 +60,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
         tenant_id: Azure AD tenant identifier used for client-secret authentication.
         client_id: Application (client) ID used for client-secret authentication.
         client_secret: Secret associated with the client ID for client-secret authentication.
-        files_to_delta_sinks: Overrides default behavior when generating DLT sinks from copy tasks.
         options: Dictionary of options that customize workflow generation and deployment behaviour.
         workspace_client: Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
     """
@@ -74,7 +73,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
     tenant_id: str | None = None
     client_id: str | None = None
     client_secret: str | None = None
-    files_to_delta_sinks: bool | None = None
     options: dict[str, Any] = dataclasses.field(default_factory=dict)
     workspace_client: WorkspaceClient | None = dataclasses.field(init=False, default=None)
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
@@ -109,36 +107,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._validate_compute_type_value(self.options.get('compute_type'))
         self.workspace_client = self._login_workspace_client()
 
-    def _validate_option_keys(self, keys: Iterable[str]) -> None:
-        """
-        Validates that all provided keys are recognised option keys.
-
-        Args:
-            keys: Option key names to validate.
-
-        Raises:
-            ValueError: If any key is not a recognised option.
-        """
-        invalid_keys = set(keys) - self._valid_option_keys
-        if invalid_keys:
-            raise ValueError(f'Invalid option key(s): {", ".join(sorted(invalid_keys))}')
-
-    def _validate_compute_type_value(self, compute_type: Any) -> None:
-        """
-        Validates that a ``compute_type`` value is one of the supported types.
-
-        Args:
-            compute_type: Value to validate, or ``None`` to skip validation.
-
-        Raises:
-            ValueError: If *compute_type* is not ``None`` and not in the supported set.
-        """
-        if compute_type is not None and compute_type not in self._valid_compute_types:
-            raise ValueError(
-                f'Invalid compute_type "{compute_type}"; must be one of: '
-                f'{", ".join(sorted(self._valid_compute_types))}'
-            )
-
     def set_option(self, key: str, value: Any) -> None:
         """
         Sets the value of a single option.
@@ -156,7 +124,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             self._validate_compute_type_value(value)
         self.options[key] = value
 
-    def set_all_options(self, options: dict[str, Any]) -> None:
+    def set_options(self, options: dict[str, Any]) -> None:
         """
         Replaces all options with the provided dictionary.
 
@@ -173,10 +141,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
     def _effective_files_to_delta_sinks(self) -> bool | None:
         """Returns the files_to_delta_sinks value, preferring options over the field."""
-        option = self.options.get('files_to_delta_sinks')
-        if option is not None:
-            return option
-        return self.files_to_delta_sinks
+        return self.options.get('files_to_delta_sinks')
 
     def _effective_root_path(self) -> str | None:
         """Returns the root_path option, or None if not set."""
@@ -281,6 +246,36 @@ class WorkspaceDefinitionStore(DefinitionStore):
         else:
             prepared = self._prepare_workflow(pipeline_ir)
             self._write_asset_bundle(prepared, bundle_directory, download_notebooks=False)
+
+    def _validate_option_keys(self, keys: Iterable[str]) -> None:
+        """
+        Validates that all provided keys are recognised option keys.
+
+        Args:
+            keys: Option key names to validate.
+
+        Raises:
+            ValueError: If any key is not a recognised option.
+        """
+        invalid_keys = set(keys) - self._valid_option_keys
+        if invalid_keys:
+            raise ValueError(f'Invalid option key(s): {", ".join(sorted(invalid_keys))}')
+
+    def _validate_compute_type_value(self, compute_type: Any) -> None:
+        """
+        Validates that a ``compute_type`` value is one of the supported types.
+
+        Args:
+            compute_type: Value to validate, or ``None`` to skip validation.
+
+        Raises:
+            ValueError: If *compute_type* is not ``None`` and not in the supported set.
+        """
+        if compute_type is not None and compute_type not in self._valid_compute_types:
+            raise ValueError(
+                f'Invalid compute_type "{compute_type}"; must be one of: '
+                f'{", ".join(sorted(self._valid_compute_types))}'
+            )
 
     def _prepare_workflow(self, pipeline_definition: Pipeline, *, defer_root_path: bool = False) -> PreparedWorkflow:
         """

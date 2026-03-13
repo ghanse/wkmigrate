@@ -244,16 +244,16 @@ def test_set_and_get_option(mock_workspace_client) -> None:
 
 
 def test_set_all_options_replaces_existing(mock_workspace_client) -> None:
-    """set_all_options replaces the entire options dictionary."""
+    """set_options replaces the entire options dictionary."""
     store = _make_workspace_store(mock_workspace_client)
     store.set_option('catalog', 'old_catalog')
-    store.set_all_options({'schema': 'new_schema'})
+    store.set_options({'schema': 'new_schema'})
     assert store.options.get('schema') == 'new_schema'
     assert store.options.get('catalog') is None
 
 
 def test_options_dict_is_independent_of_caller(mock_workspace_client) -> None:
-    """Mutating a reference obtained from options does not affect the store when set via set_all_options."""
+    """Mutating a reference obtained from options does not affect the store when set via set_options."""
     store = _make_workspace_store(mock_workspace_client)
     store.set_option('catalog', 'my_catalog')
     copy = dict(store.options)
@@ -269,10 +269,10 @@ def test_invalid_option_key_raises_on_set(mock_workspace_client) -> None:
 
 
 def test_invalid_option_key_raises_on_set_all(mock_workspace_client) -> None:
-    """set_all_options raises ValueError when dict contains an invalid key."""
+    """set_options raises ValueError when dict contains an invalid key."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid option key'):
-        store.set_all_options({'bad_key': 'value'})
+        store.set_options({'bad_key': 'value'})
 
 
 def test_invalid_option_key_raises_on_init(mock_workspace_client) -> None:
@@ -298,19 +298,6 @@ def test_options_can_be_passed_at_construction(mock_workspace_client) -> None:
     )
     assert store.options['root_path'] == '/prod'
     assert store.options['compute_type'] == 'serverless'
-
-
-def test_files_to_delta_sinks_option_takes_precedence(mock_workspace_client) -> None:
-    """The files_to_delta_sinks option takes precedence over the field."""
-    assert mock_workspace_client is not None
-    store = WorkspaceDefinitionStore(
-        authentication_type='pat',
-        host_name='https://example.com',
-        pat='DUMMY_TOKEN',
-        files_to_delta_sinks=False,
-        options={'files_to_delta_sinks': True},
-    )
-    assert store._effective_files_to_delta_sinks() is True
 
 
 def test_root_path_option_rewrites_notebook_paths(mock_workspace_client, tmp_path) -> None:
@@ -399,16 +386,16 @@ def test_invalid_compute_type_raises_on_init(mock_workspace_client) -> None:
 
 
 def test_invalid_compute_type_raises_on_set_all(mock_workspace_client) -> None:
-    """set_all_options raises ValueError for an invalid compute_type value."""
+    """set_options raises ValueError for an invalid compute_type value."""
     store = _make_workspace_store(mock_workspace_client)
     with pytest.raises(ValueError, match='Invalid compute_type'):
-        store.set_all_options({'compute_type': 'bad_value'})
+        store.set_options({'compute_type': 'bad_value'})
 
 
 def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None:
     """catalog and schema options propagate to PipelineInstruction objects via activities."""
     store = _make_workspace_store(mock_workspace_client)
-    store.set_all_options({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
+    store.set_options({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
 
     task_ref = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
     instructions = [
