@@ -1,6 +1,7 @@
 """Tests for definition store contracts and asset bundle generation."""
 
 import os
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -405,7 +406,7 @@ def test_invalid_compute_type_raises_on_set_all(mock_workspace_client) -> None:
 
 
 def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None:
-    """catalog and schema options propagate to PipelineInstruction objects."""
+    """catalog and schema options propagate to PipelineInstruction objects via activities."""
     store = _make_workspace_store(mock_workspace_client)
     store.set_all_options({'catalog': 'prod_catalog', 'schema': 'prod_schema'})
 
@@ -419,13 +420,17 @@ def test_catalog_schema_override_on_dlt_pipelines(mock_workspace_client) -> None
     assert instructions[0].catalog == 'wkmigrate'
     assert instructions[0].target == 'wkmigrate'
 
-    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
-        instructions, store.options.get('catalog'), store.options.get('schema')
+    activities = [
+        PreparedActivity(task={'task_key': f'task{i}'}, pipelines=[instr]) for i, instr in enumerate(instructions)
+    ]
+    result_activities = WorkspaceDefinitionStore._apply_catalog_schema_to_activities(
+        activities, store.options.get('catalog'), store.options.get('schema')
     )
 
-    for instr in result:
-        assert instr.catalog == 'prod_catalog'
-        assert instr.target == 'prod_schema'
+    for activity in result_activities:
+        for instr in activity.pipelines:
+            assert instr.catalog == 'prod_catalog'
+            assert instr.target == 'prod_schema'
 
 
 def test_catalog_only_override_leaves_schema_unchanged(mock_workspace_client) -> None:
@@ -434,11 +439,12 @@ def test_catalog_only_override_leaves_schema_unchanged(mock_workspace_client) ->
     store.set_option('catalog', 'new_catalog')
 
     instr = PipelineInstruction(task_ref={}, file_path='/notebooks/x', name='p', target='original_schema')
-    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
-        [instr], store.options.get('catalog'), store.options.get('schema')
+    activities = [PreparedActivity(task={'task_key': 'task1'}, pipelines=[instr])]
+    result = WorkspaceDefinitionStore._apply_catalog_schema_to_activities(
+        activities, store.options.get('catalog'), store.options.get('schema')
     )
-    assert result[0].catalog == 'new_catalog'
-    assert result[0].target == 'original_schema'
+    assert result[0].pipelines[0].catalog == 'new_catalog'
+    assert result[0].pipelines[0].target == 'original_schema'
 
 
 def test_root_path_option_rewrites_notebook_artifact_file_path(mock_workspace_client) -> None:
@@ -561,15 +567,15 @@ def test_catalog_target_in_asset_bundle_yaml(mock_workspace_client, tmp_path) ->
     task_ref: dict = {'pipeline_task': {'pipeline_id': '__PIPELINE_ID__'}}
     pipeline_instr = PipelineInstruction(task_ref=task_ref, file_path='/notebooks/copy', name='copy_pipeline')
 
-    # Apply catalog/schema override
-    result = WorkspaceDefinitionStore._apply_catalog_schema_override(
-        [pipeline_instr],
+    activities = [PreparedActivity(task={'task_key': 'task1'}, pipelines=[pipeline_instr])]
+    result = WorkspaceDefinitionStore._apply_catalog_schema_to_activities(
+        activities,
         store.options.get('catalog'),
         store.options.get('schema'),
     )
 
-    assert result[0].catalog == 'prod_catalog'
-    assert result[0].target == 'prod_schema'
+    assert result[0].pipelines[0].catalog == 'prod_catalog'
+    assert result[0].pipelines[0].target == 'prod_schema'
 
 
 def test_workspace_url_override_rewrites_linked_service_host(mock_workspace_client) -> None:
@@ -687,3 +693,70 @@ def test_workspace_url_applied_via_apply_options(mock_workspace_client, tmp_path
     # contain the old host
     new_cluster = tasks[0].get('new_cluster', {})
     assert new_cluster.get('host_name') != 'https://source.azuredatabricks.net'
+
+
+def test_download_notebooks_with_root_path_applies_rewrite(mock_workspace_client, tmp_path) -> None:
+    """download_notebooks=True with root_path downloads using original paths, then rewrites."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        options={'root_path': '/migrated'},
+    )
+    pipeline = _simple_pipeline('dl_root')
+    bundle_dir = str(tmp_path / 'bundle')
+
+    # Mock _download_workspace_notebooks to return a mapping without hitting a real workspace.
+    fake_mapping: dict[str, str] = {'/notebooks/etl': './notebooks/etl.py'}
+    with patch.object(
+        WorkspaceDefinitionStore,
+        '_download_workspace_notebooks',
+        return_value=fake_mapping,
+    ) as mock_download:
+        store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=True)
+
+    # The download should have been called with the original (un-rewritten) path.
+    mock_download.assert_called_once()
+    downloaded_paths = mock_download.call_args[0][0]
+    assert '/notebooks/etl' in downloaded_paths
+
+    # The generated YAML should contain bundle-relative paths (download rewrote
+    # to './notebooks/etl.py') because paths starting with './' are skipped by
+    # the root_path rewrite.
+    job_file = os.path.join(bundle_dir, 'resources', 'jobs', 'dl_root.yml')
+    with open(job_file) as f:
+        content = yaml.safe_load(f)
+    tasks = content['resources']['jobs']['dl_root']['tasks']
+    notebook_path = tasks[0]['notebook_task']['notebook_path']
+    assert notebook_path == './notebooks/etl.py'
+
+
+def test_download_notebooks_with_root_path_rewrites_inner_workflow_tasks(mock_workspace_client, tmp_path) -> None:
+    """download_notebooks=True with root_path rewrites inner workflow task dicts."""
+    assert mock_workspace_client is not None
+    store = WorkspaceDefinitionStore(
+        authentication_type='pat',
+        host_name='https://example.com',
+        pat='DUMMY_TOKEN',
+        options={'root_path': '/migrated'},
+    )
+    pipeline = _foreach_pipeline()
+    bundle_dir = str(tmp_path / 'bundle')
+
+    # No notebooks will actually be downloadable, so return an empty mapping.
+    with patch.object(
+        WorkspaceDefinitionStore,
+        '_download_workspace_notebooks',
+        return_value={},
+    ):
+        store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=True)
+
+    # Inner job YAML should have paths rewritten under /migrated.
+    inner_job_file = os.path.join(bundle_dir, 'resources', 'jobs', 'loop_inner_activities.yml')
+    with open(inner_job_file) as f:
+        content = yaml.safe_load(f)
+    inner_tasks = content['resources']['jobs']['loop_inner_activities']['tasks']
+    for task in inner_tasks:
+        nb_path = task.get('notebook_task', {}).get('notebook_path', '')
+        assert nb_path.startswith('/migrated/'), f"Expected /migrated/ prefix, got: {nb_path}"

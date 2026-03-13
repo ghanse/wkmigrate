@@ -22,7 +22,7 @@ import json
 import os
 from typing import Any
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 import dataclasses
 import yaml
 from databricks.sdk import WorkspaceClient
@@ -445,9 +445,41 @@ class WorkspaceDefinitionStore(DefinitionStore):
         return path.startswith(prefix) or path.rstrip('/') == root_path.rstrip('/')
 
     @staticmethod
-    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> list[dict[str, Any]]:
+    def _apply_task_override(
+        tasks: list[dict[str, Any]],
+        rewrite_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Applies *rewrite_fn* to each task dict, recursing into ``for_each_task``.
+
+        This is the shared recursion skeleton used by the individual override
+        helpers so the ``for_each_task`` traversal logic is defined once.
+
+        Args:
+            tasks: Job task dicts to process.
+            rewrite_fn: Function that receives a shallow-copied task dict and
+                returns the modified task dict.
+
+        Returns:
+            New list of task dicts with *rewrite_fn* applied.
         """
-        Returns a new tasks list with notebook paths rooted under *root_path*.
+        result: list[dict[str, Any]] = []
+        for task in tasks:
+            task = rewrite_fn(dict(task))
+            for_each_task = task.get('for_each_task')
+            if for_each_task:
+                for_each_task = dict(for_each_task)
+                nested = for_each_task.get('task')
+                if isinstance(nested, dict):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_task_override([nested], rewrite_fn)[0]
+                elif isinstance(nested, list):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_task_override(nested, rewrite_fn)
+                task['for_each_task'] = for_each_task
+            result.append(task)
+        return result
+
+    @staticmethod
+    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> list[dict[str, Any]]:
+        """Returns a new tasks list with notebook paths rooted under *root_path*.
 
         Args:
             tasks: Job task dicts to rewrite.
@@ -457,9 +489,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
             New list of task dicts with rewritten paths.
         """
         prefix = root_path.rstrip('/') + '/'
-        result: list[dict[str, Any]] = []
-        for task in tasks:
-            task = dict(task)
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
             notebook_task = task.get('notebook_task')
             if notebook_task:
                 notebook_task = dict(notebook_task)
@@ -471,25 +502,16 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 ):
                     notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
                 task['notebook_task'] = notebook_task
-            for_each_task = task.get('for_each_task')
-            if for_each_task:
-                for_each_task = dict(for_each_task)
-                nested = for_each_task.get('task')
-                if isinstance(nested, dict):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_root_path_override([nested], root_path)[0]
-                elif isinstance(nested, list):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_root_path_override(nested, root_path)
-                task['for_each_task'] = for_each_task
-            result.append(task)
-        return result
+            return task
+
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
 
     @staticmethod
     def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> list[dict[str, Any]]:
-        """
-        Returns a new tasks list switched to the requested compute type.
+        """Returns a new tasks list switched to the requested compute type.
 
-        When *compute_type* is ``"serverless"``, existing ``new_cluster`` definitions are
-        removed so the task runs on serverless compute.
+        When *compute_type* is ``"serverless"``, existing ``new_cluster`` definitions
+        are removed so the task runs on serverless compute.
 
         Args:
             tasks: Job task dicts to process.
@@ -498,58 +520,18 @@ class WorkspaceDefinitionStore(DefinitionStore):
         Returns:
             New list of task dicts with compute settings applied.
         """
-        result: list[dict[str, Any]] = []
-        for task in tasks:
-            task = dict(task)
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
             if compute_type == 'serverless':
                 task.pop('new_cluster', None)
                 task.pop('existing_cluster_id', None)
-            for_each_task = task.get('for_each_task')
-            if for_each_task:
-                for_each_task = dict(for_each_task)
-                nested = for_each_task.get('task')
-                if isinstance(nested, dict):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_compute_type_override(
-                        [nested], compute_type
-                    )[0]
-                elif isinstance(nested, list):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_compute_type_override(nested, compute_type)
-                task['for_each_task'] = for_each_task
-            result.append(task)
-        return result
+            return task
 
-    @staticmethod
-    def _apply_catalog_schema_override(
-        pipelines: list[PipelineInstruction],
-        catalog: str | None,
-        schema: str | None,
-    ) -> list[PipelineInstruction]:
-        """
-        Returns new pipeline instructions with the target catalog and/or schema overridden.
-
-        Args:
-            pipelines: Pipeline instructions to process.
-            catalog: New catalog name, or ``None`` to leave unchanged.
-            schema: New schema (target) name, or ``None`` to leave unchanged.
-
-        Returns:
-            New list of PipelineInstruction objects with updated values.
-        """
-        result: list[PipelineInstruction] = []
-        for instruction in pipelines:
-            new_catalog = catalog if catalog is not None else instruction.catalog
-            new_target = schema if schema is not None else instruction.target
-            result.append(dataclasses.replace(instruction, catalog=new_catalog, target=new_target))
-        return result
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
 
     @staticmethod
     def _apply_workspace_url_override(tasks: list[dict[str, Any]], workspace_url: str) -> list[dict[str, Any]]:
-        """
-        Returns a new tasks list with all Databricks linked-service hosts set to *workspace_url*.
-
-        Scans each task's ``new_cluster`` for a ``host_name`` key (set by translated
-        ``DatabricksClusterLinkedService`` definitions) and replaces it with the
-        specified URL.
+        """Returns a new tasks list with Databricks linked-service hosts set to *workspace_url*.
 
         Args:
             tasks: Job task dicts to process.
@@ -558,29 +540,16 @@ class WorkspaceDefinitionStore(DefinitionStore):
         Returns:
             New list of task dicts with workspace URLs applied.
         """
-        result: list[dict[str, Any]] = []
-        for task in tasks:
-            task = dict(task)
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
             new_cluster = task.get('new_cluster')
             if isinstance(new_cluster, dict) and 'host_name' in new_cluster:
                 new_cluster = dict(new_cluster)
                 new_cluster['host_name'] = workspace_url
                 task['new_cluster'] = new_cluster
-            for_each_task = task.get('for_each_task')
-            if for_each_task:
-                for_each_task = dict(for_each_task)
-                nested = for_each_task.get('task')
-                if isinstance(nested, dict):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_workspace_url_override(
-                        [nested], workspace_url
-                    )[0]
-                elif isinstance(nested, list):
-                    for_each_task['task'] = WorkspaceDefinitionStore._apply_workspace_url_override(
-                        nested, workspace_url
-                    )
-                task['for_each_task'] = for_each_task
-            result.append(task)
-        return result
+            return task
+
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
 
     @staticmethod
     def _upload_notebooks(client: WorkspaceClient, notebooks: Iterable[NotebookArtifact]) -> None:
@@ -740,8 +709,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         os.makedirs(pipelines_dir, exist_ok=True)
         os.makedirs(notebooks_dir, exist_ok=True)
 
-        inner_workflows = prepared.inner_workflows
-        all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
+        all_tasks = prepared.tasks + [t for wf in prepared.inner_workflows for t in wf.tasks]
 
         if download_notebooks:
             workspace_paths = {
@@ -764,10 +732,14 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 prepared,
                 activities=self._apply_root_path_to_activities(list(prepared.activities), root_path),
             )
-            inner_workflows = prepared.inner_workflows
-            all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
+            # Also rewrite task dicts inside inner workflows so that inner job
+            # YAML files receive the root_path prefix.
+            for inner_wf in prepared.inner_workflows:
+                rewritten = self._apply_root_path_override(inner_wf.tasks, root_path)
+                for activity, task in zip(inner_wf.activities, rewritten):
+                    activity.task = task
 
-        if inner_workflows:
+        if prepared.inner_workflows:
             self._assign_inner_job_refs(prepared.tasks)
 
         job_settings = {
@@ -782,7 +754,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         with open(job_file, "w", encoding="utf-8") as job_handle:
             yaml.safe_dump(job_resource, job_handle, sort_keys=False)
 
-        for inner_wf in inner_workflows:
+        for inner_wf in prepared.inner_workflows:
             inner_name = inner_wf.pipeline.name or "inner_job"
             inner_job_file = os.path.join(jobs_dir, f"{inner_name}.yml")
             self._assign_inner_job_refs(inner_wf.tasks)
@@ -801,7 +773,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
         self._write_secrets(prepared.all_secrets, bundle_dir)
         self._write_unsupported(prepared.pipeline.not_translatable or [], bundle_dir)
-        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, inner_workflows)
+        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, prepared.inner_workflows)
 
     def _write_notebooks(self, notebooks: Iterable[NotebookArtifact], output_dir: str) -> None:
         """
