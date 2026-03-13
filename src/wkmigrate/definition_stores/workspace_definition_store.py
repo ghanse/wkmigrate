@@ -42,7 +42,6 @@ from typing_extensions import deprecated
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
-from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
 from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 from wkmigrate.preparers.preparer import prepare_workflow
@@ -143,7 +142,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._validate_option_keys(options.keys())
         self._validate_compute_type_value(options.get('compute_type'))
         self.options = dict(options)
-        
+
     def to_jobs(self, pipeline_definitions: list[Pipeline]) -> list[int]:
         """
         Uploads artifacts and creates a Databricks job for each pipeline.
@@ -168,7 +167,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             if job_id is not None:
                 job_ids.append(job_id)
         return job_ids
-      
+
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
         Uploads artifacts and creates a Databricks job.
@@ -267,8 +266,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
         else:
             prepared = self._prepare_workflow(pipeline_ir)
             self._write_asset_bundle(prepared, bundle_directory, download_notebooks=False)
-
-    
 
     @deprecated("Use 'to_job' as of wkmigrate 0.0.3")
     def dump(self, pipeline_definition: Pipeline) -> int | None:
