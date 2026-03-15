@@ -256,16 +256,51 @@ External dependencies (Azure SDK, Databricks SDK) are replaced with lightweight 
 - **Preparer functions**: Given an `Activity` IR, assert the returned `PreparedActivity` has the correct task dict structure, notebook content, and side-effect artifacts.
 - **Definition stores**: Use mock clients to test `load()`, `to_job()`, and `to_asset_bundle()` end-to-end without network calls.
 - **Parsers**: Test expression and dataset parsing with representative ADF expression strings.
-- **Integration tests**: `test_pipeline_integration.py` tests the full `load -> translate -> prepare` pipeline against fixture data.
+- **Integration tests (fixture-based)**: `test_pipeline_integration.py` tests the full `load -> translate -> prepare` pipeline against JSON fixture data.
+- **Integration tests (live Azure)**: `tests/integration/` tests the full pipeline against a real Azure Data Factory subscription. See *Integration Testing* below.
+
+### Integration Testing
+
+End-to-end integration tests live in `tests/integration/` and are marked with `@pytest.mark.integration`. They are **excluded** from the default `make test` run via `addopts = "-m 'not integration'"` in `pyproject.toml`.
+
+#### Organization
+
+| Module | Purpose |
+|---|---|
+| `tests/integration/conftest.py` | Session- and function-scoped fixtures for Azure credential management, ADF factory provisioning, and sample resource deployment/teardown. |
+| `tests/integration/test_pipeline_integration.py` | Tests `FactoryClient` reads and `FactoryDefinitionStore` load/translate against real ADF resources. |
+
+#### Fixtures
+
+Integration fixtures are layered:
+
+1. **`azure_config`** (session): Loads credentials from environment variables (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_FACTORY_NAME`). Skips the test if any variable is missing.
+2. **`adf_factory`** (session): Ensures the test Data Factory exists via `create_or_update`.
+3. **`sample_pipeline`**, **`sample_foreach_pipeline`**, **`sample_linked_service`**, **`sample_dataset`** (function): Deploy and tear down individual ADF resources per test.
+4. **`factory_client`**, **`factory_store`** (function): Create `FactoryClient` and `FactoryDefinitionStore` instances connected to the test factory.
+
+#### Running Integration Tests
+
+```bash
+# Run only integration tests (requires Azure env vars)
+poetry run pytest -m integration --tb=short -v
+
+# Run all tests including integration
+poetry run pytest -m '' --tb=short -v
+```
+
+#### CI Workflow
+
+The `.github/workflows/integration.yml` workflow runs integration tests on every push to a PR branch (excluding external forks). It uses repository secrets to provide Azure credentials.
 
 ### Running Tests
 
 ```bash
-make test          # poetry run pytest
+make test          # poetry run pytest (excludes integration tests by default)
 make fmt           # black + ruff + mypy + pylint
 ```
 
-pytest is configured with `--no-header` and suppresses `DeprecationWarning`.
+pytest is configured with `--no-header`, suppresses `DeprecationWarning`, and excludes `integration`-marked tests by default.
 
 ---
 
