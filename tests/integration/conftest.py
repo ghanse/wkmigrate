@@ -16,6 +16,7 @@ Required environment variables:
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from dataclasses import dataclass
 
 import pytest
@@ -150,7 +151,7 @@ def sample_linked_service(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
     adf_factory: Factory,
-) -> LinkedServiceResource:
+) -> Generator[LinkedServiceResource, None, None]:
     """Deploy a sample Azure Blob Storage linked service into the test factory.
 
     The linked service uses a connection-string authentication pattern
@@ -162,7 +163,7 @@ def sample_linked_service(
         adf_management_client: Data Factory management client fixture.
         adf_factory: Ensures the factory exists before provisioning.
 
-    Returns:
+    Yields:
         The created ``LinkedServiceResource``.
     """
     linked_service = adf_management_client.linked_services.create_or_update(
@@ -183,7 +184,7 @@ def sample_linked_service(
             }
         ),
     )
-    yield linked_service  # type: ignore[misc]
+    yield linked_service
 
     # Teardown
     adf_management_client.linked_services.delete(
@@ -198,7 +199,7 @@ def sample_dataset(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
     sample_linked_service: LinkedServiceResource,
-) -> DatasetResource:
+) -> Generator[DatasetResource, None, None]:
     """Deploy a sample CSV dataset referencing the test linked service.
 
     Args:
@@ -206,7 +207,7 @@ def sample_dataset(
         adf_management_client: Data Factory management client fixture.
         sample_linked_service: Ensures the linked service exists first.
 
-    Returns:
+    Yields:
         The created ``DatasetResource``.
     """
     dataset = adf_management_client.datasets.create_or_update(
@@ -232,7 +233,7 @@ def sample_dataset(
             }
         ),
     )
-    yield dataset  # type: ignore[misc]
+    yield dataset
 
     # Teardown
     adf_management_client.datasets.delete(
@@ -247,7 +248,7 @@ def sample_pipeline(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
     adf_factory: Factory,
-) -> PipelineResource:
+) -> Generator[PipelineResource, None, None]:
     """Deploy a sample ADF pipeline with Databricks notebook activities.
 
     The pipeline contains two sequential notebook activities and a
@@ -259,7 +260,7 @@ def sample_pipeline(
         adf_management_client: Data Factory management client fixture.
         adf_factory: Ensures the factory exists before provisioning.
 
-    Returns:
+    Yields:
         The created ``PipelineResource``.
     """
     pipeline = adf_management_client.pipelines.create_or_update(
@@ -299,7 +300,7 @@ def sample_pipeline(
             }
         ),
     )
-    yield pipeline  # type: ignore[misc]
+    yield pipeline
 
     # Teardown
     adf_management_client.pipelines.delete(
@@ -314,7 +315,7 @@ def sample_foreach_pipeline(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
     adf_factory: Factory,
-) -> PipelineResource:
+) -> Generator[PipelineResource, None, None]:
     """Deploy a pipeline with a ForEach activity for control-flow testing.
 
     Args:
@@ -322,7 +323,7 @@ def sample_foreach_pipeline(
         adf_management_client: Data Factory management client fixture.
         adf_factory: Ensures the factory exists before provisioning.
 
-    Returns:
+    Yields:
         The created ``PipelineResource``.
     """
     pipeline = adf_management_client.pipelines.create_or_update(
@@ -363,7 +364,7 @@ def sample_foreach_pipeline(
             }
         ),
     )
-    yield pipeline  # type: ignore[misc]
+    yield pipeline
 
     # Teardown
     adf_management_client.pipelines.delete(

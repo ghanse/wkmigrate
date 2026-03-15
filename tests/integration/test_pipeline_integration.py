@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from azure.mgmt.datafactory.models import PipelineResource
+from azure.mgmt.datafactory.models import DatasetResource, LinkedServiceResource, PipelineResource
 
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
@@ -56,7 +56,7 @@ class TestFactoryClientIntegration:
     def test_get_linked_service(
         self,
         factory_client: FactoryClient,
-        sample_linked_service: object,
+        sample_linked_service: LinkedServiceResource,
     ) -> None:
         """Fetching a linked service returns a dict with properties."""
         linked_service = factory_client.get_linked_service("test_blob_storage")
@@ -65,7 +65,7 @@ class TestFactoryClientIntegration:
     def test_get_dataset(
         self,
         factory_client: FactoryClient,
-        sample_dataset: object,
+        sample_dataset: DatasetResource,
     ) -> None:
         """Fetching a dataset returns a dict with linked-service metadata."""
         dataset = factory_client.get_dataset("test_csv_dataset")
