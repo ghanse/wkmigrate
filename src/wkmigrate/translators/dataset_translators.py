@@ -37,14 +37,16 @@ _IGNORED_FORMAT_OPTIONS = {"dataset_name", "container", "folder_path"}
 
 
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
-    """
-    Translates a dataset definition returned by the Azure Data Factory API into a ``Dataset`` object. Supports files, SQL tables, and Delta tables. Any datasets which cannot be fully translated will return an ``UnsupportedValue`` object.
+    """Translates a raw ADF dataset definition into a ``Dataset`` object.
+
+    Supports files, SQL tables, and Delta tables.  Datasets that cannot be
+    fully translated are returned as ``UnsupportedValue``.
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Dataset as a ``Dataset`` object.
+        Translated ``Dataset``, or ``UnsupportedValue`` on failure.
     """
     dataset_properties = dataset.get("properties", {})
     if not dataset_properties:
@@ -297,6 +299,9 @@ def _parse_json_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {
@@ -311,6 +316,9 @@ def _parse_orc_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {
@@ -324,6 +332,9 @@ def _parse_parquet_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {

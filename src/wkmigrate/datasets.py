@@ -188,15 +188,13 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:
         secret_keys = DATASET_PROVIDER_SECRETS.get(service_type, [])
         lookup_type = service_type
 
-    collected: list[SecretInstruction] = []
-    for secret in secret_keys:
-        value = definition.get(secret)
-        instruction = SecretInstruction(
+    return [
+        SecretInstruction(
             scope=DEFAULT_CREDENTIALS_SCOPE,
             key=f"{service_name}_{secret}",
             service_name=service_name,
             service_type=lookup_type,
-            provided_value=value,
+            provided_value=definition.get(secret),
         )
-        collected.append(instruction)
-    return collected
+        for secret in secret_keys
+    ]
