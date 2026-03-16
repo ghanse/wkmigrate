@@ -7,7 +7,6 @@ SQL Server connections, ABFS storage accounts, and cloud file services (S3, GCS,
 
 from __future__ import annotations
 
-
 from tests.conftest import get_fixture
 from wkmigrate.models.ir.linked_services import (
     AbfsLinkedService,

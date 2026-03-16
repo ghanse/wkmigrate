@@ -358,6 +358,9 @@ def _parse_json_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict`` object.
     """
     properties = dataset.get("properties", {})
     return {
@@ -372,6 +375,9 @@ def _parse_orc_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict`` object.
     """
     properties = dataset.get("properties", {})
     return {
@@ -385,6 +391,9 @@ def _parse_parquet_format_options(dataset: dict) -> dict:
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
+
+    Returns:
+        Format options as a ``dict`` object.
     """
     properties = dataset.get("properties", {})
     return {

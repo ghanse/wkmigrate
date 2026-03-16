@@ -1,7 +1,7 @@
 """This module defines translators for Azure Data Factory linked service definitions.
 
 Translators in this module normalize linked service payloads into internal representations.
-Translators must validate required fields, coerce connection settings, and emit an ``UnsupportedValue``
+Translators must validate required fields, coerce connection settings, and emit ``UnsupportedValue``
 objects for any unparsable inputs.
 """
 

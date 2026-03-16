@@ -7,7 +7,6 @@ missing properties, and null inputs.
 
 from __future__ import annotations
 
-
 from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators import (
@@ -27,7 +26,20 @@ def _build_cloud_dataset(
     linked_service: dict,
     file_format: dict | None = None,
 ) -> dict:
-    """Build a cloud file dataset definition for testing."""
+    """Build a cloud file dataset definition for testing.
+
+    Args:
+        dataset_type: ADF dataset type string (e.g. AmazonS3Dataset).
+        dataset_name: Logical dataset name.
+        bucket_name: Cloud storage bucket or container name.
+        folder_path: Directory path within the bucket.
+        file_name: File name within the folder.
+        linked_service: Linked service definition dictionary.
+        file_format: Optional file format descriptor.
+
+    Returns:
+        Dataset definition dictionary suitable for translator input.
+    """
     location = {
         "bucket_name": bucket_name,
         "folder_path": folder_path,
