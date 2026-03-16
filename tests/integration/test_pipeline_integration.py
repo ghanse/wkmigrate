@@ -159,7 +159,7 @@ class TestFactoryDefinitionStoreIntegration:
         result = factory_store.load("integration_test_foreach_pipeline")
 
         assert isinstance(result, Pipeline)
-        assert len(result.tasks) >= 1
+        assert len(result.tasks) == 1
 
         foreach_task = next(
             (t for t in result.tasks if isinstance(t, ForEachActivity)),
@@ -205,7 +205,7 @@ class TestUnsupportedActivityIntegration:
         result = factory_store.load("integration_test_unsupported_pipeline")
 
         assert isinstance(result, Pipeline)
-        assert len(result.tasks) >= 1
+        assert len(result.tasks) == 1
 
         placeholder = next(
             (t for t in result.tasks if t.name == "unsupported_function_call"),
@@ -337,7 +337,7 @@ class TestTranslatableTypeCoverage:
         assert isinstance(result, Pipeline)
         if_tasks = [t for t in result.tasks if isinstance(t, IfConditionActivity)]
         assert len(if_tasks) == 1
-        assert len(if_tasks[0].child_activities) >= 2
+        assert len(if_tasks[0].child_activities) == 2
 
     def test_set_variable_activity_translates(
         self,

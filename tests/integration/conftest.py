@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any, TypeVar
 
 import pytest
 from azure.identity import ClientSecretCredential
@@ -31,6 +33,8 @@ from azure.mgmt.datafactory.models import (
 
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+
+_T = TypeVar("_T", LinkedServiceResource, DatasetResource, PipelineResource)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,6 +59,60 @@ class AzureTestConfig:
     subscription_id: str
     resource_group: str
     factory_name: str
+
+
+# ---------------------------------------------------------------------------
+# Resource deployment helper
+# ---------------------------------------------------------------------------
+
+# Name-keyword and resource-keyword mappings for the three ADF management
+# sub-clients.  Each tuple is (name_kwarg, resource_kwarg) passed to both
+# ``create_or_update`` and ``delete``.
+_KWARG_MAP: dict[str, tuple[str, str]] = {
+    "LinkedServicesOperations": ("linked_service_name", "linked_service"),
+    "DatasetsOperations": ("dataset_name", "dataset"),
+    "PipelinesOperations": ("pipeline_name", "pipeline"),
+}
+
+
+@contextmanager
+def _deploy_adf_resource(
+    mgmt_ops: Any,
+    azure_config: AzureTestConfig,
+    resource_name: str,
+    resource: _T,
+) -> Generator[_T, None, None]:
+    """Create an ADF resource, yield it, then delete it on teardown.
+
+    This eliminates the repetitive create/yield/delete boilerplate that every
+    linked-service, dataset, and pipeline fixture would otherwise duplicate.
+
+    Args:
+        mgmt_ops: One of ``adf_management_client.linked_services``,
+            ``.datasets``, or ``.pipelines``.
+        azure_config: Azure configuration with resource group / factory name.
+        resource_name: The name to assign to the resource inside ADF.
+        resource: The SDK resource object to deploy.
+
+    Yields:
+        The created resource as returned by the Azure SDK.
+    """
+    ops_type = type(mgmt_ops).__name__
+    name_kwarg, resource_kwarg = _KWARG_MAP[ops_type]
+
+    result = mgmt_ops.create_or_update(
+        resource_group_name=azure_config.resource_group,
+        factory_name=azure_config.factory_name,
+        **{name_kwarg: resource_name},
+        **{resource_kwarg: resource},
+    )
+    yield result
+
+    mgmt_ops.delete(
+        resource_group_name=azure_config.resource_group,
+        factory_name=azure_config.factory_name,
+        **{name_kwarg: resource_name},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +178,10 @@ def adf_factory(
 ) -> Generator[Factory, None, None]:
     """Ensure the test Data Factory exists and return its resource descriptor.
 
-    The factory is created if it does not already exist. Teardown deletes
-    all test resources deployed during the session.
+    The factory is assumed to be pre-deployed and shared across test runs.
+    Teardown is intentionally omitted — we do not delete the factory because
+    it is a long-lived resource managed outside of CI. Individual resource
+    fixtures (linked services, datasets, pipelines) clean up after themselves.
 
     Args:
         azure_config: Azure configuration fixture.
@@ -151,10 +211,6 @@ def sample_linked_service(
 ) -> Generator[LinkedServiceResource, None, None]:
     """Deploy a sample Azure Blob Storage linked service into the test factory.
 
-    The linked service uses a connection-string authentication pattern
-    pointing at a non-existent storage account. This is sufficient for
-    translation testing since wkmigrate only reads metadata.
-
     Args:
         azure_config: Azure configuration fixture.
         adf_management_client: Data Factory management client fixture.
@@ -163,11 +219,11 @@ def sample_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_blob_storage",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_blob_storage",
+        LinkedServiceResource(
             properties={
                 "type": "AzureBlobStorage",
                 "typeProperties": {
@@ -180,15 +236,8 @@ def sample_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    # Teardown
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_blob_storage",
-    )
+    ) as ls:
+        yield ls
 
 
 @pytest.fixture(scope="session")
@@ -207,11 +256,11 @@ def abfs_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_abfs_storage",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_abfs_storage",
+        LinkedServiceResource(
             properties={
                 "type": "AzureBlobFS",
                 "typeProperties": {
@@ -225,14 +274,8 @@ def abfs_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_abfs_storage",
-    )
+    ) as ls:
+        yield ls
 
 
 @pytest.fixture(scope="session")
@@ -251,11 +294,11 @@ def s3_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_s3_storage",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_s3_storage",
+        LinkedServiceResource(
             properties={
                 "type": "AmazonS3",
                 "typeProperties": {
@@ -268,14 +311,8 @@ def s3_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_s3_storage",
-    )
+    ) as ls:
+        yield ls
 
 
 @pytest.fixture(scope="session")
@@ -294,11 +331,11 @@ def gcs_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_gcs_storage",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_gcs_storage",
+        LinkedServiceResource(
             properties={
                 "type": "GoogleCloudStorage",
                 "typeProperties": {
@@ -311,14 +348,8 @@ def gcs_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_gcs_storage",
-    )
+    ) as ls:
+        yield ls
 
 
 @pytest.fixture(scope="session")
@@ -337,11 +368,11 @@ def sql_server_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_sql_server",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_sql_server",
+        LinkedServiceResource(
             properties={
                 "type": "AzureSqlDatabase",
                 "typeProperties": {
@@ -356,14 +387,8 @@ def sql_server_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_sql_server",
-    )
+    ) as ls:
+        yield ls
 
 
 @pytest.fixture(scope="session")
@@ -382,11 +407,11 @@ def databricks_linked_service(
     Yields:
         The created ``LinkedServiceResource``.
     """
-    linked_service = adf_management_client.linked_services.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_databricks",
-        linked_service=LinkedServiceResource(
+    with _deploy_adf_resource(
+        adf_management_client.linked_services,
+        azure_config,
+        "test_databricks",
+        LinkedServiceResource(
             properties={
                 "type": "AzureDatabricks",
                 "typeProperties": {
@@ -401,14 +426,8 @@ def databricks_linked_service(
                 },
             }
         ),
-    )
-    yield linked_service
-
-    adf_management_client.linked_services.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        linked_service_name="test_databricks",
-    )
+    ) as ls:
+        yield ls
 
 
 # ---------------------------------------------------------------------------
@@ -432,11 +451,11 @@ def sample_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_csv_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_csv_dataset",
+        DatasetResource(
             properties={
                 "type": "DelimitedText",
                 "typeProperties": {
@@ -454,15 +473,8 @@ def sample_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    # Teardown
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_csv_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -481,11 +493,11 @@ def abfs_csv_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_abfs_csv_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_abfs_csv_dataset",
+        DatasetResource(
             properties={
                 "type": "DelimitedText",
                 "typeProperties": {
@@ -503,14 +515,8 @@ def abfs_csv_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_abfs_csv_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -529,11 +535,11 @@ def abfs_parquet_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_abfs_parquet_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_abfs_parquet_dataset",
+        DatasetResource(
             properties={
                 "type": "Parquet",
                 "typeProperties": {
@@ -549,14 +555,8 @@ def abfs_parquet_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_abfs_parquet_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -575,11 +575,11 @@ def s3_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_s3_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_s3_dataset",
+        DatasetResource(
             properties={
                 "type": "AmazonS3Dataset",
                 "typeProperties": {
@@ -595,14 +595,8 @@ def s3_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_s3_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -621,11 +615,11 @@ def gcs_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_gcs_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_gcs_dataset",
+        DatasetResource(
             properties={
                 "type": "GoogleCloudStorageDataset",
                 "typeProperties": {
@@ -641,14 +635,8 @@ def gcs_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_gcs_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -667,11 +655,11 @@ def azure_blob_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_azure_blob_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_azure_blob_dataset",
+        DatasetResource(
             properties={
                 "type": "AzureBlobStorageDataset",
                 "typeProperties": {
@@ -690,14 +678,8 @@ def azure_blob_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_azure_blob_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -716,11 +698,11 @@ def sql_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_sql_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_sql_dataset",
+        DatasetResource(
             properties={
                 "type": "AzureSqlTable",
                 "typeProperties": {
@@ -733,14 +715,8 @@ def sql_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_sql_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 @pytest.fixture(scope="session")
@@ -759,11 +735,11 @@ def delta_dataset(
     Yields:
         The created ``DatasetResource``.
     """
-    dataset = adf_management_client.datasets.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_delta_dataset",
-        dataset=DatasetResource(
+    with _deploy_adf_resource(
+        adf_management_client.datasets,
+        azure_config,
+        "test_delta_dataset",
+        DatasetResource(
             properties={
                 "type": "AzureDatabricksDeltaLakeDataset",
                 "typeProperties": {
@@ -776,14 +752,8 @@ def delta_dataset(
                 },
             }
         ),
-    )
-    yield dataset
-
-    adf_management_client.datasets.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        dataset_name="test_delta_dataset",
-    )
+    ) as ds:
+        yield ds
 
 
 # ---------------------------------------------------------------------------
@@ -811,11 +781,11 @@ def sample_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -847,15 +817,8 @@ def sample_pipeline(
                 },
             }
         ),
-    )
-    yield pipeline
-
-    # Teardown
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -874,11 +837,11 @@ def sample_foreach_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_foreach_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_foreach_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -911,15 +874,8 @@ def sample_foreach_pipeline(
                 },
             }
         ),
-    )
-    yield pipeline
-
-    # Teardown
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_foreach_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -943,11 +899,11 @@ def sample_unsupported_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_unsupported_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_unsupported_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -966,15 +922,8 @@ def sample_unsupported_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    # Teardown
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_unsupported_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -993,11 +942,11 @@ def spark_jar_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_spark_jar_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_spark_jar_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1017,14 +966,8 @@ def spark_jar_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_spark_jar_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1043,11 +986,11 @@ def spark_python_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_spark_python_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_spark_python_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1067,14 +1010,8 @@ def spark_python_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_spark_python_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1093,11 +1030,11 @@ def databricks_job_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_databricks_job_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_databricks_job_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1116,14 +1053,8 @@ def databricks_job_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_databricks_job_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1142,11 +1073,11 @@ def web_activity_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_web_activity_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_web_activity_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1162,14 +1093,8 @@ def web_activity_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_web_activity_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1188,11 +1113,11 @@ def lookup_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_lookup_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_lookup_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1218,14 +1143,8 @@ def lookup_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_lookup_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1246,11 +1165,11 @@ def copy_abfs_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_abfs_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_copy_abfs_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1289,14 +1208,8 @@ def copy_abfs_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_abfs_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1317,11 +1230,11 @@ def copy_s3_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_s3_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_copy_s3_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1360,14 +1273,8 @@ def copy_s3_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_s3_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1388,11 +1295,11 @@ def copy_gcs_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_gcs_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_copy_gcs_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1431,14 +1338,8 @@ def copy_gcs_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_gcs_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1459,11 +1360,11 @@ def copy_azure_blob_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_azure_blob_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_copy_azure_blob_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1502,14 +1403,8 @@ def copy_azure_blob_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_azure_blob_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1530,11 +1425,11 @@ def copy_sql_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_sql_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_copy_sql_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1570,14 +1465,8 @@ def copy_sql_pipeline(
                 ],
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_copy_sql_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1596,11 +1485,11 @@ def if_condition_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_if_condition_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_if_condition_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1642,14 +1531,8 @@ def if_condition_pipeline(
                 },
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_if_condition_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 @pytest.fixture(scope="session")
@@ -1668,11 +1551,11 @@ def set_variable_pipeline(
     Yields:
         The created ``PipelineResource``.
     """
-    pipeline = adf_management_client.pipelines.create_or_update(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_set_variable_pipeline",
-        pipeline=PipelineResource(
+    with _deploy_adf_resource(
+        adf_management_client.pipelines,
+        azure_config,
+        "integration_test_set_variable_pipeline",
+        PipelineResource(
             properties={
                 "activities": [
                     {
@@ -1690,24 +1573,21 @@ def set_variable_pipeline(
                 },
             }
         ),
-    )
-    yield pipeline
-
-    adf_management_client.pipelines.delete(
-        resource_group_name=azure_config.resource_group,
-        factory_name=azure_config.factory_name,
-        pipeline_name="integration_test_set_variable_pipeline",
-    )
+    ) as pl:
+        yield pl
 
 
 # ---------------------------------------------------------------------------
-# High-level store fixtures
+# High-level store fixtures (session-scoped)
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def factory_client(azure_config: AzureTestConfig) -> FactoryClient:
     """Create a ``FactoryClient`` connected to the test Azure Data Factory.
+
+    Session-scoped because the client is stateless — reusing a single instance
+    avoids redundant Azure AD credential round-trips.
 
     Args:
         azure_config: Azure configuration fixture.
@@ -1725,9 +1605,12 @@ def factory_client(azure_config: AzureTestConfig) -> FactoryClient:
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def factory_store(azure_config: AzureTestConfig) -> FactoryDefinitionStore:
     """Create a ``FactoryDefinitionStore`` connected to the test factory.
+
+    Session-scoped because the store is stateless — reusing a single instance
+    avoids redundant Azure AD credential round-trips.
 
     Args:
         azure_config: Azure configuration fixture.

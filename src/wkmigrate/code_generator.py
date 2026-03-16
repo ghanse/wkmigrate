@@ -90,11 +90,16 @@ def get_file_options(
     if "records_per_file" in dataset_definition:
         records_per_file = dataset_definition.get("records_per_file")
         config_lines.append(f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")')
-    config_lines.extend(_get_file_credential_lines(dataset_definition, service_name, provider_type))
+    config_lines.extend(_get_file_credential_lines(dataset_definition, service_name, provider_type, credentials_scope))
     return [f"{dataset_name}_options = {{}}", *config_lines]
 
 
-def _get_file_credential_lines(dataset_definition: dict, service_name: str, provider_type: str) -> list[str]:
+def _get_file_credential_lines(
+    dataset_definition: dict,
+    service_name: str,
+    provider_type: str,
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+) -> list[str]:
     """
     Generates Spark configuration lines for cloud storage credentials.
 
@@ -102,6 +107,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
         dataset_definition: Dataset definition dictionary.
         service_name: Linked service name used as a secret key prefix.
         provider_type: Cloud provider identifier (``"abfs"``, ``"s3"``, ``"gcs"``, or ``"azure_blob"``).
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines that configure Spark credentials.
@@ -111,7 +117,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
             f"""spark.conf.set(
                 "fs.s3a.access.key",
                     dbutils.secrets.get(
-                        scope="wkmigrate_credentials_scope",
+                        scope="{credentials_scope}",
                         key="{service_name}_access_key_id"
                 )
             )
@@ -119,7 +125,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
             f"""spark.conf.set(
                 "fs.s3a.secret.key",
                     dbutils.secrets.get(
-                        scope="wkmigrate_credentials_scope",
+                        scope="{credentials_scope}",
                         key="{service_name}_secret_access_key"
                 )
             )
@@ -130,7 +136,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
             f"""spark.conf.set(
                 "fs.gs.auth.service.account.private.key",
                     dbutils.secrets.get(
-                        scope="wkmigrate_credentials_scope",
+                        scope="{credentials_scope}",
                         key="{service_name}_service_account_key"
                 )
             )
@@ -142,7 +148,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
             f"""spark.conf.set(
                 "fs.azure.account.key.{storage_account_name}.blob.core.windows.net",
                     dbutils.secrets.get(
-                        scope="wkmigrate_credentials_scope",
+                        scope="{credentials_scope}",
                         key="{service_name}_storage_account_key"
                 )
             )

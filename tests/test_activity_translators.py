@@ -61,7 +61,6 @@ from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.parsers.expression_parsers import parse_variable_value
 from wkmigrate.utils import get_placeholder_activity
 
-
 NOTEBOOK_ACTIVITY: dict = {
     "name": "nb_task",
     "type": "DatabricksNotebook",
