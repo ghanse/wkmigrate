@@ -18,9 +18,17 @@ from azure.mgmt.datafactory.models import DatasetResource, LinkedServiceResource
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
 from wkmigrate.models.ir.pipeline import (
+    CopyActivity,
     DatabricksNotebookActivity,
     ForEachActivity,
+    IfConditionActivity,
+    LookupActivity,
     Pipeline,
+    RunJobActivity,
+    SetVariableActivity,
+    SparkJarActivity,
+    SparkPythonActivity,
+    WebActivity,
 )
 
 pytestmark = pytest.mark.integration
@@ -223,7 +231,7 @@ class TestUnsupportedActivityIntegration:
 
 
 # ---------------------------------------------------------------------------
-# Translatable-type coverage tests
+# Translatable activity type coverage
 # ---------------------------------------------------------------------------
 
 
@@ -250,5 +258,175 @@ class TestTranslatableTypeCoverage:
         result = factory_store.load("integration_test_foreach_pipeline")
         foreach_tasks = [t for t in result.tasks if isinstance(t, ForEachActivity)]
         assert len(foreach_tasks) == 1
-        assert foreach_tasks[0].tasks is not None
-        assert len(foreach_tasks[0].tasks) >= 1
+        assert foreach_tasks[0].for_each_task is not None
+
+    def test_spark_jar_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        spark_jar_pipeline: PipelineResource,
+    ) -> None:
+        """DatabricksSparkJar activities translate to ``SparkJarActivity``."""
+        result = factory_store.load("integration_test_spark_jar_pipeline")
+
+        assert isinstance(result, Pipeline)
+        spark_jar_tasks = [t for t in result.tasks if isinstance(t, SparkJarActivity)]
+        assert len(spark_jar_tasks) == 1
+        assert spark_jar_tasks[0].main_class_name == "com.example.Main"
+
+    def test_spark_python_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        spark_python_pipeline: PipelineResource,
+    ) -> None:
+        """DatabricksSparkPython activities translate to ``SparkPythonActivity``."""
+        result = factory_store.load("integration_test_spark_python_pipeline")
+
+        assert isinstance(result, Pipeline)
+        spark_python_tasks = [t for t in result.tasks if isinstance(t, SparkPythonActivity)]
+        assert len(spark_python_tasks) == 1
+        assert spark_python_tasks[0].python_file == "dbfs:/scripts/etl.py"
+
+    def test_databricks_job_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        databricks_job_pipeline: PipelineResource,
+    ) -> None:
+        """DatabricksJob activities translate to ``RunJobActivity``."""
+        result = factory_store.load("integration_test_databricks_job_pipeline")
+
+        assert isinstance(result, Pipeline)
+        job_tasks = [t for t in result.tasks if isinstance(t, RunJobActivity)]
+        assert len(job_tasks) == 1
+        assert job_tasks[0].existing_job_id == "12345"
+
+    def test_web_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        web_activity_pipeline: PipelineResource,
+    ) -> None:
+        """WebActivity translates to ``WebActivity`` with correct URL and method."""
+        result = factory_store.load("integration_test_web_activity_pipeline")
+
+        assert isinstance(result, Pipeline)
+        web_tasks = [t for t in result.tasks if isinstance(t, WebActivity)]
+        assert len(web_tasks) == 1
+        assert web_tasks[0].url == "https://httpbin.org/get"
+        assert web_tasks[0].method == "GET"
+
+    def test_lookup_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        lookup_pipeline: PipelineResource,
+    ) -> None:
+        """Lookup activities translate to ``LookupActivity``."""
+        result = factory_store.load("integration_test_lookup_pipeline")
+
+        assert isinstance(result, Pipeline)
+        lookup_tasks = [t for t in result.tasks if isinstance(t, LookupActivity)]
+        assert len(lookup_tasks) == 1
+        assert lookup_tasks[0].first_row_only is True
+
+    def test_if_condition_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        if_condition_pipeline: PipelineResource,
+    ) -> None:
+        """IfCondition activities translate to ``IfConditionActivity`` with child branches."""
+        result = factory_store.load("integration_test_if_condition_pipeline")
+
+        assert isinstance(result, Pipeline)
+        if_tasks = [t for t in result.tasks if isinstance(t, IfConditionActivity)]
+        assert len(if_tasks) == 1
+        assert len(if_tasks[0].child_activities) >= 2
+
+    def test_set_variable_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        set_variable_pipeline: PipelineResource,
+    ) -> None:
+        """SetVariable activities translate to ``SetVariableActivity``."""
+        result = factory_store.load("integration_test_set_variable_pipeline")
+
+        assert isinstance(result, Pipeline)
+        set_var_tasks = [t for t in result.tasks if isinstance(t, SetVariableActivity)]
+        assert len(set_var_tasks) == 1
+        assert set_var_tasks[0].variable_name == "output_path"
+
+
+# ---------------------------------------------------------------------------
+# Copy activity dataset-type coverage
+# ---------------------------------------------------------------------------
+
+
+class TestCopyActivityDatasetCoverage:
+    """Verifies that Copy activities using each supported dataset type translate correctly."""
+
+    def test_copy_abfs_csv_to_parquet(
+        self,
+        factory_store: FactoryDefinitionStore,
+        copy_abfs_pipeline: PipelineResource,
+    ) -> None:
+        """Copy from ABFS CSV to ABFS Parquet produces a ``CopyActivity`` with valid datasets."""
+        result = factory_store.load("integration_test_copy_abfs_pipeline")
+
+        assert isinstance(result, Pipeline)
+        copy_tasks = [t for t in result.tasks if isinstance(t, CopyActivity)]
+        assert len(copy_tasks) == 1
+        assert copy_tasks[0].source_dataset is not None
+        assert copy_tasks[0].sink_dataset is not None
+
+    def test_copy_s3_to_abfs(
+        self,
+        factory_store: FactoryDefinitionStore,
+        copy_s3_pipeline: PipelineResource,
+    ) -> None:
+        """Copy from S3 to ABFS produces a ``CopyActivity`` with an S3 source dataset."""
+        result = factory_store.load("integration_test_copy_s3_pipeline")
+
+        assert isinstance(result, Pipeline)
+        copy_tasks = [t for t in result.tasks if isinstance(t, CopyActivity)]
+        assert len(copy_tasks) == 1
+        assert copy_tasks[0].source_dataset is not None
+        assert copy_tasks[0].sink_dataset is not None
+
+    def test_copy_gcs_to_abfs(
+        self,
+        factory_store: FactoryDefinitionStore,
+        copy_gcs_pipeline: PipelineResource,
+    ) -> None:
+        """Copy from GCS to ABFS produces a ``CopyActivity`` with a GCS source dataset."""
+        result = factory_store.load("integration_test_copy_gcs_pipeline")
+
+        assert isinstance(result, Pipeline)
+        copy_tasks = [t for t in result.tasks if isinstance(t, CopyActivity)]
+        assert len(copy_tasks) == 1
+        assert copy_tasks[0].source_dataset is not None
+        assert copy_tasks[0].sink_dataset is not None
+
+    def test_copy_azure_blob_to_abfs(
+        self,
+        factory_store: FactoryDefinitionStore,
+        copy_azure_blob_pipeline: PipelineResource,
+    ) -> None:
+        """Copy from Azure Blob to ABFS produces a ``CopyActivity`` with a Blob source dataset."""
+        result = factory_store.load("integration_test_copy_azure_blob_pipeline")
+
+        assert isinstance(result, Pipeline)
+        copy_tasks = [t for t in result.tasks if isinstance(t, CopyActivity)]
+        assert len(copy_tasks) == 1
+        assert copy_tasks[0].source_dataset is not None
+        assert copy_tasks[0].sink_dataset is not None
+
+    def test_copy_sql_to_abfs(
+        self,
+        factory_store: FactoryDefinitionStore,
+        copy_sql_pipeline: PipelineResource,
+    ) -> None:
+        """Copy from Azure SQL to ABFS produces a ``CopyActivity`` with a SQL source dataset."""
+        result = factory_store.load("integration_test_copy_sql_pipeline")
+
+        assert isinstance(result, Pipeline)
+        copy_tasks = [t for t in result.tasks if isinstance(t, CopyActivity)]
+        assert len(copy_tasks) == 1
+        assert copy_tasks[0].source_dataset is not None
+        assert copy_tasks[0].sink_dataset is not None

@@ -276,7 +276,7 @@ Integration fixtures are layered:
 
 1. **`azure_config`** (session): Loads credentials from environment variables (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_FACTORY_NAME`). Skips the test if any variable is missing.
 2. **`adf_factory`** (session): Ensures the test Data Factory exists via `create_or_update`.
-3. **`sample_pipeline`**, **`sample_foreach_pipeline`**, **`sample_linked_service`**, **`sample_dataset`** (function): Deploy and tear down individual ADF resources per test.
+3. **`sample_pipeline`**, **`sample_foreach_pipeline`**, **`sample_linked_service`**, **`sample_dataset`** (session): Deploy and tear down individual ADF resources once per session.
 4. **`factory_client`**, **`factory_store`** (function): Create `FactoryClient` and `FactoryDefinitionStore` instances connected to the test factory.
 
 #### Running Integration Tests
