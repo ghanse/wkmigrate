@@ -286,18 +286,19 @@ Integration fixtures are layered:
 poetry run pytest -m integration --tb=short -v
 
 # Run all tests including integration
-poetry run pytest -m '' --tb=short -v
+make integration     # poetry run pytest -m integration (requires Azure env vars)
 ```
 
 #### CI Workflow
 
-The `.github/workflows/integration.yml` workflow runs integration tests on every push to a PR branch (excluding external forks). It uses repository secrets to provide Azure credentials.
+The `.github/workflows/integration.yml` workflow runs integration tests on every push to a PR branch (excluding external forks).
 
 ### Running Tests
 
 ```bash
 make test          # poetry run pytest (excludes integration tests by default)
 make fmt           # black + ruff + mypy + pylint
+make integration   # poetry run pytest -m integration (requires Azure env vars)
 ```
 
 pytest is configured with `--no-header`, suppresses `DeprecationWarning`, and excludes `integration`-marked tests by default.

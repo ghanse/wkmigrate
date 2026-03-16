@@ -1,4 +1,4 @@
-.PHONY: dev test fmt docs docs-serve docs-clean docker
+.PHONY: dev test integration fmt docs docs-serve docs-clean docker
 
 dev:
 	pip install poetry==2.2.1
@@ -8,6 +8,9 @@ dev:
 
 test:
 	poetry run pytest
+
+integration:
+	poetry run pytest -m integration --tb=short -v
 
 fmt:
 	poetry run black .

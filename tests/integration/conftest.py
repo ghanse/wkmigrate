@@ -118,19 +118,17 @@ def adf_management_client(
 def adf_factory(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
-) -> Factory:
+) -> Generator[Factory, None, None]:
     """Ensure the test Data Factory exists and return its resource descriptor.
 
-    The factory is created if it does not already exist. Teardown is intentionally
-    omitted at the session level so that subsequent local runs can reuse the
-    factory. CI environments should clean up via a separate workflow step or
-    resource-group deletion.
+    The factory is created if it does not already exist. Teardown deletes
+    all test resources deployed during the session.
 
     Args:
         azure_config: Azure configuration fixture.
         adf_management_client: Data Factory management client fixture.
 
-    Returns:
+    Yields:
         The ``Factory`` resource object.
     """
     factory = adf_management_client.factories.create_or_update(
@@ -138,15 +136,15 @@ def adf_factory(
         factory_name=azure_config.factory_name,
         factory=Factory(location="eastus2"),
     )
-    return factory
+    yield factory
 
 
 # ---------------------------------------------------------------------------
-# Test-pipeline provisioning (function-scoped)
+# Test-resource provisioning (session-scoped)
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sample_linked_service(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
@@ -194,7 +192,7 @@ def sample_linked_service(
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sample_dataset(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
@@ -243,7 +241,7 @@ def sample_dataset(
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sample_pipeline(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
@@ -310,7 +308,7 @@ def sample_pipeline(
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sample_foreach_pipeline(
     azure_config: AzureTestConfig,
     adf_management_client: DataFactoryManagementClient,
@@ -371,6 +369,61 @@ def sample_foreach_pipeline(
         resource_group_name=azure_config.resource_group,
         factory_name=azure_config.factory_name,
         pipeline_name="integration_test_foreach_pipeline",
+    )
+
+
+@pytest.fixture(scope="session")
+def sample_unsupported_pipeline(
+    azure_config: AzureTestConfig,
+    adf_management_client: DataFactoryManagementClient,
+    adf_factory: Factory,
+) -> Generator[PipelineResource, None, None]:
+    """Deploy a pipeline with an unsupported activity type and a secure-input policy.
+
+    The ``AzureFunctionActivity`` type is not in the translator registry and
+    will produce a placeholder ``DatabricksNotebookActivity`` with
+    ``notebook_path="/UNSUPPORTED_ADF_ACTIVITY"``. The ``secure_input`` policy
+    property triggers a ``NotTranslatableWarning`` during translation.
+
+    Args:
+        azure_config: Azure configuration fixture.
+        adf_management_client: Data Factory management client fixture.
+        adf_factory: Ensures the factory exists before provisioning.
+
+    Yields:
+        The created ``PipelineResource``.
+    """
+    pipeline = adf_management_client.pipelines.create_or_update(
+        resource_group_name=azure_config.resource_group,
+        factory_name=azure_config.factory_name,
+        pipeline_name="integration_test_unsupported_pipeline",
+        pipeline=PipelineResource(
+            properties={
+                "activities": [
+                    {
+                        "name": "unsupported_function_call",
+                        "type": "AzureFunctionActivity",
+                        "typeProperties": {
+                            "functionName": "MyFunction",
+                            "method": "POST",
+                        },
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.00:30:00",
+                            "secure_input": True,
+                        },
+                    },
+                ],
+            }
+        ),
+    )
+    yield pipeline
+
+    # Teardown
+    adf_management_client.pipelines.delete(
+        resource_group_name=azure_config.resource_group,
+        factory_name=azure_config.factory_name,
+        pipeline_name="integration_test_unsupported_pipeline",
     )
 
 

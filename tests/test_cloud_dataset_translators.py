@@ -1,7 +1,7 @@
-"""Tests for cloud file dataset translators (S3, GCS, ADLS).
+"""Tests for cloud file dataset translators (S3, GCS, Azure Blob Storage).
 
 This module tests dataset translation for Amazon S3, Google Cloud Storage,
-and Azure Data Lake Storage Gen2 datasets. Tests cover successful translation,
+and Azure Blob Storage datasets. Tests cover successful translation,
 missing properties, and null inputs.
 """
 
@@ -249,7 +249,7 @@ class TestGcsFileDataset:
         assert result.dataset_name == "gcs_dispatch"
 
 
-# --- Azure Data Lake Storage Gen2 dataset translation tests ---
+# --- Azure Blob Storage dataset translation tests ---
 
 
 class TestAzureBlobFileDataset:

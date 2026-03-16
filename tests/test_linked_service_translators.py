@@ -2,7 +2,7 @@
 
 This module tests all linked service translators against realistic ADF payloads
 loaded from JSON fixture files. Tests cover Databricks cluster configurations,
-SQL Server connections, ABFS storage accounts, and cloud file services (S3, GCS, ADLS).
+SQL Server connections, ABFS storage accounts, and cloud file services (S3, GCS, Azure Blob Storage).
 """
 
 from __future__ import annotations
@@ -396,7 +396,7 @@ def test_gcs_null_input_returns_unsupported(linked_service_fixtures: list[dict])
     assert fixture["expected_message"] in result.message
 
 
-# --- Azure Data Lake Storage Gen2 linked service tests ---
+# --- Azure Blob Storage linked service tests ---
 
 
 def test_full_azure_blob_configuration(linked_service_fixtures: list[dict]) -> None:

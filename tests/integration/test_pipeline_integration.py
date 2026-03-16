@@ -178,3 +178,77 @@ class TestFactoryDefinitionStoreIntegration:
         results = factory_store.load_all(pipeline_names=["integration_test_pipeline"])
         assert len(results) == 1
         assert all(isinstance(pipeline, Pipeline) for pipeline in results)
+
+
+# ---------------------------------------------------------------------------
+# Unsupported activity / property tests
+# ---------------------------------------------------------------------------
+
+
+class TestUnsupportedActivityIntegration:
+    """Validates that unsupported ADF types are handled gracefully during translation."""
+
+    def test_unsupported_activity_creates_placeholder(
+        self,
+        factory_store: FactoryDefinitionStore,
+        sample_unsupported_pipeline: PipelineResource,
+    ) -> None:
+        """An unsupported activity type produces a placeholder notebook with /UNSUPPORTED_ADF_ACTIVITY."""
+        result = factory_store.load("integration_test_unsupported_pipeline")
+
+        assert isinstance(result, Pipeline)
+        assert len(result.tasks) >= 1
+
+        placeholder = next(
+            (t for t in result.tasks if t.name == "unsupported_function_call"),
+            None,
+        )
+        assert placeholder is not None
+        assert isinstance(placeholder, DatabricksNotebookActivity)
+        assert placeholder.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
+
+    def test_unsupported_property_raises_not_translatable_warning(
+        self,
+        factory_store: FactoryDefinitionStore,
+        sample_unsupported_pipeline: PipelineResource,
+    ) -> None:
+        """A ``secure_input`` policy property populates ``not_translatable`` on the Pipeline IR."""
+        result = factory_store.load("integration_test_unsupported_pipeline")
+
+        assert isinstance(result, Pipeline)
+        assert len(result.not_translatable) >= 1
+
+        warning_props = [entry.get("property_name") for entry in result.not_translatable]
+        assert "secure_input" in warning_props
+
+
+# ---------------------------------------------------------------------------
+# Translatable-type coverage tests
+# ---------------------------------------------------------------------------
+
+
+class TestTranslatableTypeCoverage:
+    """Verifies that all translatable activity types produce correct IR types."""
+
+    def test_notebook_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        sample_pipeline: PipelineResource,
+    ) -> None:
+        """DatabricksNotebook activities translate to ``DatabricksNotebookActivity``."""
+        result = factory_store.load("integration_test_pipeline")
+        notebook_tasks = [t for t in result.tasks if isinstance(t, DatabricksNotebookActivity)]
+        assert len(notebook_tasks) == 2
+        assert all(t.notebook_path is not None for t in notebook_tasks)
+
+    def test_foreach_activity_translates(
+        self,
+        factory_store: FactoryDefinitionStore,
+        sample_foreach_pipeline: PipelineResource,
+    ) -> None:
+        """ForEach activities translate to ``ForEachActivity`` with nested tasks."""
+        result = factory_store.load("integration_test_foreach_pipeline")
+        foreach_tasks = [t for t in result.tasks if isinstance(t, ForEachActivity)]
+        assert len(foreach_tasks) == 1
+        assert foreach_tasks[0].tasks is not None
+        assert len(foreach_tasks[0].tasks) >= 1
