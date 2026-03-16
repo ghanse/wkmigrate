@@ -1,8 +1,7 @@
-"""This module defines translators for translating datasets into internal representations.
+"""Translators for normalizing ADF dataset payloads into internal representations.
 
-Translators in this module normalize dataset payloads into internal representations. Each
-translator must validate required fields, coerce connection settings, and emit ``UnsupportedValue``
-objects for any unparsable inputs.
+Each translator validates required fields, coerces connection settings, and emits
+``UnsupportedValue`` objects for any unparsable inputs.
 """
 
 import json
@@ -31,17 +30,26 @@ from wkmigrate.translators.linked_service_translators import (
 )
 
 _IGNORED_FORMAT_OPTIONS = {"dataset_name", "container", "folder_path"}
+_CLOUD_FORMAT_MAPPINGS: dict[str, str] = {
+    "TextFormat": "DelimitedText",
+    "JsonFormat": "Json",
+    "AvroFormat": "Avro",
+    "OrcFormat": "Orc",
+    "ParquetFormat": "Parquet",
+}
 
 
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
-    """
-    Translates a dataset definition returned by the Azure Data Factory API into a ``Dataset`` object. Supports files, SQL tables, and Delta tables. Any datasets which cannot be fully translated will return an ``UnsupportedValue`` object.
+    """Translates an ADF dataset definition into a ``Dataset`` IR object.
+
+    Supports file, SQL table, and Delta table datasets. Datasets that cannot be
+    fully translated are returned as ``UnsupportedValue``.
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Dataset as a ``Dataset`` object.
+        Translated ``Dataset``, or ``UnsupportedValue`` for unparsable inputs.
     """
     dataset_properties = dataset.get("properties", {})
     if not dataset_properties:
@@ -534,14 +542,7 @@ def _parse_cloud_file_format(properties: dict) -> str:
     format_block = properties.get("format")
     if format_block and isinstance(format_block, dict):
         format_type = format_block.get("type", "")
-        format_mappings = {
-            "TextFormat": "DelimitedText",
-            "JsonFormat": "Json",
-            "AvroFormat": "Avro",
-            "OrcFormat": "Orc",
-            "ParquetFormat": "Parquet",
-        }
-        mapped = format_mappings.get(format_type)
+        mapped = _CLOUD_FORMAT_MAPPINGS.get(format_type)
         if mapped:
             return mapped
     return "Parquet"

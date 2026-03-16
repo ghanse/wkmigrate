@@ -3,7 +3,7 @@
 from wkmigrate.translators.pipeline_translators.parsers import parse_parameter_value
 from wkmigrate.utils import translate
 
-mapping = {"default": {"key": "default_value", "parser": parse_parameter_value}}
+_mapping = {"default": {"key": "default_value", "parser": parse_parameter_value}}
 
 
 def translate_parameters(parameters: dict | None) -> list[dict] | None:
@@ -32,7 +32,7 @@ def translate_parameter(parameter_name: str, parameter: dict) -> dict:
     Returns:
         Translated parameter definition as a ``dict``.
     """
-    translated_parameter = translate(parameter, mapping)
+    translated_parameter = translate(parameter, _mapping)
     result = {"name": parameter_name}
     if translated_parameter is not None:
         result.update(translated_parameter)
