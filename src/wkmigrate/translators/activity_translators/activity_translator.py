@@ -35,7 +35,7 @@ from wkmigrate.translators.activity_translators.spark_jar_activity_translator im
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import translate_spark_python_activity
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
 from wkmigrate.translators.linked_service_translators import translate_databricks_cluster_spec
-from wkmigrate.utils import get_placeholder_activity, normalize_translated_result, parse_activity_timeout_string
+from wkmigrate.utils import get_placeholder_activity, normalize_translated_result, parse_timeout_string
 
 
 TypeTranslator = Callable[[dict, dict], TranslationResult]
@@ -355,7 +355,7 @@ def _parse_policy(policy: dict | None) -> dict:
     if "timeout" in policy and policy.get("timeout"):
         timeout_value = policy.get("timeout")
         if timeout_value is not None:
-            parsed_policy["timeout_seconds"] = parse_activity_timeout_string(timeout_value)
+            parsed_policy["timeout_seconds"] = parse_timeout_string(timeout_value)
 
     if "retry" in policy:
         retry_value = policy.get("retry")
