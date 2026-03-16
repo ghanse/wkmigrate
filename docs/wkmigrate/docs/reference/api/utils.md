@@ -64,14 +64,23 @@ Appends the ``CREATED_BY_WKMIGRATE`` system tag to a set of job tags.
 
 - `dict` - Updated tag dictionary.
 
-#### parse\_activity\_timeout\_string
+#### parse\_timeout\_string
 
 ```python
-def parse_activity_timeout_string(timeout_string: str,
-                                  prefix: str = "") -> int
+def parse_timeout_string(timeout_string: str, prefix: str = "") -> int
 ```
 
-Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
+Parses a timeout string in the format ``d.hh:mm:ss`` or ``hh:mm:ss`` into seconds.
+
+Supports ADF timeout formats including:
+- ``"0.12:00:00"`` (12 hours)
+- ``"1.00:00:00"`` (1 day)
+- ``"2.05:30:00"`` (2 days, 5 hours, 30 minutes)
+- ``"00:30:00"`` (30 minutes, no day prefix)
+
+When the timeout string cannot be parsed or represents a zero/negative duration,
+a ``NotTranslatableWarning`` is emitted and the ADF default of 12 hours
+(``DEFAULT_TIMEOUT_SECONDS``) is returned instead of raising an exception.
 
 **Arguments**:
 
@@ -81,7 +90,14 @@ Parses a timeout string in the format ``d.hh:mm:ss`` into seconds.
 
 **Returns**:
 
-  Total seconds represented by the timeout.
+  Total seconds represented by the timeout, or ``DEFAULT_TIMEOUT_SECONDS``
+  when the value cannot be parsed.
+  
+
+**Warns**:
+
+- `NotTranslatableWarning` - If the timeout string is not in a recognised format
+  or represents zero/negative duration.
 
 #### parse\_authentication
 

@@ -176,3 +176,76 @@ print(f"Created {len(job_ids)} jobs: {job_ids}")
 <Admonition type="info" title="Error handling in batch methods">
 When using `load_all`, `to_jobs`, and `to_asset_bundles` failures of a single pipeline will raise a warning and skip translation of the failed pipeline. The remaining pipelines will be processed. Check logs for warnings after a batch run to identify any failures.
 </Admonition>
+
+## Customize translation with definition store options
+
+`WorkspaceDefinitionStore` accepts an `options` dictionary that customizes how workflows are generated and deployed. 
+Specifying definition store options will adapt the migration output without modifying the translated pipeline definition.
+
+### Available options
+
+| Option                 | Type                          | Description                                                                                                                                                     |
+|------------------------|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `workspace_url`        | `str`                         | Overrides the Databricks host URL used when resolving linked services during translation.                                                                       |
+| `root_path`            | `str`                         | Rewrites notebook and pipeline paths so artifacts are placed under a different workspace directory. Useful for cross-workspace or cross-environment migrations. |
+| `compute_type`         | `"serverless"` or `"classic"` | When set to `"serverless"`, strips `new_cluster` definitions so that jobs run on serverless compute.                                                            |
+| `files_to_delta_sinks` | `bool`                        | Converts non-Delta file sinks to Delta format during DLT pipeline generation.                                                                                   |
+| `catalog`              | `str`                         | Overrides the Unity Catalog catalog name used for generated DLT pipelines.                                                                                      |
+| `schema`               | `str`                         | Overrides the Unity Catalog schema name used for generated DLT pipelines.                                                                                       |
+
+### Set options at construction time
+
+Pass an `options` dictionary when you create the definition store:
+
+```python
+workspace_definition_store = WorkspaceDefinitionStore(
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS PAT>",
+    authentication_type="pat",
+    options={
+        "root_path": "/Workspace/Users/team@example.com/migrated",
+        "compute_type": "serverless",
+        "catalog": "main",
+        "schema": "bronze",
+    },
+)
+```
+
+### Set options after construction
+
+You can also modify options on an existing store using `set_option` and `set_options`:
+
+```python
+# Set a single option
+workspace_definition_store.set_option("compute_type", "serverless")
+
+# Replace all options at once
+workspace_definition_store.set_options({
+    "root_path": "/Workspace/Shared/prod",
+    "files_to_delta_sinks": True,
+})
+```
+
+Options are stored in the `options` attribute and can be read directly:
+
+```python
+print(workspace_definition_store.options)
+# {"root_path": "/Workspace/Shared/prod", "files_to_delta_sinks": True}
+```
+
+### Example: Deploying to a different workspace path with serverless compute
+
+```python
+workspace_definition_store = WorkspaceDefinitionStore(
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS PAT>",
+    authentication_type="pat",
+    options={
+        "root_path": "/Workspace/Shared/production/pipelines",
+        "compute_type": "serverless",
+    },
+)
+
+# Options are applied automatically when creating jobs or asset bundles
+job_id = workspace_definition_store.to_job(pipeline_ir)
+```

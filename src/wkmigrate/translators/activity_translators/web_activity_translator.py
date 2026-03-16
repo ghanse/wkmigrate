@@ -8,7 +8,7 @@ objects for any unparsable inputs.
 
 from wkmigrate.models.ir.pipeline import WebActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.utils import parse_activity_timeout_string, parse_authentication
+from wkmigrate.utils import parse_timeout_string, parse_authentication
 
 
 def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | UnsupportedValue:
@@ -31,7 +31,7 @@ def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | U
         return UnsupportedValue(activity, "Missing value 'method' for Web activity")
 
     raw_timeout = activity.get("http_request_timeout")
-    timeout_seconds = parse_activity_timeout_string(raw_timeout, prefix="0.") if raw_timeout else None
+    timeout_seconds = parse_timeout_string(raw_timeout, prefix="0.") if raw_timeout else None
 
     activity_name = activity.get("name")
     if not activity_name:

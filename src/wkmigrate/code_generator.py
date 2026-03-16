@@ -15,6 +15,8 @@ from wkmigrate.datasets import DATASET_OPTIONS, DATASET_SECRETS
 from wkmigrate.models.ir.pipeline import Authentication
 from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 
+DEFAULT_CREDENTIALS_SCOPE = "wkmigrate_credentials_scope"
+
 
 def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
     """
@@ -44,31 +46,35 @@ def get_set_variable_notebook_content(variable_name: str, variable_value: str) -
     return autopep8.fix_code("\n".join(script_lines))
 
 
-def get_option_expressions(dataset_definition: dict) -> list[str]:
+def get_option_expressions(dataset_definition: dict, credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE) -> list[str]:
     """
     Generates code to create a Spark data source options dictionary for the specified dataset definition.
 
     Args:
         dataset_definition: Dataset definition dictionary.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines that creates an options dictionary.
     """
     dataset_type = dataset_definition.get("type")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
-        return get_file_options(dataset_definition, dataset_type)
+        return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     if dataset_type == "sqlserver":
-        return get_database_options(dataset_definition, dataset_type)
+        return get_database_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     return []
 
 
-def get_file_options(dataset_definition: dict, file_type: str) -> list[str]:
+def get_file_options(
+    dataset_definition: dict, file_type: str, credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE
+) -> list[str]:
     """
     Generates code to create a Spark data source options dictionary for a file dataset.
 
     Args:
         dataset_definition: Dataset definition dictionary.
         file_type: File type (for example ``"csv"`` or ``"parquet"``).
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines that create the options dictionary.
@@ -147,7 +153,7 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
         f"""spark.conf.set(
                 "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
                     dbutils.secrets.get(
-                        scope="wkmigrate_credentials_scope",
+                        scope="{credentials_scope}",
                         key="{service_name}_storage_account_key"
                 )
             )
@@ -155,13 +161,16 @@ def _get_file_credential_lines(dataset_definition: dict, service_name: str, prov
     ]
 
 
-def get_database_options(dataset_definition: dict, database_type: str) -> list[str]:
+def get_database_options(
+    dataset_definition: dict, database_type: str, credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE
+) -> list[str]:
     """
     Generates code to create a Spark data source options dictionary for interacting with a database.
 
     Args:
         dataset_definition: Dataset definition dictionary.
         database_type: Database type (for example ``"sqlserver"``).
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines that create the options dictionary.
@@ -170,7 +179,7 @@ def get_database_options(dataset_definition: dict, database_type: str) -> list[s
     service_name = dataset_definition["service_name"]
     secrets_lines = [
         f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
-                scope="wkmigrate_credentials_scope", 
+                scope="{credentials_scope}",
                 key="{service_name}_{secret}"
             )
             """
@@ -322,6 +331,7 @@ def get_web_activity_notebook_content(
     disable_cert_validation: bool = False,
     http_request_timeout_seconds: int | None = None,
     turn_off_async: bool = False,
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
 ) -> str:
     """
     Generates notebook source for a Web activity.
@@ -340,6 +350,7 @@ def get_web_activity_notebook_content(
         disable_cert_validation: When ``True``, TLS certificate verification is skipped.
         http_request_timeout_seconds: Optional HTTP request timeout in seconds.
         turn_off_async: When ``True``, noted in the notebook as a comment for visibility.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         Formatted Python notebook source as a ``str``.
@@ -370,7 +381,7 @@ def get_web_activity_notebook_content(
         script_lines.append(f'kwargs["timeout"] = {http_request_timeout_seconds}')
 
     if authentication:
-        script_lines.extend(_get_authentication_lines(activity_name, activity_type, authentication))
+        script_lines.extend(_get_authentication_lines(activity_name, activity_type, authentication, credentials_scope))
 
     if turn_off_async:
         script_lines.append("")
@@ -390,7 +401,12 @@ def get_web_activity_notebook_content(
     return autopep8.fix_code("\n".join(script_lines))
 
 
-def _get_authentication_lines(activity_name: str, activity_type: str, authentication: Authentication) -> list[str]:
+def _get_authentication_lines(
+    activity_name: str,
+    activity_type: str,
+    authentication: Authentication,
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+) -> list[str]:
     """
     Generates notebook source lines for an authentication configuration.
 
@@ -398,6 +414,7 @@ def _get_authentication_lines(activity_name: str, activity_type: str, authentica
         activity_name: Logical name of the activity being translated.
         activity_type: Activity type string emitted by ADF.
         authentication: Parsed authentication configuration.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines to append to the notebook script.
@@ -405,24 +422,27 @@ def _get_authentication_lines(activity_name: str, activity_type: str, authentica
     with not_translatable_context(activity_name, activity_type):
         match authentication.auth_type.lower():
             case "basic":
-                return _get_basic_authentication_lines(authentication)
+                return _get_basic_authentication_lines(authentication, credentials_scope)
             case _:
                 raise NotTranslatableWarning(
                     "authentication_type", f"Unsupported authentication type '{authentication.auth_type}'"
                 )
 
 
-def _get_basic_authentication_lines(authentication: Authentication) -> list[str]:
+def _get_basic_authentication_lines(
+    authentication: Authentication, credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE
+) -> list[str]:
     """
     Generates notebook source lines for Basic authentication.
 
     Args:
         authentication: Parsed authentication configuration.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines to append to the notebook script.
     """
     return [
         f'kwargs["auth"] = ({authentication.username!r}, '
-        f'dbutils.secrets.get(scope="wkmigrate_credentials_scope", key="{authentication.password_secret_key}"))'
+        f'dbutils.secrets.get(scope="{credentials_scope}", key="{authentication.password_secret_key}"))'
     ]

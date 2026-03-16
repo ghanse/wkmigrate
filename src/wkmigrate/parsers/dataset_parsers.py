@@ -5,10 +5,10 @@ options and type-specific metadata. Parsers should emit ``UnsupportedValue`` obj
 for any unparsable inputs.
 """
 
-from datetime import datetime, timedelta
 import json
 from wkmigrate.enums.isolation_level import IsolationLevel
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.utils import parse_timeout_string
 
 
 def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
@@ -233,7 +233,7 @@ def _parse_query_timeout_seconds(properties: dict | None) -> int | UnsupportedVa
     query_timeout = properties.get("query_timeout")
     if query_timeout is None:
         return 0
-    return _parse_query_timeout_string(query_timeout)
+    return parse_timeout_string(query_timeout)
 
 
 def _parse_query_isolation_level(properties: dict | None) -> str | None:
@@ -252,25 +252,6 @@ def _parse_query_isolation_level(properties: dict | None) -> str | None:
     if isolation_level is None:
         return "READ_COMMITTED"
     return IsolationLevel(isolation_level).name
-
-
-def _parse_query_timeout_string(timeout_string: str) -> int | UnsupportedValue:
-    """
-    Parses an ``hh:mm:ss`` string into seconds.
-
-    Args:
-        timeout_string: Timeout string in ``HH:MM:SS`` format.
-
-    Returns:
-        Integer number of seconds represented by the string.
-    """
-    try:
-        time_format = "%H:%M:%S"
-        date_time = datetime.strptime(timeout_string, time_format)
-        time_delta = timedelta(hours=date_time.hour, minutes=date_time.minute, seconds=date_time.second)
-        return int(time_delta.total_seconds())
-    except ValueError:
-        return UnsupportedValue(value=timeout_string, message=f"Invalid query timeout string '{timeout_string}'")
 
 
 def _parse_character_value(char: str) -> str:
