@@ -2,7 +2,6 @@
 
 from wkmigrate.translators.trigger_translators.parsers import parse_cron_expression
 
-
 _DEFAULT_TIMEZONE = "UTC"
 
 

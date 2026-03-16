@@ -37,7 +37,6 @@ from wkmigrate.translators.activity_translators.web_activity_translator import t
 from wkmigrate.translators.linked_service_translators import translate_databricks_cluster_spec
 from wkmigrate.utils import get_placeholder_activity, normalize_translated_result, parse_timeout_string
 
-
 TypeTranslator = Callable[[dict, dict], TranslationResult]
 
 _default_type_translators: dict[str, TypeTranslator] = {

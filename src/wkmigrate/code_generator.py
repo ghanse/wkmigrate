@@ -369,10 +369,18 @@ def _get_file_credential_lines(
     if provider_type == "gcs":
         return [
             f"""spark.conf.set(
-                "fs.gs.auth.service.account.private.key",
+                "fs.gs.hmac.key.access",
                     dbutils.secrets.get(
                         scope="{credentials_scope}",
-                        key="{service_name}_service_account_key"
+                        key="{service_name}_access_key_id"
+                )
+            )
+            """,
+            f"""spark.conf.set(
+                "fs.gs.hmac.key.secret",
+                    dbutils.secrets.get(
+                        scope="{credentials_scope}",
+                        key="{service_name}_secret_access_key"
                 )
             )
             """,

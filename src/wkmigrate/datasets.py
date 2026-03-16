@@ -32,7 +32,7 @@ DATASET_PROVIDER_SECRETS: dict[str, list[str]] = {
     "abfs": ["storage_account_key"],
     "azure_blob": ["storage_account_key"],
     "delta": [],
-    "gcs": ["service_account_key"],
+    "gcs": ["access_key_id", "secret_access_key"],
     "s3": ["access_key_id", "secret_access_key"],
     "sqlserver": ["host", "database", "user_name", "password"],
 }

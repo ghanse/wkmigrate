@@ -3,7 +3,6 @@
 from wkmigrate.translators.pipeline_translators.parsers import parse_parameter_value
 from wkmigrate.utils import translate
 
-
 mapping = {"default": {"key": "default_value", "parser": parse_parameter_value}}
 
 

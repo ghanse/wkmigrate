@@ -25,11 +25,12 @@ def _build_cloud_dataset(
     folder_path: str,
     file_name: str,
     linked_service: dict,
+    container_key: str = "bucket_name",
 ) -> dict:
     """Build a cloud file dataset definition for testing."""
     location = {
         "type": location_type,
-        "bucket_name": bucket_name,
+        container_key: bucket_name,
         "folder_path": folder_path,
         "file_name": file_name,
     }
@@ -293,9 +294,8 @@ class TestAzureBlobFileDataset:
                     ),
                 },
             },
+            container_key="container",
         )
-        # Azure Blob uses container key
-        dataset["properties"]["location"]["container"] = dataset["properties"]["location"].pop("bucket_name")
         result = translate_cloud_file_dataset("Parquet", dataset, "azure_blob")
 
         assert isinstance(result, FileDataset)

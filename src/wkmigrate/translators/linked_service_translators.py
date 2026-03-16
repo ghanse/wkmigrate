@@ -188,7 +188,7 @@ def translate_azure_blob_spec(azure_blob_spec: dict) -> AzureBlobLinkedService |
 
     storage_account_name = properties.get("storage_account_name")
     if storage_account_name is None and connection_string is not None:
-        parsed = _parse_storage_account_name_from_connection_string(connection_string)
+        parsed = _parse_storage_account_name(connection_string)
         if not isinstance(parsed, UnsupportedValue):
             storage_account_name = parsed
 
@@ -313,18 +313,5 @@ def _parse_storage_account_name(connection_string: str) -> str | UnsupportedValu
 
     Returns:
         Storage account name as a ``str``.
-    """
-    return extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")
-
-
-def _parse_storage_account_name_from_connection_string(connection_string: str) -> str | UnsupportedValue:
-    """
-    Extracts the storage account name from an Azure Storage connection string.
-
-    Args:
-        connection_string: Azure Storage connection string.
-
-    Returns:
-        Storage account name as a ``str``, or ``UnsupportedValue`` if parsing fails.
     """
     return extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")

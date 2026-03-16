@@ -13,6 +13,11 @@ from wkmigrate.datasets import (
     SQL_DATASET_TYPES,
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.models.ir.linked_services import (
+    AzureBlobLinkedService,
+    GcsLinkedService,
+    S3LinkedService,
+)
 from wkmigrate.models.ir.datasets import (
     Dataset,
     DeltaTableDataset,
@@ -441,7 +446,9 @@ def _parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
     return file_name if not folder_path else f"{folder_path}/{file_name}"
 
 
-def _translate_cloud_linked_service(provider_type: str, linked_service_definition: dict):
+def _translate_cloud_linked_service(
+    provider_type: str, linked_service_definition: dict
+) -> S3LinkedService | GcsLinkedService | AzureBlobLinkedService | UnsupportedValue:
     """
     Dispatches to the appropriate linked-service translator for the given cloud provider.
 
