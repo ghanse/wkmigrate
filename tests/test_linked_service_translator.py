@@ -246,14 +246,14 @@ def test_translate_s3_spec_parses_result(linked_service_definition, expected_res
             {
                 "name": "gcs-linked-service",
                 "properties": {
-                    "project_id": "my-gcp-project",
+                    "access_key_id": "my-gcs-key",
                     "service_url": "https://storage.googleapis.com",
                 },
             },
             GcsLinkedService(
                 service_name="gcs-linked-service",
                 service_type="gcs",
-                project_id="my-gcp-project",
+                access_key_id="my-gcs-key",
                 service_url="https://storage.googleapis.com",
             ),
             does_not_raise(),
@@ -294,29 +294,34 @@ def test_translate_gcs_spec_parses_result(linked_service_definition, expected_re
             {
                 "name": "blob-linked-service",
                 "properties": {
-                    "url": "https://myblobaccount.blob.core.windows.net/",
+                    "connection_string": (
+                        "DefaultEndpointsProtocol=https;AccountName=myblobaccount;" "EndpointSuffix=core.windows.net;"
+                    ),
                     "storage_account_name": "myblobaccount",
                 },
             },
             AzureBlobLinkedService(
                 service_name="blob-linked-service",
                 service_type="azure_blob",
-                url="https://myblobaccount.blob.core.windows.net/",
+                connection_string=(
+                    "DefaultEndpointsProtocol=https;AccountName=myblobaccount;" "EndpointSuffix=core.windows.net;"
+                ),
                 storage_account_name="myblobaccount",
             ),
             does_not_raise(),
         ),
         (
             {
-                "name": "blob-no-url",
+                "name": "blob-no-conn",
                 "properties": {},
             },
             UnsupportedValue(
                 value={
-                    "name": "blob-no-url",
+                    "name": "blob-no-conn",
                     "properties": {},
                 },
-                message="Missing property 'url' in Azure Blob linked service definition",
+                message="Missing property 'connection_string' or 'service_endpoint'"
+                " in Azure Blob linked service definition",
             ),
             does_not_raise(),
         ),

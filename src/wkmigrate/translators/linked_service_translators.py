@@ -158,7 +158,7 @@ def translate_gcs_spec(gcs_spec: dict) -> GcsLinkedService | UnsupportedValue:
     return GcsLinkedService(
         service_name=gcs_spec.get("name", str(uuid4())),
         service_type="gcs",
-        project_id=properties.get("project_id"),
+        access_key_id=properties.get("access_key_id"),
         service_url=properties.get("service_url"),
     )
 
@@ -177,18 +177,26 @@ def translate_azure_blob_spec(azure_blob_spec: dict) -> AzureBlobLinkedService |
         return UnsupportedValue(value=azure_blob_spec, message="Missing Azure Blob linked service definition")
 
     properties = azure_blob_spec.get("properties", {})
-    url = properties.get("url")
-    if url is None:
+    connection_string = properties.get("connection_string")
+    service_endpoint = properties.get("service_endpoint")
+
+    if connection_string is None and service_endpoint is None:
         return UnsupportedValue(
-            value=azure_blob_spec, message="Missing property 'url' in Azure Blob linked service definition"
+            value=azure_blob_spec,
+            message="Missing property 'connection_string' or 'service_endpoint' in Azure Blob linked service definition",
         )
 
     storage_account_name = properties.get("storage_account_name")
+    if storage_account_name is None and connection_string is not None:
+        parsed = _parse_storage_account_name_from_connection_string(connection_string)
+        if not isinstance(parsed, UnsupportedValue):
+            storage_account_name = parsed
 
     return AzureBlobLinkedService(
         service_name=azure_blob_spec.get("name", str(uuid4())),
         service_type="azure_blob",
-        url=url,
+        connection_string=connection_string,
+        service_endpoint=service_endpoint,
         storage_account_name=storage_account_name,
     )
 
@@ -305,5 +313,18 @@ def _parse_storage_account_name(connection_string: str) -> str | UnsupportedValu
 
     Returns:
         Storage account name as a ``str``.
+    """
+    return extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")
+
+
+def _parse_storage_account_name_from_connection_string(connection_string: str) -> str | UnsupportedValue:
+    """
+    Extracts the storage account name from an Azure Storage connection string.
+
+    Args:
+        connection_string: Azure Storage connection string.
+
+    Returns:
+        Storage account name as a ``str``, or ``UnsupportedValue`` if parsing fails.
     """
     return extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")

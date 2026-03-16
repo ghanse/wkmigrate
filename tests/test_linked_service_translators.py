@@ -371,7 +371,7 @@ def test_full_gcs_configuration(linked_service_fixtures: list[dict]) -> None:
     assert isinstance(result, GcsLinkedService)
     assert result.service_name == fixture["expected"]["service_name"]
     assert result.service_type == fixture["expected"]["service_type"]
-    assert result.project_id == fixture["expected"]["project_id"]
+    assert result.access_key_id == fixture["expected"]["access_key_id"]
     assert result.service_url == fixture["expected"]["service_url"]
 
 
@@ -383,7 +383,7 @@ def test_minimal_gcs_configuration(linked_service_fixtures: list[dict]) -> None:
     assert isinstance(result, GcsLinkedService)
     assert result.service_name == fixture["expected"]["service_name"]
     assert result.service_type == fixture["expected"]["service_type"]
-    assert result.project_id is None
+    assert result.access_key_id is None
     assert result.service_url is None
 
 
@@ -407,13 +407,13 @@ def test_full_azure_blob_configuration(linked_service_fixtures: list[dict]) -> N
     assert isinstance(result, AzureBlobLinkedService)
     assert result.service_name == fixture["expected"]["service_name"]
     assert result.service_type == fixture["expected"]["service_type"]
-    assert result.url == fixture["expected"]["url"]
+    assert result.connection_string == fixture["expected"]["connection_string"]
     assert result.storage_account_name == fixture["expected"]["storage_account_name"]
 
 
-def test_azure_blob_missing_url_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
-    """Test that missing URL returns UnsupportedValue."""
-    fixture = get_fixture(linked_service_fixtures, "azure_blob_missing_url")
+def test_azure_blob_missing_connection_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that missing connection_string and service_endpoint returns UnsupportedValue."""
+    fixture = get_fixture(linked_service_fixtures, "azure_blob_missing_connection")
     result = translate_azure_blob_spec(fixture["input"])
 
     assert isinstance(result, UnsupportedValue)

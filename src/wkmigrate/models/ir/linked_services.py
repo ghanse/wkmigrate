@@ -78,11 +78,11 @@ class GcsLinkedService(LinkedService):
     Linked-service metadata for Google Cloud Storage.
 
     Attributes:
-        project_id: Google Cloud project identifier.
+        access_key_id: HMAC access key identifier used for authentication.
         service_url: Custom GCS-compatible endpoint URL, when applicable.
     """
 
-    project_id: str | None = None
+    access_key_id: str | None = None
     service_url: str | None = None
 
 
@@ -92,12 +92,14 @@ class AzureBlobLinkedService(LinkedService):
     Linked-service metadata for Azure Blob Storage.
 
     Attributes:
-        storage_account_name: Storage account name for the Azure Blob endpoint.
-        url: Fully qualified base URL for the storage account.
+        connection_string: Azure Storage connection string.
+        service_endpoint: Service endpoint URL for the storage account.
+        storage_account_name: Storage account name parsed from the connection string.
     """
 
+    connection_string: str | None = None
+    service_endpoint: str | None = None
     storage_account_name: str | None = None
-    url: str | None = None
 
 
 @dataclass(slots=True)

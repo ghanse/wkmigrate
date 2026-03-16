@@ -17,22 +17,23 @@ from wkmigrate.models.workflows.instructions import SecretInstruction
 from wkmigrate.utils import parse_mapping
 
 FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
-S3_DATASET_TYPES = {"AmazonS3Dataset"}
-GCS_DATASET_TYPES = {"GoogleCloudStorageDataset"}
-AZURE_BLOB_DATASET_TYPES = {"AzureBlobStorageDataset"}
 SQL_DATASET_TYPES = {"AzureSqlTable"}
 DELTA_DATASET_TYPES = {"AzureDatabricksDeltaLakeDataset"}
 
-DATASET_SECRETS: dict[str, list[str]] = {
-    "avro": ["storage_account_key"],
-    "csv": ["storage_account_key"],
-    "delta": [],
-    "json": ["storage_account_key"],
-    "orc": ["storage_account_key"],
-    "parquet": ["storage_account_key"],
-    "s3": ["access_key_id", "secret_access_key"],
-    "gcs": ["service_account_key"],
+CLOUD_LOCATION_TYPES: dict[str, str] = {
+    "AmazonS3Location": "s3",
+    "GoogleCloudStorageLocation": "gcs",
+    "AzureBlobStorageLocation": "azure_blob",
+}
+
+DEFAULT_CREDENTIALS_SCOPE = "wkmigrate_credentials_scope"
+
+DATASET_PROVIDER_SECRETS: dict[str, list[str]] = {
+    "abfs": ["storage_account_key"],
     "azure_blob": ["storage_account_key"],
+    "delta": [],
+    "gcs": ["service_account_key"],
+    "s3": ["access_key_id", "secret_access_key"],
     "sqlserver": ["host", "database", "user_name", "password"],
 }
 
@@ -158,9 +159,12 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:
     """
     Builds the list of ``SecretInstruction`` objects required for a dataset definition.
 
-    Each dataset type declares a set of secret keys in ``DATASET_SECRETS``.  This
-    helper creates one ``SecretInstruction`` per declared key, stamped with the
+    Each provider type declares a set of secret keys in ``DATASET_PROVIDER_SECRETS``.
+    This helper creates one ``SecretInstruction`` per declared key, stamped with the
     service name and type so the workspace deployer can materialise the secrets.
+
+    File datasets resolve secrets by ``provider_type`` (e.g. ``"abfs"``, ``"s3"``).
+    SQL datasets resolve secrets by ``service_type`` (e.g. ``"sqlserver"``).
 
     Args:
         definition: Flat dataset definition dictionary produced by ``merge_dataset_definition``.
@@ -171,21 +175,27 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:
     """
     service_type = definition.get("type")
     service_name = definition.get("service_name")
-    provider_type = definition.get("provider_type")
     if service_type is None or service_name is None:
         return []
-    # Look up secrets by provider_type first (for cloud file datasets whose
-    # service_type is the file format, not the cloud provider), then fall back
-    # to service_type for non-file datasets (e.g. sqlserver, delta).
-    secret_keys = DATASET_SECRETS.get(provider_type or "", []) or DATASET_SECRETS.get(service_type, [])
+
+    provider_type = definition.get("provider_type")
+    if provider_type is not None:
+        # File dataset: look up by provider
+        secret_keys = DATASET_PROVIDER_SECRETS.get(provider_type, [])
+        lookup_type = provider_type
+    else:
+        # SQL or other dataset: look up by service type
+        secret_keys = DATASET_PROVIDER_SECRETS.get(service_type, [])
+        lookup_type = service_type
+
     collected: list[SecretInstruction] = []
     for secret in secret_keys:
         value = definition.get(secret)
         instruction = SecretInstruction(
-            scope="wkmigrate_credentials_scope",
+            scope=DEFAULT_CREDENTIALS_SCOPE,
             key=f"{service_name}_{secret}",
             service_name=service_name,
-            service_type=provider_type or service_type,
+            service_type=lookup_type,
             provided_value=value,
         )
         collected.append(instruction)
