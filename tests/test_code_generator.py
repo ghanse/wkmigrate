@@ -76,9 +76,6 @@ def test_web_activity_notebook_with_unsupported_auth_type() -> None:
     assert "UNSUPPORTED_AUTH_TYPE" in str(exc_info.value)
 
 
-# --- Configurable credentials scope tests (fix for #35) ---
-
-
 def test_default_credentials_scope_constant() -> None:
     """DEFAULT_CREDENTIALS_SCOPE is 'wkmigrate_credentials_scope'."""
     assert DEFAULT_CREDENTIALS_SCOPE == "wkmigrate_credentials_scope"

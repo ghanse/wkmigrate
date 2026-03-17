@@ -61,7 +61,7 @@ class AbfsLinkedService(LinkedService):
 @dataclass(slots=True)
 class S3LinkedService(LinkedService):
     """
-    Linked-service metadata for Amazon S3 storage.
+    Linked-service metadata for Amazon S3.
 
     Attributes:
         access_key_id: AWS access key identifier used for authentication.
@@ -92,14 +92,12 @@ class AzureBlobLinkedService(LinkedService):
     Linked-service metadata for Azure Blob Storage.
 
     Attributes:
-        connection_string: Azure Storage connection string.
-        service_endpoint: Service endpoint URL for the storage account.
         storage_account_name: Storage account name parsed from the connection string.
+        url: Storage account URL (can be a container URL, SAS URI, or service endpoint URL).
     """
 
-    connection_string: str | None = None
-    service_endpoint: str | None = None
     storage_account_name: str | None = None
+    url: str | None = None
 
 
 @dataclass(slots=True)

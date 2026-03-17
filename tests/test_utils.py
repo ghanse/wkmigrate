@@ -49,9 +49,6 @@ def test_parse_authentication_missing_username_returns_unsupported() -> None:
     assert "Missing value 'username'" in result.message
 
 
-# --- Timeout parsing tests (fix for #36) ---
-
-
 def test_timeout_zero_day_twelve_hours() -> None:
     """0.12:00:00 is 12 hours = 43200 seconds."""
     assert parse_timeout_string("0.12:00:00") == 43200

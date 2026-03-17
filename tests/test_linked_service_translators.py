@@ -324,9 +324,6 @@ def test_uuid_generated_when_no_name() -> None:
     assert len(result.service_name) > 0
 
 
-# --- Amazon S3 linked service tests ---
-
-
 def test_full_s3_configuration(linked_service_fixtures: list[dict]) -> None:
     """Test translation of S3 linked service with full configuration."""
     fixture = get_fixture(linked_service_fixtures, "s3_full")
@@ -358,9 +355,6 @@ def test_s3_null_input_returns_unsupported(linked_service_fixtures: list[dict]) 
 
     assert isinstance(result, UnsupportedValue)
     assert fixture["expected_message"] in result.message
-
-
-# --- Google Cloud Storage linked service tests ---
 
 
 def test_full_gcs_configuration(linked_service_fixtures: list[dict]) -> None:
@@ -396,9 +390,6 @@ def test_gcs_null_input_returns_unsupported(linked_service_fixtures: list[dict])
     assert fixture["expected_message"] in result.message
 
 
-# --- Azure Data Lake Storage Gen2 linked service tests ---
-
-
 def test_full_azure_blob_configuration(linked_service_fixtures: list[dict]) -> None:
     """Test translation of Azure Blob linked service with full configuration."""
     fixture = get_fixture(linked_service_fixtures, "azure_blob_full")
@@ -407,7 +398,7 @@ def test_full_azure_blob_configuration(linked_service_fixtures: list[dict]) -> N
     assert isinstance(result, AzureBlobLinkedService)
     assert result.service_name == fixture["expected"]["service_name"]
     assert result.service_type == fixture["expected"]["service_type"]
-    assert result.connection_string == fixture["expected"]["connection_string"]
+    assert result.url == fixture["expected"]["url"]
     assert result.storage_account_name == fixture["expected"]["storage_account_name"]
 
 

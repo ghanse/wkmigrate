@@ -24,6 +24,7 @@ CLOUD_LOCATION_TYPES: dict[str, str] = {
     "AmazonS3Location": "s3",
     "GoogleCloudStorageLocation": "gcs",
     "AzureBlobStorageLocation": "azure_blob",
+    "AzureBlobFSLocation": "abfs",
 }
 
 DEFAULT_CREDENTIALS_SCOPE = "wkmigrate_credentials_scope"

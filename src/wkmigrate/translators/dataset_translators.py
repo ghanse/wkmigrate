@@ -14,6 +14,7 @@ from wkmigrate.datasets import (
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.models.ir.linked_services import (
+    AbfsLinkedService,
     AzureBlobLinkedService,
     GcsLinkedService,
     S3LinkedService,
@@ -34,10 +35,12 @@ from wkmigrate.translators.linked_service_translators import (
 )
 
 _IGNORED_FORMAT_OPTIONS = {"dataset_name", "container", "folder_path"}
+CloudLinkedService = S3LinkedService | GcsLinkedService | AzureBlobLinkedService | AbfsLinkedService
 
 
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
-    """Translates a raw ADF dataset definition into a ``Dataset`` object.
+    """
+    Translates a raw ADF dataset definition into a ``Dataset`` object.
 
     Supports files, SQL tables, and Delta tables.  Datasets that cannot be
     fully translated are returned as ``UnsupportedValue``.
@@ -46,7 +49,7 @@ def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Translated ``Dataset``, or ``UnsupportedValue`` on failure.
+        Translated ``Dataset`` or ``UnsupportedValue`` if the dataset cannot be translated.
     """
     dataset_properties = dataset.get("properties", {})
     if not dataset_properties:
@@ -59,9 +62,9 @@ def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
     if dataset_type in FILE_DATASET_TYPES:
         location_type = dataset_properties.get("location", {}).get("type", "")
         provider_type = CLOUD_LOCATION_TYPES.get(location_type)
-        if provider_type is not None:
-            return translate_cloud_file_dataset(dataset_type, dataset, provider_type)
-        return translate_file_dataset(dataset_type, dataset)
+        if provider_type is None:
+            return UnsupportedValue(value=dataset, message=f"Unsupported cloud file location type '{location_type}'")
+        return translate_cloud_file_dataset(dataset_type, dataset, provider_type)
     if dataset_type in SQL_DATASET_TYPES:
         return translate_sql_server_dataset(dataset)
     if dataset_type in DELTA_DATASET_TYPES:
@@ -153,8 +156,8 @@ def translate_cloud_file_dataset(
     if isinstance(format_options, UnsupportedValue):
         return UnsupportedValue(value=dataset, message=format_options.message)
 
-    storage_account_name = getattr(linked_service, "storage_account_name", None)
-    service_url = getattr(linked_service, "service_url", None) or getattr(linked_service, "service_endpoint", None)
+    storage_account_name = _get_storage_account_name(linked_service)
+    service_url = _get_service_url(linked_service)
 
     return FileDataset(
         dataset_name=dataset.get("name", "DATASET_NAME_NOT_PROVIDED"),
@@ -224,6 +227,18 @@ def translate_sql_server_dataset(dataset: dict) -> SqlTableDataset | Unsupported
         authentication_type=linked_service.authentication_type,
         connection_options={},
     )
+
+
+def _get_storage_account_name(linked_service: CloudLinkedService) -> str | None:
+    if isinstance(linked_service, AzureBlobLinkedService | AbfsLinkedService):
+        return linked_service.storage_account_name
+    return None
+
+
+def _get_service_url(linked_service: CloudLinkedService) -> str | None:
+    if isinstance(linked_service, GcsLinkedService | S3LinkedService):
+        return linked_service.service_url
+    return linked_service.url
 
 
 def _parse_format_options(dataset_type: str, dataset: dict) -> dict | UnsupportedValue:
@@ -459,7 +474,7 @@ def _parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
 
 def _translate_cloud_linked_service(
     provider_type: str, linked_service_definition: dict
-) -> S3LinkedService | GcsLinkedService | AzureBlobLinkedService | UnsupportedValue:
+) -> S3LinkedService | GcsLinkedService | AzureBlobLinkedService | AbfsLinkedService | UnsupportedValue:
     """
     Dispatches to the appropriate linked-service translator for the given cloud provider.
 
@@ -474,6 +489,7 @@ def _translate_cloud_linked_service(
         "s3": translate_s3_spec,
         "gcs": translate_gcs_spec,
         "azure_blob": translate_azure_blob_spec,
+        "abfs": translate_abfs_spec,
     }
     translator = translators.get(provider_type)
     if translator is None:

@@ -6,17 +6,10 @@ title: wkmigrate.datasets
 This module defines dataset constants, type mappings, and shared helpers for working with datasets.
 
 Dataset constants define the ADF dataset types that the library can translate, the secret keys
-required per provider type, and the Spark options emitted for each format.  Type-mapping helpers
+required per dataset type, and the Spark options emitted for each format.  Type-mapping helpers
 normalize source-system column types into Spark equivalents.  Shared helpers convert ``Dataset``
 and ``DatasetProperties`` IR objects into flat dictionaries and collect the ``SecretInstruction``
 objects needed to materialise credentials in a Databricks workspace.
-
-Provider secrets are defined in ``DATASET_PROVIDER_SECRETS``, keyed by provider type
-(e.g. ``"abfs"``, ``"s3"``, ``"gcs"``, ``"azure_blob"``, ``"delta"``, ``"sqlserver"``).
-File datasets resolve secrets by ``provider_type``; SQL and other datasets resolve by
-``service_type``.
-
-The default Databricks secrets scope is defined by ``DEFAULT_CREDENTIALS_SCOPE``.
 
 #### parse\_spark\_data\_type
 
@@ -105,9 +98,12 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]
 
 Builds the list of ``SecretInstruction`` objects required for a dataset definition.
 
-Each dataset type declares a set of secret keys in ``DATASET_SECRETS``.  This
-helper creates one ``SecretInstruction`` per declared key, stamped with the
+Each provider type declares a set of secret keys in ``DATASET_PROVIDER_SECRETS``.
+This helper creates one ``SecretInstruction`` per declared key, stamped with the
 service name and type so the workspace deployer can materialise the secrets.
+
+File datasets resolve secrets by ``provider_type`` (e.g. ``"abfs"``, ``"s3"``).
+SQL datasets resolve secrets by ``service_type`` (e.g. ``"sqlserver"``).
 
 **Arguments**:
 

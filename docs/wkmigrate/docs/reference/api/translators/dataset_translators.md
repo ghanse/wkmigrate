@@ -15,7 +15,10 @@ objects for any unparsable inputs.
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue
 ```
 
-Translates a dataset definition returned by the Azure Data Factory API into a ``Dataset`` object. Supports files, SQL tables, and Delta tables. Any datasets which cannot be fully translated will return an ``UnsupportedValue`` object.
+Translates a raw ADF dataset definition into a ``Dataset`` object.
+
+Supports files, SQL tables, and Delta tables.  Datasets that cannot be
+fully translated are returned as ``UnsupportedValue``.
 
 **Arguments**:
 
@@ -24,7 +27,7 @@ Translates a dataset definition returned by the Azure Data Factory API into a ``
 
 **Returns**:
 
-  Dataset as a ``Dataset`` object.
+  Translated ``Dataset`` or ``UnsupportedValue`` if the dataset cannot be translated.
 
 #### translate\_file\_dataset
 
@@ -48,19 +51,24 @@ Translates a file-based dataset definition (e.g. CSV, JSON, or Parquet) into a `
 #### translate\_cloud\_file\_dataset
 
 ```python
-def translate_cloud_file_dataset(dataset_type: str,
-                                 dataset: dict,
-                                 provider_type: str) -> FileDataset | UnsupportedValue
+def translate_cloud_file_dataset(
+        dataset_type: str, dataset: dict,
+        provider_type: str) -> FileDataset | UnsupportedValue
 ```
 
-Translates a cloud file dataset definition (S3, GCS, or Azure Blob) into a ``FileDataset`` object. Cloud file datasets use standard ADF file types (e.g. ``DelimitedText``, ``Parquet``) with cloud-specific location types that determine the storage provider.
+Translates a cloud file dataset definition (S3, GCS, or Azure Blob) into a ``FileDataset`` object.
+
+Cloud file datasets use standard ADF file types (e.g. ``DelimitedText``, ``Parquet``) but
+store data in a cloud provider identified by ``provider_type``.  The storage location is
+parsed from the ``location`` block, and the linked service is translated using the
+appropriate provider-specific translator.
 
 **Arguments**:
 
 - `dataset_type` - ADF dataset type from ``properties.type`` (e.g. ``"DelimitedText"``).
 - `dataset` - Raw dataset definition from Azure Data Factory.
 - `provider_type` - Cloud provider identifier (``"s3"``, ``"gcs"``, or ``"azure_blob"``).
-
+  
 
 **Returns**:
 

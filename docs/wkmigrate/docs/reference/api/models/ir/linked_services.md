@@ -61,7 +61,7 @@ Linked-service metadata for ABFS/ADLS storage accounts.
 class S3LinkedService(LinkedService)
 ```
 
-Linked-service metadata for Amazon S3 storage.
+Linked-service metadata for Amazon S3.
 
 **Attributes**:
 
@@ -93,9 +93,8 @@ Linked-service metadata for Azure Blob Storage.
 
 **Attributes**:
 
-- `connection_string` - Azure Storage connection string.
-- `service_endpoint` - Service endpoint URL for the storage account.
 - `storage_account_name` - Storage account name parsed from the connection string.
+- `url` - Storage account URL (can be a container URL, SAS URI, or service endpoint URL).
 
 ## DatabricksClusterLinkedService Objects
 

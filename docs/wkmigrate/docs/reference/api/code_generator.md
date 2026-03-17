@@ -123,16 +123,18 @@ Generates code to read data from a data source into a DataFrame.
 def get_file_uri(definition: dict) -> str
 ```
 
-Builds the cloud storage URI for a file dataset definition. Returns the correct URI scheme per provider: ``s3a://`` for S3, ``gs://`` for GCS, ``wasbs://`` for Azure Blob, and ``abfss://`` for ABFS (ADLS Gen2).
+Builds the cloud storage URI for a file dataset definition.
 
 **Arguments**:
 
-- `definition` - Dataset definition dictionary containing ``provider_type``, ``container``, ``folder_path``, and (for Azure) ``storage_account_name``.
-
+- `definition` - Dataset definition dictionary containing provider_type, container,
+  folder_path, and (for Azure) storage_account_name.
+  
 
 **Returns**:
 
-  Cloud storage URI string.
+  Cloud storage URI string (for example ``s3a://bucket/path`` or
+  ``abfss://container@account.dfs.core.windows.net/path``).
 
 #### get\_file\_read\_expression
 
