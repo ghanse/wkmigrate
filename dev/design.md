@@ -291,7 +291,7 @@ make integration     # poetry run pytest -m integration (requires Azure env vars
 
 #### CI Workflow
 
-The `.github/workflows/integration.yml` workflow runs integration tests on every push to a PR branch (excluding external forks).
+The `.github/workflows/integration.yml` workflow runs integration tests on pull requests and pushes to `main` (excluding PRs from external forks, which cannot access repository secrets).
 
 ### Running Tests
 
