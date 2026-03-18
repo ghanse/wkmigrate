@@ -117,6 +117,25 @@ Generates code to read data from a data source into a DataFrame.
 
 - `ValueError` - If the dataset type is not supported for reading.
 
+#### get\_file\_uri
+
+```python
+def get_file_uri(definition: dict) -> str
+```
+
+Builds the cloud storage URI for a file dataset definition.
+
+**Arguments**:
+
+- `definition` - Dataset definition dictionary containing provider_type, container,
+  folder_path, and (for Azure) storage_account_name.
+  
+
+**Returns**:
+
+  Cloud storage URI string (for example ``s3a://bucket/path`` or
+  ``abfss://container@account.dfs.core.windows.net/path``).
+
 #### get\_file\_read\_expression
 
 ```python

@@ -6,14 +6,18 @@ Each translator validates required fields, coerces connection settings, and emit
 
 import json
 from wkmigrate.datasets import (
-    AZURE_BLOB_DATASET_TYPES,
+    CLOUD_LOCATION_TYPES,
     DELTA_DATASET_TYPES,
     FILE_DATASET_TYPES,
-    GCS_DATASET_TYPES,
-    S3_DATASET_TYPES,
     SQL_DATASET_TYPES,
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.models.ir.linked_services import (
+    AbfsLinkedService,
+    AzureBlobLinkedService,
+    GcsLinkedService,
+    S3LinkedService,
+)
 from wkmigrate.models.ir.datasets import (
     Dataset,
     DeltaTableDataset,
@@ -30,26 +34,21 @@ from wkmigrate.translators.linked_service_translators import (
 )
 
 _IGNORED_FORMAT_OPTIONS = {"dataset_name", "container", "folder_path"}
-_CLOUD_FORMAT_MAPPINGS: dict[str, str] = {
-    "TextFormat": "DelimitedText",
-    "JsonFormat": "Json",
-    "AvroFormat": "Avro",
-    "OrcFormat": "Orc",
-    "ParquetFormat": "Parquet",
-}
+CloudLinkedService = S3LinkedService | GcsLinkedService | AzureBlobLinkedService | AbfsLinkedService
 
 
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
-    """Translates an ADF dataset definition into a ``Dataset`` IR object.
+    """
+    Translates a raw ADF dataset definition into a ``Dataset`` object.
 
-    Supports file, SQL table, and Delta table datasets. Datasets that cannot be
+    Supports files, SQL tables, and Delta tables.  Datasets that cannot be
     fully translated are returned as ``UnsupportedValue``.
 
     Args:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Translated ``Dataset``, or ``UnsupportedValue`` for unparsable inputs.
+        Translated ``Dataset`` or ``UnsupportedValue`` if the dataset cannot be translated.
     """
     dataset_properties = dataset.get("properties", {})
     if not dataset_properties:
@@ -60,13 +59,11 @@ def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
         return UnsupportedValue(value=dataset, message="Missing property 'type' in dataset properties")
 
     if dataset_type in FILE_DATASET_TYPES:
-        return translate_file_dataset(dataset_type, dataset)
-    if dataset_type in S3_DATASET_TYPES:
-        return translate_s3_file_dataset(dataset)
-    if dataset_type in GCS_DATASET_TYPES:
-        return translate_gcs_file_dataset(dataset)
-    if dataset_type in AZURE_BLOB_DATASET_TYPES:
-        return translate_azure_blob_file_dataset(dataset)
+        location_type = dataset_properties.get("location", {}).get("type", "")
+        provider_type = CLOUD_LOCATION_TYPES.get(location_type)
+        if provider_type is None:
+            return UnsupportedValue(value=dataset, message=f"Unsupported cloud file location type '{location_type}'")
+        return translate_cloud_file_dataset(dataset_type, dataset, provider_type)
     if dataset_type in SQL_DATASET_TYPES:
         return translate_sql_server_dataset(dataset)
     if dataset_type in DELTA_DATASET_TYPES:
@@ -118,18 +115,27 @@ def translate_file_dataset(dataset_type: str, dataset: dict) -> FileDataset | Un
     )
 
 
-def translate_s3_file_dataset(dataset: dict) -> FileDataset | UnsupportedValue:
+def translate_cloud_file_dataset(
+    dataset_type: str, dataset: dict, provider_type: str
+) -> FileDataset | UnsupportedValue:
     """
-    Translates an Amazon S3 dataset definition into a ``FileDataset`` object.
+    Translates a cloud file dataset definition (S3, GCS, or Azure Blob) into a ``FileDataset`` object.
+
+    Cloud file datasets use standard ADF file types (e.g. ``DelimitedText``, ``Parquet``) but
+    store data in a cloud provider identified by ``provider_type``.  The storage location is
+    parsed from the ``location`` block, and the linked service is translated using the
+    appropriate provider-specific translator.
 
     Args:
+        dataset_type: ADF dataset type from ``properties.type`` (e.g. ``"DelimitedText"``).
         dataset: Raw dataset definition from Azure Data Factory.
+        provider_type: Cloud provider identifier (``"s3"``, ``"gcs"``, or ``"azure_blob"``).
 
     Returns:
-        S3 dataset as a ``FileDataset`` object.
+        Cloud file dataset as a ``FileDataset`` object.
     """
     if not dataset:
-        return UnsupportedValue(value=dataset, message="Missing S3 dataset definition")
+        return UnsupportedValue(value=dataset, message=f"Missing {provider_type} dataset definition")
 
     properties = dataset.get("properties", {})
     bucket_name = _parse_cloud_bucket_name(properties)
@@ -140,99 +146,28 @@ def translate_s3_file_dataset(dataset: dict) -> FileDataset | UnsupportedValue:
     if isinstance(file_path, UnsupportedValue):
         return UnsupportedValue(value=dataset, message=file_path.message)
 
-    linked_service = translate_s3_spec(_get_linked_service_definition(dataset))
+    linked_service_definition = _get_linked_service_definition(dataset)
+    linked_service = _translate_cloud_linked_service(provider_type, linked_service_definition)
     if isinstance(linked_service, UnsupportedValue):
         return UnsupportedValue(value=dataset, message=linked_service.message)
 
-    file_format = _parse_cloud_file_format(properties)
+    format_options = _parse_format_options(dataset_type, dataset)
+    if isinstance(format_options, UnsupportedValue):
+        return UnsupportedValue(value=dataset, message=format_options.message)
+
+    storage_account_name = _get_storage_account_name(linked_service)
+    service_url = _get_service_url(linked_service)
 
     return FileDataset(
         dataset_name=dataset.get("name", "DATASET_NAME_NOT_PROVIDED"),
-        dataset_type=file_format,
+        dataset_type=dataset_type,
         container=bucket_name,
         folder_path=file_path,
+        storage_account_name=storage_account_name,
         service_name=linked_service.service_name,
-        url=linked_service.service_url,
-        provider_type="s3",
-    )
-
-
-def translate_gcs_file_dataset(dataset: dict) -> FileDataset | UnsupportedValue:
-    """
-    Translates a Google Cloud Storage dataset definition into a ``FileDataset`` object.
-
-    Args:
-        dataset: Raw dataset definition from Azure Data Factory.
-
-    Returns:
-        GCS dataset as a ``FileDataset`` object.
-    """
-    if not dataset:
-        return UnsupportedValue(value=dataset, message="Missing GCS dataset definition")
-
-    properties = dataset.get("properties", {})
-    bucket_name = _parse_cloud_bucket_name(properties)
-    if isinstance(bucket_name, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=bucket_name.message)
-
-    file_path = _parse_cloud_file_path(properties)
-    if isinstance(file_path, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=file_path.message)
-
-    linked_service = translate_gcs_spec(_get_linked_service_definition(dataset))
-    if isinstance(linked_service, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=linked_service.message)
-
-    file_format = _parse_cloud_file_format(properties)
-
-    return FileDataset(
-        dataset_name=dataset.get("name", "DATASET_NAME_NOT_PROVIDED"),
-        dataset_type=file_format,
-        container=bucket_name,
-        folder_path=file_path,
-        service_name=linked_service.service_name,
-        url=linked_service.service_url,
-        provider_type="gcs",
-    )
-
-
-def translate_azure_blob_file_dataset(dataset: dict) -> FileDataset | UnsupportedValue:
-    """
-    Translates an Azure Blob Storage dataset definition into a ``FileDataset`` object.
-
-    Args:
-        dataset: Raw dataset definition from Azure Data Factory.
-
-    Returns:
-        Azure Blob dataset as a ``FileDataset`` object.
-    """
-    if not dataset:
-        return UnsupportedValue(value=dataset, message="Missing Azure Blob dataset definition")
-
-    properties = dataset.get("properties", {})
-    container_name = _parse_cloud_bucket_name(properties)
-    if isinstance(container_name, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=container_name.message)
-
-    file_path = _parse_cloud_file_path(properties)
-    if isinstance(file_path, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=file_path.message)
-
-    linked_service = translate_azure_blob_spec(_get_linked_service_definition(dataset))
-    if isinstance(linked_service, UnsupportedValue):
-        return UnsupportedValue(value=dataset, message=linked_service.message)
-
-    file_format = _parse_cloud_file_format(properties)
-
-    return FileDataset(
-        dataset_name=dataset.get("name", "DATASET_NAME_NOT_PROVIDED"),
-        dataset_type=file_format,
-        container=container_name,
-        folder_path=file_path,
-        storage_account_name=linked_service.storage_account_name,
-        service_name=linked_service.service_name,
-        url=linked_service.url,
-        provider_type="azure_blob",
+        url=service_url,
+        format_options=format_options,
+        provider_type=provider_type,
     )
 
 
@@ -291,6 +226,18 @@ def translate_sql_server_dataset(dataset: dict) -> SqlTableDataset | Unsupported
         authentication_type=linked_service.authentication_type,
         connection_options={},
     )
+
+
+def _get_storage_account_name(linked_service: CloudLinkedService) -> str | None:
+    if isinstance(linked_service, AzureBlobLinkedService | AbfsLinkedService):
+        return linked_service.storage_account_name
+    return None
+
+
+def _get_service_url(linked_service: CloudLinkedService) -> str | None:
+    if isinstance(linked_service, GcsLinkedService | S3LinkedService):
+        return linked_service.service_url
+    return linked_service.url
 
 
 def _parse_format_options(dataset_type: str, dataset: dict) -> dict | UnsupportedValue:
@@ -368,7 +315,7 @@ def _parse_json_format_options(dataset: dict) -> dict:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Format options as a ``dict`` object.
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {
@@ -385,7 +332,7 @@ def _parse_orc_format_options(dataset: dict) -> dict:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Format options as a ``dict`` object.
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {
@@ -401,7 +348,7 @@ def _parse_parquet_format_options(dataset: dict) -> dict:
         dataset: Raw dataset definition from Azure Data Factory.
 
     Returns:
-        Format options as a ``dict`` object.
+        Format options as a ``dict``.
     """
     properties = dataset.get("properties", {})
     return {
@@ -519,33 +466,36 @@ def _parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
     folder_path = location.get("folder_path")
     file_name = location.get("file_name")
     if file_name is None:
-        return UnsupportedValue(value=properties, message="Missing property 'file_name' in dataset properties")
+        return UnsupportedValue(value=properties, message="Missing property 'file_name' in dataset location")
 
     return file_name if not folder_path else f"{folder_path}/{file_name}"
 
 
-def _parse_cloud_file_format(properties: dict) -> str:
+def _translate_cloud_linked_service(
+    provider_type: str, linked_service_definition: dict
+) -> S3LinkedService | GcsLinkedService | AzureBlobLinkedService | AbfsLinkedService | UnsupportedValue:
     """
-    Determines the file format from cloud dataset properties.
-
-    Cloud file datasets encode the format as a ``type`` in the ``location`` block
-    (e.g. ``AmazonS3Location``) and the actual data format in a ``format`` block
-    or the ``compression_codec`` / top-level properties. When the format cannot be
-    determined, the default ``Parquet`` is returned.
+    Dispatches to the appropriate linked-service translator for the given cloud provider.
 
     Args:
-        properties: Dataset properties block.
+        provider_type: Cloud provider identifier (``"s3"``, ``"gcs"``, or ``"azure_blob"``).
+        linked_service_definition: Linked-service definition from Azure Data Factory.
 
     Returns:
-        File format string (e.g. ``Parquet``, ``DelimitedText``, ``Json``).
+        Translated linked-service object, or ``UnsupportedValue`` on failure.
     """
-    format_block = properties.get("format")
-    if format_block and isinstance(format_block, dict):
-        format_type = format_block.get("type", "")
-        mapped = _CLOUD_FORMAT_MAPPINGS.get(format_type)
-        if mapped:
-            return mapped
-    return "Parquet"
+    translators = {
+        "s3": translate_s3_spec,
+        "gcs": translate_gcs_spec,
+        "azure_blob": translate_azure_blob_spec,
+        "abfs": translate_abfs_spec,
+    }
+    translator = translators.get(provider_type)
+    if translator is None:
+        return UnsupportedValue(
+            value=linked_service_definition, message=f"Unsupported cloud provider '{provider_type}'"
+        )
+    return translator(linked_service_definition)
 
 
 def _get_linked_service_definition(dataset: dict) -> dict:

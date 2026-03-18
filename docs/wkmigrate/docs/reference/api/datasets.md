@@ -98,9 +98,12 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]
 
 Builds the list of ``SecretInstruction`` objects required for a dataset definition.
 
-Each dataset type declares a set of secret keys in ``DATASET_SECRETS``.  This
-helper creates one ``SecretInstruction`` per declared key, stamped with the
+Each provider type declares a set of secret keys in ``DATASET_PROVIDER_SECRETS``.
+This helper creates one ``SecretInstruction`` per declared key, stamped with the
 service name and type so the workspace deployer can materialise the secrets.
+
+File datasets resolve secrets by ``provider_type`` (e.g. ``"abfs"``, ``"s3"``).
+SQL datasets resolve secrets by ``service_type`` (e.g. ``"sqlserver"``).
 
 **Arguments**:
 

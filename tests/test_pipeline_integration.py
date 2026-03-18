@@ -145,11 +145,6 @@ def test_nested_foreach_creates_run_job(complex_pipeline_fixtures: list[dict]) -
     assert len(inner_pipeline.tasks) == fixture["expected"]["inner_job_task_count"]
 
 
-# =============================================================================
-# Pipeline Parameter Translation Tests
-# =============================================================================
-
-
 def test_string_parameter() -> None:
     """Test translation of string parameter."""
     pipeline = {

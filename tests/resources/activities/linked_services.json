@@ -285,14 +285,14 @@
       "type": "Microsoft.DataFactory/factories/linkedservices",
       "properties": {
         "type": "GoogleCloudStorage",
-        "project_id": "my-gcp-project-123",
+        "access_key_id": "my-gcs-access-key",
         "service_url": "https://storage.googleapis.com"
       }
     },
     "expected": {
       "service_name": "gcs-storage-account",
       "service_type": "gcs",
-      "project_id": "my-gcp-project-123",
+      "access_key_id": "my-gcs-access-key",
       "service_url": "https://storage.googleapis.com"
     }
   },
@@ -325,7 +325,7 @@
       "type": "Microsoft.DataFactory/factories/linkedservices",
       "properties": {
         "type": "AzureBlobStorage",
-        "url": "https://myblobaccount.blob.core.windows.net/",
+        "connection_string": "DefaultEndpointsProtocol=https;AccountName=myblobaccount;EndpointSuffix=core.windows.net;",
         "storage_account_name": "myblobaccount"
       }
     },
@@ -337,16 +337,16 @@
     }
   },
   {
-    "id": "azure_blob_missing_url",
-    "description": "Azure Blob Storage linked service - missing URL",
+    "id": "azure_blob_missing_connection",
+    "description": "Azure Blob Storage linked service - missing connection_string and service_endpoint",
     "input": {
-      "name": "blob-no-url",
+      "name": "blob-no-conn",
       "properties": {
         "type": "AzureBlobStorage"
       }
     },
     "expected_unsupported": true,
-    "expected_message": "Missing property 'url' in Azure Blob linked service definition"
+    "expected_message": "Missing property 'container_url', 'sas_uri', or 'service_endpoint' in storage account properties"
   },
   {
     "id": "azure_blob_null",

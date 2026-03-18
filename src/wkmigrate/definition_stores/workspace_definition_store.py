@@ -39,6 +39,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 from typing_extensions import deprecated
 
+from wkmigrate.datasets import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
@@ -690,8 +691,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         if not secrets_to_create:
             return
         scopes = [scope.name for scope in client.secrets.list_scopes()]
-        if "wkmigrate_credentials_scope" not in scopes:
-            client.secrets.create_scope(scope="wkmigrate_credentials_scope")
+        if DEFAULT_CREDENTIALS_SCOPE not in scopes:
+            client.secrets.create_scope(scope=DEFAULT_CREDENTIALS_SCOPE)
         for secret in secrets_to_create:
             value = secret.provided_value or "PLACEHOLDER_SECRET_VALUE"
             client.secrets.put_secret(scope=secret.scope, key=secret.key, string_value=value)

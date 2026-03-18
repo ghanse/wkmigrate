@@ -43,15 +43,15 @@ to the pipeline’s `not_translatable` metadata.
 
 Datasets are translated from the ADF dataset properties and linked service definition. The following dataset types are supported:
 
-| Dataset type                              | Internal mapping        | Key details                                                                                                     |
-|-------------------------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------|
-| Avro files                                | `FileDataset`           | Uses ABFS/ADLS linked services to resolve storage account, container, and folder path; captures compression.    |
-| Delimited Text files (e.g. CSV)           | `FileDataset`           | Captures delimiter, header configuration, encoding, null handling, and file layout options.                     |
-| Json files                                | `FileDataset`           | Captures JSON-specific options such as encoding and compression, along with container and folder path.          |
-| Orc files                                 | `FileDataset`           | Captures ORC compression and storage layout using ABFS/ADLS linked services.                                    |
-| Parquet files                             | `FileDataset`           | Captures Parquet compression and storage layout using ABFS/ADLS linked services.                                |
-| Azure Databricks Delta Lake tables        | `DeltaTableDataset`     | Captures database/schema, table, and optional catalog information for Delta tables.                             |
-| Azure SQL Database tables                 | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.       |
+| Dataset type                              | Internal mapping        | Key details                                                                                                                                                                 |
+|-------------------------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Avro files                                | `FileDataset`           | Resolves storage account, container, and folder path via linked service; captures compression. Supports ABFS, S3, GCS, and Azure Blob storage providers.                    |
+| Delimited Text files (e.g. CSV)           | `FileDataset`           | Captures delimiter, header configuration, encoding, null handling, and file layout options. Supports ABFS, S3, GCS, and Azure Blob storage providers.                       |
+| Json files                                | `FileDataset`           | Captures JSON-specific options such as encoding and compression, along with container and folder path. Supports ABFS, S3, GCS, and Azure Blob storage providers.            |
+| Orc files                                 | `FileDataset`           | Captures ORC compression and storage layout. Supports ABFS, S3, GCS, and Azure Blob storage providers.                                                                     |
+| Parquet files                             | `FileDataset`           | Captures Parquet compression and storage layout. Supports ABFS, S3, GCS, and Azure Blob storage providers.                                                                 |
+| Azure Databricks Delta Lake tables        | `DeltaTableDataset`     | Captures database/schema, table, and optional catalog information for Delta tables.                                                                                         |
+| Azure SQL Database tables                 | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.                                                                   |
 
 <Admonition type="warning" title="Unsupported dataset types">
 When calling `to_job` or `to_asset_bundle`, unsupported datasets will not generate valid code or job configuration. A
@@ -68,7 +68,10 @@ The following linked services are supported:
 | Linked-service type               | Internal mapping                 | Key details                                                                                                                                                            |
 |-----------------------------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Azure Databricks workspace        | `DatabricksClusterLinkedService` | Captures host name and workspace URL, node types and autoscaling, Spark configuration and environment variables, and init scripts (DBFS, Volumes, or workspace paths). |
-| Azure Blob/File storage           | `AbfsLinkedService`              | Uses ABFS/ADLS connection information to resolve storage account name and ABFS URL for the container; used when translating file-based datasets.                       |
+| Azure Blob/File storage (ABFS)    | `AbfsLinkedService`              | Uses ABFS/ADLS connection information to resolve storage account name and ABFS URL for the container; used when translating file-based datasets.                       |
+| Amazon S3                         | `S3LinkedService`                | Captures access key identifier and service URL; used when translating file-based datasets stored in S3.                                                                |
+| Google Cloud Storage              | `GcsLinkedService`               | Captures HMAC access key identifier and service URL; used when translating file-based datasets stored in GCS.                                                          |
+| Azure Blob Storage                | `AzureBlobLinkedService`         | Captures connection string and service endpoint; used when translating file-based datasets stored in Azure Blob Storage.                                               |
 | Azure SQL Server                  | `SqlLinkedService`               | Captures host name, database, and authentication details (for example user name and authentication type); used when translating Azure SQL datasets.                    |
 
 <Admonition type="warning" title="Unsupported linked services">
