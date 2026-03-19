@@ -720,7 +720,6 @@ def sql_dataset(
         yield ds
 
 
-
 @pytest.fixture(scope="session")
 def sample_pipeline(
     azure_config: AzureTestConfig,
