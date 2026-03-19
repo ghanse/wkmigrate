@@ -22,7 +22,7 @@ def translate_databricks_job_activity(activity: dict, base_kwargs: dict) -> RunJ
         ``RunJobActivity`` referencing the existing Databricks job, or an
         ``UnsupportedValue`` if ``existing_job_id`` is missing.
     """
-    existing_job_id = activity.get("existing_job_id")
+    existing_job_id = activity.get("existing_job_id") or activity.get("job_id")
     if not existing_job_id:
         return UnsupportedValue(activity, "Missing field 'existing_job_id' for Databricks Job activity")
 

@@ -286,10 +286,6 @@ class TestTranslatableTypeCoverage:
         assert len(spark_python_tasks) == 1
         assert spark_python_tasks[0].python_file == "dbfs:/scripts/etl.py"
 
-    @pytest.mark.xfail(
-        reason="azure-mgmt-datafactory v8 cannot deserialize DatabricksJob — typeProperties are not flattened on read-back",
-        strict=True,
-    )
     def test_databricks_job_activity_translates(
         self,
         factory_store: FactoryDefinitionStore,

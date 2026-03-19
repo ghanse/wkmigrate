@@ -36,11 +36,11 @@ from azure.mgmt.datafactory.models import (
     CopyActivity,
     DatabricksNotebookActivity,
     DatabricksSparkJarActivity,
+    DatabricksJobActivity,
     DatabricksSparkPythonActivity,
     DatasetReference,
     DatasetResource,
     DelimitedTextSource,
-    ExecutionActivity,
     Expression,
     Factory,
     ForEachActivity,
@@ -1027,20 +1027,15 @@ def databricks_job_pipeline(
         "integration_test_databricks_job_pipeline",
         PipelineResource(
             activities=[
-                ExecutionActivity(
+                DatabricksJobActivity(
                     name="run_databricks_job",
+                    job_id=12345,
                     linked_service_name=LinkedServiceReference(
                         type="LinkedServiceReference",
                         reference_name="test_databricks",
                     ),
                     policy=ActivityPolicy(timeout="0.01:00:00"),
                     depends_on=[],
-                    additional_properties={
-                        "type": "DatabricksJob",
-                        "typeProperties": {
-                            "existingJobId": "12345",
-                        },
-                    },
                 ),
             ],
         ),
