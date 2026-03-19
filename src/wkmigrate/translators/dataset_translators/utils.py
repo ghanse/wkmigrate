@@ -73,7 +73,12 @@ def parse_abfs_container_name(properties: dict) -> str | UnsupportedValue:
     location = get_value_or_unsupported(properties, "location", "dataset properties")
     if isinstance(location, UnsupportedValue):
         return location
-    return get_value_or_unsupported(location, "container", "location")
+    result = location.get("container") or location.get("file_system")
+    if result is None:
+        return UnsupportedValue(
+            value=properties, message="Missing property 'container' or 'file_system' in dataset location"
+        )
+    return result
 
 
 def parse_abfs_file_path(properties: dict) -> str | UnsupportedValue:

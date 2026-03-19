@@ -106,7 +106,10 @@ def _translate_sql_dataset(
             message=f"Missing required property 'table' in {dataset_type} dataset definition",
         )
 
-    linked_service_definition = get_linked_service_definition(dataset)
+    try:
+        linked_service_definition = get_linked_service_definition(dataset)
+    except (ValueError, KeyError, TypeError) as exc:
+        return UnsupportedValue(value=dataset, message=f"Failed to resolve linked service: {exc}")
     if isinstance(linked_service_definition, UnsupportedValue):
         return UnsupportedValue(value=dataset, message=linked_service_definition.message)
 
