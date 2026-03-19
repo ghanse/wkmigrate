@@ -50,7 +50,11 @@ def profile(
         factory_name=factory_name,
     )
 
-    result: FactoryProfile = profile_factory(client)
+    try:
+        result: FactoryProfile = profile_factory(client)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc
 
     if output_format == "json":
         _print_json(result)

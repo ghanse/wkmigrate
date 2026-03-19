@@ -222,7 +222,7 @@ def format_profile(profile: FactoryProfile) -> str:
     if profile.integration_runtime_details:
         lines += ["", "Integration Runtimes:"]
         for irt in profile.integration_runtime_details:
-            node_info = f", {irt.node_count} nodes" if irt.node_count else ""
+            node_info = f", {irt.node_count} nodes" if irt.node_count is not None else ""
             lines.append(f"  - {irt.name} ({irt.runtime_type}{node_info})")
 
     return "\n".join(lines)
