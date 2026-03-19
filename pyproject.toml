@@ -34,6 +34,7 @@ azure-mgmt-datafactory = "^9.0.0"
 databricks-sdk = "^0.20.0"
 databricks-bundles = "^0.286.0"
 autopep8 = "^2.3.2"
+click = "^8.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -44,6 +45,9 @@ pylint = "^3.3.9"
 mypy = "^1.18.2"
 types-pyyaml = "^6.0.12.20250915"
 pydoc-markdown = ">=4.8.2"
+
+[tool.poetry.scripts]
+wkmigrate = "wkmigrate.cli:cli"
 
 [build-system]
 requires = ["poetry-core"]
