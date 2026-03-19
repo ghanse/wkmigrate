@@ -3,11 +3,10 @@ sidebar_label: dataset_translators
 title: wkmigrate.translators.dataset_translators
 ---
 
-This module defines translators for translating datasets into internal representations.
+This module defines translators for normalizing ADF dataset payloads into internal representations.
 
-Translators in this module normalize dataset payloads into internal representations. Each
-translator must validate required fields, coerce connection settings, and emit ``UnsupportedValue``
-objects for any unparsable inputs.
+Each translator validates required fields, coerces connection settings, and emits
+``UnsupportedValue`` objects for any unparsable inputs.
 
 #### translate\_dataset
 

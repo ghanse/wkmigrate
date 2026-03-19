@@ -86,7 +86,7 @@ Gets a linked-service definition with the specified name.
 #### get\_trigger
 
 ```python
-def get_trigger(pipeline_name: str) -> dict
+def get_trigger(pipeline_name: str) -> dict | None
 ```
 
 Gets the trigger associated with a pipeline.
@@ -98,7 +98,7 @@ Gets the trigger associated with a pipeline.
 
 **Returns**:
 
-  Trigger definition as a ``dict``.
+  Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
 
 #### get\_dataset
 
