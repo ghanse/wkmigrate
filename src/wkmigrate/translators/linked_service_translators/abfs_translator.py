@@ -30,9 +30,7 @@ def translate_abfs_spec(abfs_spec: dict) -> AbfsLinkedService | UnsupportedValue
     properties = abfs_spec.get("properties", {})
     raw_url = properties.get("url")
     if raw_url is None:
-        return UnsupportedValue(
-            value=abfs_spec, message="Missing property 'url' in ABFS linked service definition"
-        )
+        return UnsupportedValue(value=abfs_spec, message="Missing property 'url' in ABFS linked service definition")
     url = parse_storage_account_connection_string(raw_url)
 
     if isinstance(url, UnsupportedValue):
@@ -40,9 +38,7 @@ def translate_abfs_spec(abfs_spec: dict) -> AbfsLinkedService | UnsupportedValue
             value=abfs_spec, message=f"Invalid property 'url' in ABFS linked service definition; {url.message}"
         )
 
-    storage_account_name = parse_storage_account_name(
-        properties.get("storage_account_name") or properties.get("url")
-    )
+    storage_account_name = parse_storage_account_name(properties.get("storage_account_name") or properties.get("url"))
     if isinstance(storage_account_name, UnsupportedValue):
         return UnsupportedValue(
             value=abfs_spec,

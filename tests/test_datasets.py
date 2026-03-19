@@ -121,7 +121,10 @@ def test_dataset_missing_linked_service_returns_unsupported() -> None:
     """Dataset without linked_service_definition returns UnsupportedValue."""
     dataset = {
         "name": "test_dataset",
-        "properties": {"type": "Avro", "location": {"type": "AzureBlobFSLocation", "container": "c", "folder_path": "f", "file_name": "x.avro"}},
+        "properties": {
+            "type": "Avro",
+            "location": {"type": "AzureBlobFSLocation", "container": "c", "folder_path": "f", "file_name": "x.avro"},
+        },
     }
     result = translate_dataset(dataset)
 
