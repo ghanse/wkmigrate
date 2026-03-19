@@ -14,7 +14,7 @@ from typing import Any
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.pipeline import Activity, Authentication, DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.translation_warnings import TranslationWarning, UnsupportedActivityWarning
 
 DEFAULT_TIMEOUT_SECONDS = 43200
 
@@ -315,6 +315,13 @@ def normalize_translated_result(result: Activity | UnsupportedValue, base_kwargs
         A placeholder DatabricksNotebookActivity for any UnsupportedValue; Otherwise the input Activity
     """
     if isinstance(result, UnsupportedValue):
+        warnings.warn(
+            UnsupportedActivityWarning(
+                base_kwargs.get("name", "unknown"),
+                f"Activity could not be translated: {result.message}",
+            ),
+            stacklevel=3,
+        )
         return get_placeholder_activity(base_kwargs)
 
     return result

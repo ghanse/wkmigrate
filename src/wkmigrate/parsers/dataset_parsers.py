@@ -38,7 +38,7 @@ def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
     if dataset_type == "parquet":
         return _parse_parquet_format_options(dataset)
     if dataset_type in ("sqlserver", "postgresql", "mysql", "oracle"):
-        return _parse_sql_format_options(dataset)
+        return _parse_sql_format_options(dataset, dataset_type)
     return UnsupportedValue(value=dataset, message=f"Unsupported dataset type '{dataset_type}'")
 
 

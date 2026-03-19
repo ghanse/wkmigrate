@@ -21,7 +21,7 @@ from wkmigrate.models.ir.pipeline import Activity, Dependency, IfConditionActivi
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning, translation_warning_context
+from wkmigrate.translation_warnings import TranslationWarning, UnsupportedActivityWarning, translation_warning_context
 from wkmigrate.translators.activity_translators.copy_activity_translator import translate_copy_activity
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
@@ -191,6 +191,13 @@ def _dispatch_activity(
             translator = context.registry.get(activity_type)
             if translator is not None:
                 return translator(activity, base_kwargs), context
+            warnings.warn(
+                UnsupportedActivityWarning(
+                    base_kwargs.get("name", "unknown"),
+                    f"Activity type '{activity_type}' is not supported for translation.",
+                ),
+                stacklevel=3,
+            )
             return get_placeholder_activity(base_kwargs), context
 
 
