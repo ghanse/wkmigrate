@@ -21,7 +21,7 @@ from wkmigrate.models.ir.pipeline import Activity, Dependency, IfConditionActivi
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
+from wkmigrate.translation_warnings import TranslationWarning, translation_warning_context
 from wkmigrate.translators.activity_translators.copy_activity_translator import translate_copy_activity
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
@@ -149,7 +149,7 @@ def visit_activity(
         return cached, context
 
     activity_type = activity.get("type") or "Unsupported"
-    with not_translatable_context(name, activity_type):
+    with translation_warning_context(name, activity_type):
         base_properties = _get_base_properties(activity, is_conditional_task)
         result, context = _dispatch_activity(activity_type, activity, base_properties, context)
         translated = normalize_translated_result(result, base_properties)
@@ -328,14 +328,14 @@ def _parse_policy(policy: dict | None) -> dict:
         Dictionary containing policy settings.
 
     Raises:
-        NotTranslatableWarning: If secure input/output logging is used.
+        TranslationWarning: If secure input/output logging is used.
     """
     if not policy:
         return {}
 
     if "secure_input" in policy:
         warnings.warn(
-            NotTranslatableWarning(
+            TranslationWarning(
                 "secure_input",
                 "Secure input logging not applicable to Databricks workflows.",
             ),
@@ -343,7 +343,7 @@ def _parse_policy(policy: dict | None) -> dict:
         )
     if "secure_output" in policy:
         warnings.warn(
-            NotTranslatableWarning(
+            TranslationWarning(
                 "secure_output",
                 "Secure output logging not applicable to Databricks workflows.",
             ),

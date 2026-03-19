@@ -6,7 +6,7 @@ import pytest
 
 from wkmigrate.models.ir.pipeline import Authentication
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.not_translatable import NotTranslatableWarning
+from wkmigrate.translation_warnings import TranslationWarning
 from wkmigrate.utils import DEFAULT_TIMEOUT_SECONDS, parse_timeout_string, parse_authentication
 
 
@@ -100,22 +100,22 @@ def test_timeout_999_days() -> None:
 
 
 def test_timeout_invalid_format_warns_and_returns_default() -> None:
-    """Invalid format emits NotTranslatableWarning and returns default."""
-    with pytest.warns(NotTranslatableWarning, match="Invalid timeout format"):
+    """Invalid format emits TranslationWarning and returns default."""
+    with pytest.warns(TranslationWarning, match="Invalid timeout format"):
         result = parse_timeout_string("abc")
     assert result == DEFAULT_TIMEOUT_SECONDS
 
 
 def test_timeout_empty_string_warns_and_returns_default() -> None:
-    """Empty string emits NotTranslatableWarning and returns default."""
-    with pytest.warns(NotTranslatableWarning, match="Invalid timeout format"):
+    """Empty string emits TranslationWarning and returns default."""
+    with pytest.warns(TranslationWarning, match="Invalid timeout format"):
         result = parse_timeout_string("")
     assert result == DEFAULT_TIMEOUT_SECONDS
 
 
 def test_timeout_zero_warns_and_returns_default() -> None:
-    """All-zero timeout emits NotTranslatableWarning and returns default."""
-    with pytest.warns(NotTranslatableWarning, match="Timeout must be positive"):
+    """All-zero timeout emits TranslationWarning and returns default."""
+    with pytest.warns(TranslationWarning, match="Timeout must be positive"):
         result = parse_timeout_string("0.00:00:00")
     assert result == DEFAULT_TIMEOUT_SECONDS
 

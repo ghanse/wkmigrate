@@ -19,8 +19,8 @@ from wkmigrate.translation_warnings import TranslationWarning
 from wkmigrate.utils import parse_mapping
 
 
-JDBC_SECRETS = ["user_name", "password"]
-JDBC_OPTIONS = ["dbtable", "numPartitions", "batchsize", "sessionInitStatement"]
+_JDBC_SECRETS = ["user_name", "password"]
+_JDBC_OPTIONS = ["dbtable", "numPartitions", "batchsize", "sessionInitStatement"]
 DEFAULT_PORTS: dict[str, int] = {
     "sqlserver": 1433,
     "postgresql": 5432,

@@ -8,7 +8,7 @@ objects for any unparsable inputs.
 from uuid import uuid4
 import warnings
 from wkmigrate.enums.init_script_type import InitScriptType
-from wkmigrate.not_translatable import NotTranslatableWarning
+from wkmigrate.translation_warnings import TranslationWarning
 from wkmigrate.utils import append_system_tags, extract_group
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.models.ir.linked_services import (
@@ -229,7 +229,7 @@ def _get_storage_account_url(storage_account_properties: dict) -> str | Unsuppor
     service_endpoint = storage_account_properties.get("service_endpoint")
     if service_endpoint is not None:
         warnings.warn(
-            NotTranslatableWarning(
+            TranslationWarning(
                 property_name="azure_blob_linked_service",
                 message="Cannot use service principal or managed identity authentication with Azure Blob linked service",
             )

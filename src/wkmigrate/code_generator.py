@@ -13,7 +13,7 @@ import autopep8  # type: ignore
 
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_PROVIDER_SECRETS, DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.models.ir.pipeline import Authentication
-from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
+from wkmigrate.translation_warnings import TranslationWarning, translation_warning_context
 
 
 def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
@@ -462,12 +462,12 @@ def _get_authentication_lines(
     Returns:
         List of Python source lines to append to the notebook script.
     """
-    with not_translatable_context(activity_name, activity_type):
+    with translation_warning_context(activity_name, activity_type):
         match authentication.auth_type.lower():
             case "basic":
                 return _get_basic_authentication_lines(authentication, credentials_scope)
             case _:
-                raise NotTranslatableWarning(
+                raise TranslationWarning(
                     "authentication_type", f"Unsupported authentication type '{authentication.auth_type}'"
                 )
 
