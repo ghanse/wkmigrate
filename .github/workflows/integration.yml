@@ -49,4 +49,4 @@ jobs:
           poetry install
 
       - name: Run integration tests
-        run: poetry run pytest -m integration -o "addopts=" --tb=short -v
+        run: poetry run pytest -m integration --override-ini='addopts=--no-header' --tb=short -v
