@@ -606,12 +606,12 @@ def s3_dataset(
         "test_s3_dataset",
         DatasetResource(
             properties={
-                "type": "AmazonS3Dataset",
+                "type": "Parquet",
                 "typeProperties": {
-                    "bucketName": "test-bucket",
-                    "key": "data/output.parquet",
-                    "format": {
-                        "type": "ParquetFormat",
+                    "location": {
+                        "type": "AmazonS3Location",
+                        "bucketName": "test-bucket",
+                        "key": "data/output.parquet",
                     },
                 },
                 "linkedServiceName": {
@@ -646,12 +646,12 @@ def gcs_dataset(
         "test_gcs_dataset",
         DatasetResource(
             properties={
-                "type": "GoogleCloudStorageDataset",
+                "type": "Parquet",
                 "typeProperties": {
-                    "bucketName": "test-gcs-bucket",
-                    "key": "data/output.parquet",
-                    "format": {
-                        "type": "ParquetFormat",
+                    "location": {
+                        "type": "GoogleCloudStorageLocation",
+                        "bucketName": "test-gcs-bucket",
+                        "key": "data/output.parquet",
                     },
                 },
                 "linkedServiceName": {
@@ -686,15 +686,12 @@ def azure_blob_dataset(
         "test_azure_blob_dataset",
         DatasetResource(
             properties={
-                "type": "AzureBlobStorageDataset",
+                "type": "Parquet",
                 "typeProperties": {
                     "location": {
                         "type": "AzureBlobStorageLocation",
                         "container": "test-container",
                         "fileName": "blob_data.parquet",
-                    },
-                    "format": {
-                        "type": "ParquetFormat",
                     },
                 },
                 "linkedServiceName": {
