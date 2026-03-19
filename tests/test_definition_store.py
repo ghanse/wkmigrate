@@ -61,6 +61,23 @@ def test_factory_definition_store_uses_definition_store_interface(mock_factory_c
     assert pipeline.name == "TEST_PIPELINE_NAME"
 
 
+def test_factory_definition_store_loads_pipeline_without_trigger(mock_factory_client) -> None:
+    """Pipelines with no trigger should load successfully with schedule=None."""
+    store = FactoryDefinitionStore(
+        tenant_id="TENANT_ID",
+        client_id="CLIENT_ID",
+        client_secret="SECRET",
+        subscription_id="SUBSCRIPTION_ID",
+        resource_group_name="RESOURCE_GROUP",
+        factory_name="FACTORY_NAME",
+    )
+
+    pipeline = store.load("test_pipeline_no_triggers")
+    assert isinstance(pipeline, Pipeline)
+    assert pipeline.name == "test_pipeline_no_triggers"
+    assert pipeline.schedule is None
+
+
 def test_workspace_definition_store_uses_definition_store_interface(mock_workspace_client) -> None:
     """WorkspaceDefinitionStore should behave as a DefinitionStore when wired with a mock workspace client."""
     assert mock_workspace_client is not None

@@ -108,7 +108,7 @@ class FactoryClient:
             raise ValueError(f'No linked service found with name "{linked_service_name}"')
         return dict(linked_service.as_dict())
 
-    def get_trigger(self, pipeline_name: str) -> dict:
+    def get_trigger(self, pipeline_name: str) -> dict | None:
         """
         Gets the trigger associated with a pipeline.
 
@@ -116,37 +116,30 @@ class FactoryClient:
             pipeline_name: Name of the Data Factory pipeline.
 
         Returns:
-            Trigger definition as a ``dict``.
+            Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
         """
-        # List the triggers:
         triggers = self._list_triggers()
         for trigger in triggers:
-            # Get the trigger properties:
             properties = trigger.get("properties")
             if properties is None:
                 continue
-            # Get the associated pipeline definitions:
             pipelines = properties.get("pipelines")
             if pipelines is None:
                 continue
-            # Get the pipeline references:
             pipeline_references = [
                 pipeline.get("pipeline_reference")
                 for pipeline in pipelines
                 if pipeline.get("pipeline_reference") is not None
             ]
-            # Get the pipeline names:
             pipeline_names = [
                 pipeline_reference.get("reference_name")
                 for pipeline_reference in pipeline_references
                 if pipeline_reference.get("reference_name") is not None
                 and pipeline_reference.get("type") == "PipelineReference"
             ]
-            # Get the trigger by pipeline name:
             if pipeline_name in pipeline_names:
                 return trigger
-        # If no trigger was found:
-        raise ValueError(f'No trigger found for pipeline with name "{pipeline_name}"')
+        return None
 
     def _list_triggers(self) -> list[dict]:
         """

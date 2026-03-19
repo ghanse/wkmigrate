@@ -163,17 +163,14 @@ class MockFactoryClient:
                 return pipeline
         raise ValueError(f'No pipeline found with name "{pipeline_name}"')
 
-    def get_trigger(self, pipeline_name: str) -> dict:
+    def get_trigger(self, pipeline_name: str) -> dict | None:
         """Return the trigger associated with a pipeline.
 
         Args:
             pipeline_name: Name of the pipeline the trigger belongs to.
 
         Returns:
-            Trigger definition as a ``dict``.
-
-        Raises:
-            ValueError: If no trigger is associated with the pipeline.
+            Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
         """
         with open(os.path.join(self.test_json_path, "test_triggers.json"), "rb") as file:
             triggers = json.load(file)
@@ -190,7 +187,7 @@ class MockFactoryClient:
             ]
             if pipeline_name in pipeline_names:
                 return trigger
-        raise ValueError(f'No trigger found for pipeline with name "{pipeline_name}"')
+        return None
 
     def get_dataset(self, dataset_name: str) -> dict:
         """
