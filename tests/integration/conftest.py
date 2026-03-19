@@ -866,7 +866,7 @@ def sample_foreach_pipeline(
                     batch_count=5,
                     items=Expression(
                         type="Expression",
-                        value="@pipeline().parameters.items",
+                        value="@array(['item1','item2','item3'])",
                     ),
                     activities=[
                         DatabricksNotebookActivity(
@@ -879,9 +879,6 @@ def sample_foreach_pipeline(
                     depends_on=[],
                 ),
             ],
-            parameters={
-                "items": {"type": "Array", "defaultValue": []},
-            },
         ),
     ) as pl:
         yield pl

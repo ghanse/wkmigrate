@@ -226,7 +226,7 @@ class TestUnsupportedActivityIntegration:
         assert isinstance(result, Pipeline)
         assert len(result.not_translatable) >= 1
 
-        warning_props = [entry.get("property_name") for entry in result.not_translatable]
+        warning_props = [entry.get("property") for entry in result.not_translatable]
         assert "secure_input" in warning_props
 
 
@@ -286,6 +286,10 @@ class TestTranslatableTypeCoverage:
         assert len(spark_python_tasks) == 1
         assert spark_python_tasks[0].python_file == "dbfs:/scripts/etl.py"
 
+    @pytest.mark.xfail(
+        reason="azure-mgmt-datafactory v8 cannot deserialize DatabricksJob — typeProperties are not flattened on read-back",
+        strict=True,
+    )
     def test_databricks_job_activity_translates(
         self,
         factory_store: FactoryDefinitionStore,
