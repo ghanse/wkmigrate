@@ -36,7 +36,7 @@ pytestmark = pytest.mark.integration
 
 def test_list_pipelines(
     factory_client: FactoryClient,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Listing pipelines returns the deployed test pipeline."""
     names = factory_client.list_pipelines()
@@ -45,7 +45,7 @@ def test_list_pipelines(
 
 def test_get_pipeline(
     factory_client: FactoryClient,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Fetching a pipeline returns a dict with activities."""
     pipeline = factory_client.get_pipeline("integration_test_pipeline")
@@ -55,7 +55,7 @@ def test_get_pipeline(
 
 def test_get_linked_service(
     factory_client: FactoryClient,
-    _: LinkedServiceResource,
+    sample_linked_service: LinkedServiceResource,
 ) -> None:
     """Fetching a linked service returns a dict with properties."""
     linked_service = factory_client.get_linked_service("test_blob_storage")
@@ -64,7 +64,7 @@ def test_get_linked_service(
 
 def test_get_dataset(
     factory_client: FactoryClient,
-    _: DatasetResource,
+    sample_dataset: DatasetResource,
 ) -> None:
     """Fetching a dataset returns a dict with linked-service metadata."""
     dataset = factory_client.get_dataset("test_csv_dataset")
@@ -73,7 +73,7 @@ def test_get_dataset(
 
 def test_load_pipeline(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Loading a deployed pipeline produces a valid ``Pipeline`` IR."""
     result = factory_store.load("integration_test_pipeline")
@@ -85,7 +85,7 @@ def test_load_pipeline(
 
 def test_load_pipeline_activities_are_translated(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Activities within the loaded pipeline are translated to the correct IR types."""
     result = factory_store.load("integration_test_pipeline")
@@ -100,7 +100,7 @@ def test_load_pipeline_activities_are_translated(
 
 def test_load_pipeline_dependencies(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Dependencies between activities are preserved in translation."""
     result = factory_store.load("integration_test_pipeline")
@@ -113,7 +113,7 @@ def test_load_pipeline_dependencies(
 
 def test_load_pipeline_parameters(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """Pipeline parameters are preserved in translation."""
     result = factory_store.load("integration_test_pipeline")
@@ -124,7 +124,7 @@ def test_load_pipeline_parameters(
 
 def test_load_pipeline_tags(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """System tags are added to the translated pipeline."""
     result = factory_store.load("integration_test_pipeline")
@@ -135,7 +135,7 @@ def test_load_pipeline_tags(
 
 def test_load_foreach_pipeline(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_foreach_pipeline: PipelineResource,
 ) -> None:
     """Loading a ForEach pipeline produces the expected control-flow IR."""
     result = factory_store.load("integration_test_foreach_pipeline")
@@ -153,7 +153,7 @@ def test_load_foreach_pipeline(
 
 def test_load_all(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """``load_all`` translates all pipelines without error."""
     results = factory_store.load_all(pipeline_names=["integration_test_pipeline"])
@@ -163,7 +163,7 @@ def test_load_all(
 
 def test_unsupported_activity_creates_placeholder(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_unsupported_pipeline: PipelineResource,
 ) -> None:
     """An unsupported activity type produces a placeholder notebook with /UNSUPPORTED_ADF_ACTIVITY."""
     result = factory_store.load("integration_test_unsupported_pipeline")
@@ -182,7 +182,7 @@ def test_unsupported_activity_creates_placeholder(
 
 def test_unsupported_property_raises_not_translatable_warning(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_unsupported_pipeline: PipelineResource,
 ) -> None:
     """A ``secure_input`` policy property populates ``not_translatable`` on the Pipeline IR."""
     result = factory_store.load("integration_test_unsupported_pipeline")
@@ -196,7 +196,7 @@ def test_unsupported_property_raises_not_translatable_warning(
 
 def test_notebook_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_pipeline: PipelineResource,
 ) -> None:
     """DatabricksNotebook activities translate to ``DatabricksNotebookActivity``."""
     result = factory_store.load("integration_test_pipeline")
@@ -207,7 +207,7 @@ def test_notebook_activity_translates(
 
 def test_foreach_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    sample_foreach_pipeline: PipelineResource,
 ) -> None:
     """ForEach activities translate to ``ForEachActivity`` with nested tasks."""
     result = factory_store.load("integration_test_foreach_pipeline")
@@ -218,7 +218,7 @@ def test_foreach_activity_translates(
 
 def test_spark_jar_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    spark_jar_pipeline: PipelineResource,
 ) -> None:
     """DatabricksSparkJar activities translate to ``SparkJarActivity``."""
     result = factory_store.load("integration_test_spark_jar_pipeline")
@@ -231,7 +231,7 @@ def test_spark_jar_activity_translates(
 
 def test_spark_python_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    spark_python_pipeline: PipelineResource,
 ) -> None:
     """DatabricksSparkPython activities translate to ``SparkPythonActivity``."""
     result = factory_store.load("integration_test_spark_python_pipeline")
@@ -244,7 +244,7 @@ def test_spark_python_activity_translates(
 
 def test_databricks_job_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    databricks_job_pipeline: PipelineResource,
 ) -> None:
     """DatabricksJob activities translate to ``RunJobActivity``."""
     result = factory_store.load("integration_test_databricks_job_pipeline")
@@ -257,7 +257,7 @@ def test_databricks_job_activity_translates(
 
 def test_web_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    web_activity_pipeline: PipelineResource,
 ) -> None:
     """WebActivity translates to ``WebActivity`` with correct URL and method."""
     result = factory_store.load("integration_test_web_activity_pipeline")
@@ -271,7 +271,7 @@ def test_web_activity_translates(
 
 def test_lookup_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    lookup_pipeline: PipelineResource,
 ) -> None:
     """Lookup activities translate to ``LookupActivity``."""
     result = factory_store.load("integration_test_lookup_pipeline")
@@ -284,7 +284,7 @@ def test_lookup_activity_translates(
 
 def test_if_condition_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    if_condition_pipeline: PipelineResource,
 ) -> None:
     """IfCondition activities translate to ``IfConditionActivity`` with child branches."""
     result = factory_store.load("integration_test_if_condition_pipeline")
@@ -297,7 +297,7 @@ def test_if_condition_activity_translates(
 
 def test_set_variable_activity_translates(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    set_variable_pipeline: PipelineResource,
 ) -> None:
     """SetVariable activities translate to ``SetVariableActivity``."""
     result = factory_store.load("integration_test_set_variable_pipeline")
@@ -310,7 +310,7 @@ def test_set_variable_activity_translates(
 
 def test_copy_abfs_csv_to_parquet(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    copy_abfs_pipeline: PipelineResource,
 ) -> None:
     """Copy from ABFS CSV to ABFS Parquet produces a ``CopyActivity`` with valid datasets."""
     result = factory_store.load("integration_test_copy_abfs_pipeline")
@@ -324,7 +324,7 @@ def test_copy_abfs_csv_to_parquet(
 
 def test_copy_s3_to_abfs(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    copy_s3_pipeline: PipelineResource,
 ) -> None:
     """Copy from S3 to ABFS produces a ``CopyActivity`` with an S3 source dataset."""
     result = factory_store.load("integration_test_copy_s3_pipeline")
@@ -338,7 +338,7 @@ def test_copy_s3_to_abfs(
 
 def test_copy_gcs_to_abfs(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    copy_gcs_pipeline: PipelineResource,
 ) -> None:
     """Copy from GCS to ABFS produces a ``CopyActivity`` with a GCS source dataset."""
     result = factory_store.load("integration_test_copy_gcs_pipeline")
@@ -352,7 +352,7 @@ def test_copy_gcs_to_abfs(
 
 def test_copy_azure_blob_to_abfs(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    copy_azure_blob_pipeline: PipelineResource,
 ) -> None:
     """Copy from Azure Blob to ABFS produces a ``CopyActivity`` with a Blob source dataset."""
     result = factory_store.load("integration_test_copy_azure_blob_pipeline")
@@ -366,7 +366,7 @@ def test_copy_azure_blob_to_abfs(
 
 def test_copy_sql_to_abfs(
     factory_store: FactoryDefinitionStore,
-    _: PipelineResource,
+    copy_sql_pipeline: PipelineResource,
 ) -> None:
     """Copy from Azure SQL to ABFS produces a ``CopyActivity`` with a SQL source dataset."""
     result = factory_store.load("integration_test_copy_sql_pipeline")

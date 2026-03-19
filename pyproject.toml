@@ -93,6 +93,9 @@ testpaths = ["tests"]
 addopts = "--no-header"
 cache_dir = ".venv/pytest-cache"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "integration: marks tests that require a live Azure subscription",
+]
 
 [tool.black]
 target-version = ["py312"]
