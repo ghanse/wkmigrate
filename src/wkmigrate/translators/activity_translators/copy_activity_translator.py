@@ -6,7 +6,6 @@ properties, and column mappings.  Translators should emit ``UnsupportedValue`` o
 unparsable inputs.
 """
 
-from wkmigrate.datasets import parse_spark_data_type
 from wkmigrate.models.ir.pipeline import ColumnMapping, CopyActivity
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
@@ -115,5 +114,5 @@ def _parse_dataset_mapping(mapping: dict[str, dict], sink_system: str) -> Column
     return ColumnMapping(
         source_column_name=source.get("name") or f"_c{source.get('ordinal', 1) - 1}",
         sink_column_name=sink_column_name,
-        sink_column_type=parse_spark_data_type(sink_column_type, sink_system),
+        sink_column_type=sink_column_type,
     )
