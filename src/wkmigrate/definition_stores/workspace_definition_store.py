@@ -841,6 +841,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
         self._write_secrets(prepared.all_secrets, bundle_dir)
         self._write_unsupported(prepared.pipeline.not_translatable or [], bundle_dir)
+        self._write_warnings(prepared.pipeline.warnings or [], bundle_dir)
         self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, prepared.inner_workflows)
 
     def _write_notebooks(self, notebooks: Iterable[NotebookArtifact], output_dir: str) -> None:
@@ -1130,6 +1131,19 @@ class WorkspaceDefinitionStore(DefinitionStore):
         formatted = self._format_unsupported_entries(unsupported)
         with open(unsupported_file, "w", encoding="utf-8") as unsupported_handle:
             json.dump(formatted, unsupported_handle, indent=2, ensure_ascii=False)
+
+    @staticmethod
+    def _write_warnings(warnings_list: Iterable[dict], output_dir: str) -> None:
+        """
+        Writes translation warnings to a ``warnings.json`` file in the output directory.
+
+        Args:
+            warnings_list: Warning entries collected during translation as a ``list[dict]``.
+            output_dir: Destination directory for the ``warnings.json`` file.
+        """
+        warnings_file = os.path.join(output_dir, "warnings.json")
+        with open(warnings_file, "w", encoding="utf-8") as warnings_handle:
+            json.dump(list(warnings_list), warnings_handle, indent=2, ensure_ascii=False)
 
     def _login_workspace_client(self) -> WorkspaceClient:
         """

@@ -219,6 +219,8 @@ def _parse_sql_write_behavior(write_mode: str) -> str | UnsupportedValue:
     Returns:
         Normalized Spark output mode.
     """
+    if write_mode is None:
+        return None
     if write_mode == "insert":
         return "append"
     return UnsupportedValue(value=write_mode, message=f"Unsupported SQL write mode '{write_mode}'")
