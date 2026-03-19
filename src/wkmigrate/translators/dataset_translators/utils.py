@@ -81,6 +81,53 @@ def parse_abfs_container_name(properties: dict) -> str | UnsupportedValue:
     return result
 
 
+def parse_cloud_bucket_name(properties: dict) -> str | UnsupportedValue:
+    """
+    Parses the cloud storage bucket/container name from dataset properties.
+
+    Checks ``bucket_name``, ``container``, and ``file_system`` keys in the
+    dataset location block.
+
+    Args:
+        properties: File properties block.
+
+    Returns:
+        Bucket or container name.
+    """
+    location = get_value_or_unsupported(properties, "location", "dataset properties")
+    if isinstance(location, UnsupportedValue):
+        return location
+    result = location.get("bucket_name") or location.get("container") or location.get("file_system")
+    if result is None:
+        return UnsupportedValue(
+            value=properties,
+            message="Missing property 'bucket_name', 'container', or 'file_system' in dataset location",
+        )
+    return result
+
+
+def parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
+    """
+    Parses the file path from a cloud dataset definition.
+
+    Args:
+        properties: File properties from the dataset definition.
+
+    Returns:
+        Full path to the dataset file.
+    """
+    location = properties.get("location")
+    if location is None:
+        return UnsupportedValue(value=properties, message="Missing property 'location' in dataset properties")
+
+    folder_path = location.get("folder_path")
+    file_name = location.get("file_name")
+    if file_name is None:
+        return UnsupportedValue(value=properties, message="Missing property 'file_name' in dataset properties")
+
+    return file_name if not folder_path else f"{folder_path}/{file_name}"
+
+
 def parse_abfs_file_path(properties: dict) -> str | UnsupportedValue:
     """
     Parses the ABFS file path from a dataset definition.

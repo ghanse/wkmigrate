@@ -5,6 +5,7 @@ translator validates required fields, coerces connection settings, and emits
 ``UnsupportedValue`` objects for any unparsable inputs.
 """
 
+from wkmigrate.datasets import CLOUD_LOCATION_TYPES
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators.delta_table_dataset_translator import translate_delta_table_dataset
@@ -15,6 +16,8 @@ from wkmigrate.translators.dataset_translators.sql_dataset_translator import (
     translate_postgresql_dataset,
     translate_sql_server_dataset,
 )
+
+FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
 
 
 def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
@@ -35,9 +38,19 @@ def translate_dataset(dataset: dict) -> Dataset | UnsupportedValue:
     if not dataset_type:
         return UnsupportedValue(value=dataset, message="Missing property 'type' in dataset properties")
 
+    if dataset_type in FILE_DATASET_TYPES:
+        # Determine provider from location type; translate_file_dataset handles dispatch.
+        location = dataset_properties.get("location", {})
+        location_type = location.get("type")
+        provider_type = CLOUD_LOCATION_TYPES.get(location_type) if location_type else None
+        if provider_type is None:
+            return UnsupportedValue(
+                value=dataset,
+                message=f"Unsupported file location type '{location_type}'",
+            )
+        return translate_file_dataset(dataset_type, dataset, provider_type)
+
     match dataset_type:
-        case "Avro" | "DelimitedText" | "Json" | "Orc" | "Parquet":
-            return translate_file_dataset(dataset_type, dataset)
         case "AzureSqlTable":
             return translate_sql_server_dataset(dataset)
         case "AzurePostgreSqlTable":
