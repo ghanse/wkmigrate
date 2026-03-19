@@ -611,7 +611,8 @@ def s3_dataset(
                     "location": {
                         "type": "AmazonS3Location",
                         "bucketName": "test-bucket",
-                        "key": "data/output.parquet",
+                        "fileName": "output.parquet",
+                        "folderPath": "data",
                     },
                 },
                 "linkedServiceName": {
@@ -651,7 +652,8 @@ def gcs_dataset(
                     "location": {
                         "type": "GoogleCloudStorageLocation",
                         "bucketName": "test-gcs-bucket",
-                        "key": "data/output.parquet",
+                        "fileName": "output.parquet",
+                        "folderPath": "data",
                     },
                 },
                 "linkedServiceName": {
