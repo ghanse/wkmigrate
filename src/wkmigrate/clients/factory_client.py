@@ -76,11 +76,9 @@ class FactoryClient:
         Returns:
             Pipeline definition as a ``dict``.
         """
-        # Get the pipelines:
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         pipeline = self.management_client.pipelines.get(self.resource_group_name, self.factory_name, pipeline_name)
-        # If no pipeline was found:
         if pipeline is None:
             raise ValueError(f'No pipeline found with name "{pipeline_name}"')
         return dict(pipeline.as_dict())
@@ -95,7 +93,6 @@ class FactoryClient:
         Returns:
             Linked-service definition as a ``dict``.
         """
-        # Get the linked service:
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         linked_service = self.management_client.linked_services.get(
@@ -103,7 +100,6 @@ class FactoryClient:
             factory_name=self.factory_name,
             linked_service_name=linked_service_name,
         )
-        # If no linked service was found:
         if linked_service is None:
             raise ValueError(f'No linked service found with name "{linked_service_name}"')
         return dict(linked_service.as_dict())
@@ -148,13 +144,11 @@ class FactoryClient:
         Returns:
             List of trigger definitions as ``list[dict]``.
         """
-        # List the triggers:
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         triggers = self.management_client.triggers.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
-        # If no triggers were found:
         if triggers is None:
             raise ValueError(f'No triggers found for factory "{self.factory_name}"')
         return [dict(trigger.as_dict()) for trigger in triggers]
@@ -169,28 +163,20 @@ class FactoryClient:
         Returns:
             Dataset definition as a ``dict``.
         """
-        # List the datasets:
         datasets = self._list_datasets()
         for dataset in datasets:
-            # Check the dataset name:
             if dataset.get("name") != dataset_name:
                 continue
-            # Get the dataset properties:
             properties = dataset.get("properties")
             if properties is None:
                 return dataset
-            # Get the associated linked service:
             linked_service = properties.get("linked_service_name")
             if linked_service is None:
                 return dataset
-            # Get the linked service reference name:
             linked_service_name = linked_service.get("reference_name")
-            # Get the linked service definition:
             linked_service_definition = self.get_linked_service(linked_service_name)
-            # Append the linked service definition to the dataset object:
             dataset["linked_service_definition"] = linked_service_definition
             return dataset
-        # If no datasets were found:
         raise ValueError(f'No dataset found for factory with name "{dataset_name}"')
 
     def _list_datasets(self) -> list[dict]:
@@ -200,13 +186,11 @@ class FactoryClient:
         Returns:
             List of dataset definitions as ``list[dict]``.
         """
-        # List the datasets:
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         datasets = self.management_client.datasets.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
-        # If no datasets were found:
         if datasets is None:
             raise ValueError(f'No datasets found for factory "{self.factory_name}"')
         return [dict(dataset.as_dict()) for dataset in datasets]

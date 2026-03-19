@@ -17,7 +17,6 @@ from wkmigrate.models.workflows.instructions import SecretInstruction
 from wkmigrate.utils import parse_mapping
 
 FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
-AZURE_BLOB_DATASET_TYPES = {"AzureBlobStorageDataset"}
 SQL_DATASET_TYPES = {"AzureSqlTable"}
 DELTA_DATASET_TYPES = {"AzureDatabricksDeltaLakeDataset"}
 

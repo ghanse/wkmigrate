@@ -720,42 +720,6 @@ def sql_dataset(
         yield ds
 
 
-@pytest.fixture(scope="session")
-def delta_dataset(
-    azure_config: AzureTestConfig,
-    adf_management_client: DataFactoryManagementClient,
-    databricks_linked_service: LinkedServiceResource,
-) -> Generator[DatasetResource, None, None]:
-    """Deploy a Databricks Delta Lake dataset.
-
-    Args:
-        azure_config: Azure configuration fixture.
-        adf_management_client: Data Factory management client fixture.
-        databricks_linked_service: Ensures the Databricks linked service exists first.
-
-    Yields:
-        The created ``DatasetResource``.
-    """
-    with _deploy_adf_resource(
-        adf_management_client.datasets,
-        azure_config,
-        "test_delta_dataset",
-        DatasetResource(
-            properties={
-                "type": "AzureDatabricksDeltaLakeDataset",
-                "typeProperties": {
-                    "database": "test_db",
-                    "table": "test_delta_table",
-                },
-                "linkedServiceName": {
-                    "referenceName": "test_databricks",
-                    "type": "LinkedServiceReference",
-                },
-            }
-        ),
-    ) as ds:
-        yield ds
-
 
 @pytest.fixture(scope="session")
 def sample_pipeline(
