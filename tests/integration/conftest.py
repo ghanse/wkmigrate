@@ -25,10 +25,35 @@ import pytest
 from azure.identity import ClientSecretCredential
 from azure.mgmt.datafactory import DataFactoryManagementClient
 from azure.mgmt.datafactory.models import (
+    ActivityDependency,
+    ActivityPolicy,
+    AmazonS3ReadSettings,
+    AzureBlobFSReadSettings,
+    AzureBlobFSWriteSettings,
+    AzureBlobStorageReadSettings,
+    AzureFunctionActivity,
+    AzureSqlSource,
+    CopyActivity,
+    DatabricksNotebookActivity,
+    DatabricksSparkJarActivity,
+    DatabricksSparkPythonActivity,
+    DatasetReference,
     DatasetResource,
+    DelimitedTextSource,
+    ExecutionActivity,
+    Expression,
     Factory,
+    ForEachActivity,
+    GoogleCloudStorageReadSettings,
+    IfConditionActivity,
+    LinkedServiceReference,
     LinkedServiceResource,
+    LookupActivity,
+    ParquetSink,
+    ParquetSource,
     PipelineResource,
+    SetVariableActivity,
+    WebActivity,
 )
 
 from wkmigrate.clients.factory_client import FactoryClient
@@ -787,29 +812,23 @@ def sample_pipeline(
         "integration_test_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "extract_data",
-                    "type": "DatabricksNotebook",
-                    "typeProperties": {
-                        "notebookPath": "/Shared/extract",
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
-                {
-                    "name": "transform_data",
-                    "type": "DatabricksNotebook",
-                    "typeProperties": {
-                        "notebookPath": "/Shared/transform",
-                    },
-                    "dependsOn": [
-                        {
-                            "activity": "extract_data",
-                            "dependencyConditions": ["Succeeded"],
-                        }
+                DatabricksNotebookActivity(
+                    name="extract_data",
+                    notebook_path="/Shared/extract",
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
+                DatabricksNotebookActivity(
+                    name="transform_data",
+                    notebook_path="/Shared/transform",
+                    depends_on=[
+                        ActivityDependency(
+                            activity="extract_data",
+                            dependency_conditions=["Succeeded"],
+                        ),
                     ],
-                    "policy": {"timeout": "0.02:00:00"},
-                },
+                    policy=ActivityPolicy(timeout="0.02:00:00"),
+                ),
             ],
             parameters={
                 "env": {"type": "String", "defaultValue": "dev"},
@@ -841,30 +860,24 @@ def sample_foreach_pipeline(
         "integration_test_foreach_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "process_items",
-                    "type": "ForEach",
-                    "typeProperties": {
-                        "isSequential": False,
-                        "batchCount": 5,
-                        "items": {
-                            "value": "@pipeline().parameters.items",
-                            "type": "Expression",
-                        },
-                        "activities": [
-                            {
-                                "name": "process_item",
-                                "type": "DatabricksNotebook",
-                                "typeProperties": {
-                                    "notebookPath": "/Shared/process",
-                                },
-                                "dependsOn": [],
-                                "policy": {"timeout": "0.01:00:00"},
-                            }
-                        ],
-                    },
-                    "dependsOn": [],
-                }
+                ForEachActivity(
+                    name="process_items",
+                    is_sequential=False,
+                    batch_count=5,
+                    items=Expression(
+                        type="Expression",
+                        value="@pipeline().parameters.items",
+                    ),
+                    activities=[
+                        DatabricksNotebookActivity(
+                            name="process_item",
+                            notebook_path="/Shared/process",
+                            depends_on=[],
+                            policy=ActivityPolicy(timeout="0.01:00:00"),
+                        ),
+                    ],
+                    depends_on=[],
+                ),
             ],
             parameters={
                 "items": {"type": "Array", "defaultValue": []},
@@ -901,19 +914,16 @@ def sample_unsupported_pipeline(
         "integration_test_unsupported_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "unsupported_function_call",
-                    "type": "AzureFunctionActivity",
-                    "typeProperties": {
-                        "functionName": "MyFunction",
-                        "method": "POST",
-                    },
-                    "dependsOn": [],
-                    "policy": {
-                        "timeout": "0.00:30:00",
-                        "secure_input": True,
-                    },
-                },
+                AzureFunctionActivity(
+                    name="unsupported_function_call",
+                    method="POST",
+                    function_name="MyFunction",
+                    depends_on=[],
+                    policy=ActivityPolicy(
+                        timeout="0.00:30:00",
+                        secure_input=True,
+                    ),
+                ),
             ],
         ),
     ) as pl:
@@ -942,20 +952,17 @@ def spark_jar_pipeline(
         "integration_test_spark_jar_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "run_spark_jar",
-                    "type": "DatabricksSparkJar",
-                    "linkedServiceName": {
-                        "referenceName": "test_databricks",
-                        "type": "LinkedServiceReference",
-                    },
-                    "typeProperties": {
-                        "mainClassName": "com.example.Main",
-                        "parameters": ["--input", "/data/input"],
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                DatabricksSparkJarActivity(
+                    name="run_spark_jar",
+                    main_class_name="com.example.Main",
+                    parameters=["--input", "/data/input"],
+                    linked_service_name=LinkedServiceReference(
+                        type="LinkedServiceReference",
+                        reference_name="test_databricks",
+                    ),
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -984,20 +991,17 @@ def spark_python_pipeline(
         "integration_test_spark_python_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "run_spark_python",
-                    "type": "DatabricksSparkPython",
-                    "linkedServiceName": {
-                        "referenceName": "test_databricks",
-                        "type": "LinkedServiceReference",
-                    },
-                    "typeProperties": {
-                        "pythonFile": "dbfs:/scripts/etl.py",
-                        "parameters": ["--env", "test"],
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                DatabricksSparkPythonActivity(
+                    name="run_spark_python",
+                    python_file="dbfs:/scripts/etl.py",
+                    parameters=["--env", "test"],
+                    linked_service_name=LinkedServiceReference(
+                        type="LinkedServiceReference",
+                        reference_name="test_databricks",
+                    ),
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1026,19 +1030,21 @@ def databricks_job_pipeline(
         "integration_test_databricks_job_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "run_databricks_job",
-                    "type": "DatabricksJob",
-                    "linkedServiceName": {
-                        "referenceName": "test_databricks",
-                        "type": "LinkedServiceReference",
+                ExecutionActivity(
+                    name="run_databricks_job",
+                    linked_service_name=LinkedServiceReference(
+                        type="LinkedServiceReference",
+                        reference_name="test_databricks",
+                    ),
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                    depends_on=[],
+                    additional_properties={
+                        "type": "DatabricksJob",
+                        "typeProperties": {
+                            "existingJobId": "12345",
+                        },
                     },
-                    "typeProperties": {
-                        "existingJobId": "12345",
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                ),
             ],
         ),
     ) as pl:
@@ -1067,16 +1073,13 @@ def web_activity_pipeline(
         "integration_test_web_activity_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "call_api",
-                    "type": "WebActivity",
-                    "typeProperties": {
-                        "url": "https://httpbin.org/get",
-                        "method": "GET",
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.00:05:00"},
-                },
+                WebActivity(
+                    name="call_api",
+                    method="GET",
+                    url="https://httpbin.org/get",
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.00:05:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1105,26 +1108,19 @@ def lookup_pipeline(
         "integration_test_lookup_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "lookup_csv_data",
-                    "type": "Lookup",
-                    "typeProperties": {
-                        "source": {
-                            "type": "DelimitedTextSource",
-                            "storeSettings": {
-                                "type": "AzureBlobFSReadSettings",
-                                "recursive": True,
-                            },
-                        },
-                        "dataset": {
-                            "referenceName": "test_abfs_csv_dataset",
-                            "type": "DatasetReference",
-                        },
-                        "firstRowOnly": True,
-                    },
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.00:10:00"},
-                },
+                LookupActivity(
+                    name="lookup_csv_data",
+                    source=DelimitedTextSource(
+                        store_settings=AzureBlobFSReadSettings(recursive=True),
+                    ),
+                    dataset=DatasetReference(
+                        type="DatasetReference",
+                        reference_name="test_abfs_csv_dataset",
+                    ),
+                    first_row_only=True,
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.00:10:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1155,39 +1151,29 @@ def copy_abfs_pipeline(
         "integration_test_copy_abfs_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "copy_abfs_csv_to_parquet",
-                    "type": "Copy",
-                    "typeProperties": {
-                        "source": {
-                            "type": "DelimitedTextSource",
-                            "storeSettings": {
-                                "type": "AzureBlobFSReadSettings",
-                                "recursive": True,
-                            },
-                        },
-                        "sink": {
-                            "type": "ParquetSink",
-                            "storeSettings": {
-                                "type": "AzureBlobFSWriteSettings",
-                            },
-                        },
-                    },
-                    "inputs": [
-                        {
-                            "referenceName": "test_abfs_csv_dataset",
-                            "type": "DatasetReference",
-                        }
+                CopyActivity(
+                    name="copy_abfs_csv_to_parquet",
+                    source=DelimitedTextSource(
+                        store_settings=AzureBlobFSReadSettings(recursive=True),
+                    ),
+                    sink=ParquetSink(
+                        store_settings=AzureBlobFSWriteSettings(),
+                    ),
+                    inputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_csv_dataset",
+                        ),
                     ],
-                    "outputs": [
-                        {
-                            "referenceName": "test_abfs_parquet_dataset",
-                            "type": "DatasetReference",
-                        }
+                    outputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_parquet_dataset",
+                        ),
                     ],
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1218,39 +1204,29 @@ def copy_s3_pipeline(
         "integration_test_copy_s3_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "copy_s3_to_abfs",
-                    "type": "Copy",
-                    "typeProperties": {
-                        "source": {
-                            "type": "ParquetSource",
-                            "storeSettings": {
-                                "type": "AmazonS3ReadSettings",
-                                "recursive": True,
-                            },
-                        },
-                        "sink": {
-                            "type": "ParquetSink",
-                            "storeSettings": {
-                                "type": "AzureBlobFSWriteSettings",
-                            },
-                        },
-                    },
-                    "inputs": [
-                        {
-                            "referenceName": "test_s3_dataset",
-                            "type": "DatasetReference",
-                        }
+                CopyActivity(
+                    name="copy_s3_to_abfs",
+                    source=ParquetSource(
+                        store_settings=AmazonS3ReadSettings(recursive=True),
+                    ),
+                    sink=ParquetSink(
+                        store_settings=AzureBlobFSWriteSettings(),
+                    ),
+                    inputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_s3_dataset",
+                        ),
                     ],
-                    "outputs": [
-                        {
-                            "referenceName": "test_abfs_parquet_dataset",
-                            "type": "DatasetReference",
-                        }
+                    outputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_parquet_dataset",
+                        ),
                     ],
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1281,39 +1257,29 @@ def copy_gcs_pipeline(
         "integration_test_copy_gcs_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "copy_gcs_to_abfs",
-                    "type": "Copy",
-                    "typeProperties": {
-                        "source": {
-                            "type": "ParquetSource",
-                            "storeSettings": {
-                                "type": "GoogleCloudStorageReadSettings",
-                                "recursive": True,
-                            },
-                        },
-                        "sink": {
-                            "type": "ParquetSink",
-                            "storeSettings": {
-                                "type": "AzureBlobFSWriteSettings",
-                            },
-                        },
-                    },
-                    "inputs": [
-                        {
-                            "referenceName": "test_gcs_dataset",
-                            "type": "DatasetReference",
-                        }
+                CopyActivity(
+                    name="copy_gcs_to_abfs",
+                    source=ParquetSource(
+                        store_settings=GoogleCloudStorageReadSettings(recursive=True),
+                    ),
+                    sink=ParquetSink(
+                        store_settings=AzureBlobFSWriteSettings(),
+                    ),
+                    inputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_gcs_dataset",
+                        ),
                     ],
-                    "outputs": [
-                        {
-                            "referenceName": "test_abfs_parquet_dataset",
-                            "type": "DatasetReference",
-                        }
+                    outputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_parquet_dataset",
+                        ),
                     ],
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1344,39 +1310,29 @@ def copy_azure_blob_pipeline(
         "integration_test_copy_azure_blob_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "copy_blob_to_abfs",
-                    "type": "Copy",
-                    "typeProperties": {
-                        "source": {
-                            "type": "ParquetSource",
-                            "storeSettings": {
-                                "type": "AzureBlobStorageReadSettings",
-                                "recursive": True,
-                            },
-                        },
-                        "sink": {
-                            "type": "ParquetSink",
-                            "storeSettings": {
-                                "type": "AzureBlobFSWriteSettings",
-                            },
-                        },
-                    },
-                    "inputs": [
-                        {
-                            "referenceName": "test_azure_blob_dataset",
-                            "type": "DatasetReference",
-                        }
+                CopyActivity(
+                    name="copy_blob_to_abfs",
+                    source=ParquetSource(
+                        store_settings=AzureBlobStorageReadSettings(recursive=True),
+                    ),
+                    sink=ParquetSink(
+                        store_settings=AzureBlobFSWriteSettings(),
+                    ),
+                    inputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_azure_blob_dataset",
+                        ),
                     ],
-                    "outputs": [
-                        {
-                            "referenceName": "test_abfs_parquet_dataset",
-                            "type": "DatasetReference",
-                        }
+                    outputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_parquet_dataset",
+                        ),
                     ],
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1407,36 +1363,29 @@ def copy_sql_pipeline(
         "integration_test_copy_sql_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "copy_sql_to_abfs",
-                    "type": "Copy",
-                    "typeProperties": {
-                        "source": {
-                            "type": "AzureSqlSource",
-                            "sqlReaderQuery": "SELECT * FROM dbo.test_table",
-                        },
-                        "sink": {
-                            "type": "ParquetSink",
-                            "storeSettings": {
-                                "type": "AzureBlobFSWriteSettings",
-                            },
-                        },
-                    },
-                    "inputs": [
-                        {
-                            "referenceName": "test_sql_dataset",
-                            "type": "DatasetReference",
-                        }
+                CopyActivity(
+                    name="copy_sql_to_abfs",
+                    source=AzureSqlSource(
+                        sql_reader_query="SELECT * FROM dbo.test_table",
+                    ),
+                    sink=ParquetSink(
+                        store_settings=AzureBlobFSWriteSettings(),
+                    ),
+                    inputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_sql_dataset",
+                        ),
                     ],
-                    "outputs": [
-                        {
-                            "referenceName": "test_abfs_parquet_dataset",
-                            "type": "DatasetReference",
-                        }
+                    outputs=[
+                        DatasetReference(
+                            type="DatasetReference",
+                            reference_name="test_abfs_parquet_dataset",
+                        ),
                     ],
-                    "dependsOn": [],
-                    "policy": {"timeout": "0.01:00:00"},
-                },
+                    depends_on=[],
+                    policy=ActivityPolicy(timeout="0.01:00:00"),
+                ),
             ],
         ),
     ) as pl:
@@ -1465,39 +1414,30 @@ def if_condition_pipeline(
         "integration_test_if_condition_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "check_env",
-                    "type": "IfCondition",
-                    "typeProperties": {
-                        "expression": {
-                            "value": "@equals(pipeline().parameters.env, 'prod')",
-                            "type": "Expression",
-                        },
-                        "ifTrueActivities": [
-                            {
-                                "name": "prod_notebook",
-                                "type": "DatabricksNotebook",
-                                "typeProperties": {
-                                    "notebookPath": "/Shared/prod_etl",
-                                },
-                                "dependsOn": [],
-                                "policy": {"timeout": "0.01:00:00"},
-                            }
-                        ],
-                        "ifFalseActivities": [
-                            {
-                                "name": "dev_notebook",
-                                "type": "DatabricksNotebook",
-                                "typeProperties": {
-                                    "notebookPath": "/Shared/dev_etl",
-                                },
-                                "dependsOn": [],
-                                "policy": {"timeout": "0.01:00:00"},
-                            }
-                        ],
-                    },
-                    "dependsOn": [],
-                }
+                IfConditionActivity(
+                    name="check_env",
+                    expression=Expression(
+                        type="Expression",
+                        value="@equals(pipeline().parameters.env, 'prod')",
+                    ),
+                    if_true_activities=[
+                        DatabricksNotebookActivity(
+                            name="prod_notebook",
+                            notebook_path="/Shared/prod_etl",
+                            depends_on=[],
+                            policy=ActivityPolicy(timeout="0.01:00:00"),
+                        ),
+                    ],
+                    if_false_activities=[
+                        DatabricksNotebookActivity(
+                            name="dev_notebook",
+                            notebook_path="/Shared/dev_etl",
+                            depends_on=[],
+                            policy=ActivityPolicy(timeout="0.01:00:00"),
+                        ),
+                    ],
+                    depends_on=[],
+                ),
             ],
             parameters={
                 "env": {"type": "String", "defaultValue": "dev"},
@@ -1529,15 +1469,12 @@ def set_variable_pipeline(
         "integration_test_set_variable_pipeline",
         PipelineResource(
             activities=[
-                {
-                    "name": "set_output_path",
-                    "type": "SetVariable",
-                    "typeProperties": {
-                        "variableName": "output_path",
-                        "value": "/data/output",
-                    },
-                    "dependsOn": [],
-                }
+                SetVariableActivity(
+                    name="set_output_path",
+                    variable_name="output_path",
+                    value="/data/output",
+                    depends_on=[],
+                ),
             ],
             variables={
                 "output_path": {"type": "String", "defaultValue": ""},
