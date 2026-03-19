@@ -15,8 +15,10 @@ import autopep8  # type: ignore
 from wkmigrate.datasets import (
     collect_data_source_secrets,
     merge_dataset_definition,
+    parse_spark_data_type,
 )
 from wkmigrate.code_generator import (
+    get_file_uri,
     get_option_expressions,
     get_read_expression,
 )
@@ -202,46 +204,13 @@ def _get_mapping(
     for mapping in column_mapping:
         source_col = mapping["source_column_name"]
         sink_col = mapping["sink_column_name"]
-        sink_type = mapping["sink_column_type"]
-        if cast_column_types and sink_type:
+        sink_type = parse_spark_data_type(mapping["sink_column_type"], sink_dataset["type"])
+        if cast_column_types:
             expressions.append(f'"cast({source_col} as {sink_type}) as {sink_col}"')
         else:
             expressions.append(f'"{source_col} as {sink_col}"')
     newline_characters = ", \n\t"
     return f"{sink_name}_df = {source_name}_df.selectExpr(\n\t{newline_characters.join(expressions)}\n)"
-
-
-_FILE_TYPES_WITH_OPTIONS = {"csv", "json", "orc", "parquet"}
-
-
-def _get_file_write_expression(sink_definition: dict) -> str:
-    """
-    Generates a Spark write statement for a file-based sink dataset.
-
-    Args:
-        sink_definition: Merged sink dataset definition dictionary.
-
-    Returns:
-        Python source fragment that writes a DataFrame to an ABFS file sink.
-    """
-    sink_name = sink_definition.get("dataset_name")
-    sink_type = sink_definition.get("type")
-    container_name = sink_definition.get("container")
-    storage_account_name = sink_definition.get("storage_account_name")
-    folder_path = sink_definition.get("folder_path")
-    bsl = "\\"
-    options_line = (
-        f'.options(**{sink_name}_options)  {bsl}\n                        '
-        if sink_type in _FILE_TYPES_WITH_OPTIONS
-        else ""
-    )
-    abfs_path = f"abfss://{container_name}@{storage_account_name}.dfs.core.windows.net/{folder_path}"
-    return (
-        f'{sink_name}_df.write.format("{sink_type}")  {bsl}\n'
-        f'                        {options_line}.mode("overwrite")  {bsl}\n'
-        f'                        .save("{abfs_path}")\n'
-        f'                    '
-    )
 
 
 def _get_write_expression(sink_definition: dict) -> str:
@@ -259,14 +228,41 @@ def _get_write_expression(sink_definition: dict) -> str:
     """
     sink_name = sink_definition.get("dataset_name")
     sink_type = sink_definition.get("type")
-    if sink_type in {"avro", "csv", "json", "orc", "parquet"}:
-        return _get_file_write_expression(sink_definition)
+    if sink_type == "avro":
+        return rf"""{sink_name}_df.write.format("avro")  \
+                        .mode("overwrite")  \
+                        .save("{get_file_uri(sink_definition)}")
+                    """
+    if sink_type == "csv":
+        return rf"""{sink_name}_df.write.format("csv")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("{get_file_uri(sink_definition)}")
+                    """
     if sink_type == "delta":
         database_name = sink_definition.get("database_name")
         table_name = sink_definition.get("table_name")
         return rf"""{sink_name}_df.write.format("delta")  \
                         .mode("overwrite")  \
                         .saveAsTable("hive_metastore.{database_name}.{table_name}")
+                    """
+    if sink_type == "json":
+        return rf"""{sink_name}_df.write.format("json")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("{get_file_uri(sink_definition)}")
+                    """
+    if sink_type == "orc":
+        return rf"""{sink_name}_df.write.format("orc")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("{get_file_uri(sink_definition)}")
+                    """
+    if sink_type == "parquet":
+        return rf"""{sink_name}_df.write.format("parquet")  \
+                        .options(**{sink_name}_options)  \
+                        .mode("overwrite")  \
+                        .save("{get_file_uri(sink_definition)}")
                     """
     if sink_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return rf"""{sink_name}_df.write.format("jdbc")  \

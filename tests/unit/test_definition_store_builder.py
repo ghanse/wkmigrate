@@ -7,7 +7,6 @@ import pytest
 from wkmigrate.definition_stores.definition_store_builder import build_definition_store
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 
-
 DEFINITION_STORE_CASES = [
     ("factory_definition_store", None, pytest.raises(ValueError)),
     (

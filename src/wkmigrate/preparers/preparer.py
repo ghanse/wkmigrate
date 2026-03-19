@@ -18,6 +18,7 @@ from wkmigrate.models.ir.pipeline import (
     LookupActivity,
     Pipeline,
     RunJobActivity,
+    SetVariableActivity,
     SparkJarActivity,
     SparkPythonActivity,
     WebActivity,
@@ -29,6 +30,7 @@ from wkmigrate.preparers.if_condition_activity_preparer import prepare_if_condit
 from wkmigrate.preparers.lookup_activity_preparer import prepare_lookup_activity
 from wkmigrate.preparers.notebook_activity_preparer import prepare_notebook_activity
 from wkmigrate.preparers.run_job_activity_preparer import prepare_run_job_activity
+from wkmigrate.preparers.set_variable_activity_preparer import prepare_set_variable_activity
 from wkmigrate.preparers.spark_jar_activity_preparer import prepare_spark_jar_activity
 from wkmigrate.preparers.spark_python_activity_preparer import prepare_spark_python_activity
 from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
@@ -81,4 +83,6 @@ def prepare_activity(
         return prepare_lookup_activity(activity)
     if isinstance(activity, WebActivity):
         return prepare_web_activity(activity)
+    if isinstance(activity, SetVariableActivity):
+        return prepare_set_variable_activity(activity)
     raise ValueError(f"Unsupported activity type '{type(activity)}'")

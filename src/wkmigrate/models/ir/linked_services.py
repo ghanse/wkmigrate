@@ -61,6 +61,48 @@ class AbfsLinkedService(LinkedService):
 
 
 @dataclass(slots=True)
+class S3LinkedService(LinkedService):
+    """
+    Linked-service metadata for Amazon S3.
+
+    Attributes:
+        access_key_id: AWS access key identifier used for authentication.
+        service_url: Custom S3-compatible endpoint URL, when applicable.
+    """
+
+    access_key_id: str | None = None
+    service_url: str | None = None
+
+
+@dataclass(slots=True)
+class GcsLinkedService(LinkedService):
+    """
+    Linked-service metadata for Google Cloud Storage.
+
+    Attributes:
+        access_key_id: HMAC access key identifier used for authentication.
+        service_url: Custom GCS-compatible endpoint URL, when applicable.
+    """
+
+    access_key_id: str | None = None
+    service_url: str | None = None
+
+
+@dataclass(slots=True)
+class AzureBlobLinkedService(LinkedService):
+    """
+    Linked-service metadata for Azure Blob Storage.
+
+    Attributes:
+        storage_account_name: Storage account name parsed from the connection string.
+        url: Storage account URL (can be a container URL, SAS URI, or service endpoint URL).
+    """
+
+    storage_account_name: str | None = None
+    url: str | None = None
+
+
+@dataclass(slots=True)
 class DatabricksClusterLinkedService(LinkedService):
     """
     Linked-service metadata describing a Databricks workspace/cluster.

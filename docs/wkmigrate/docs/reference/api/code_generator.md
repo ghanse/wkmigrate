@@ -6,13 +6,35 @@ title: wkmigrate.code_generator
 This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy, Lookup, and Web activity preparers
-to build Databricks notebooks.
+and manage credentials.  They are consumed by the Copy, Lookup, SetVariable, and Web
+activity preparers to build Databricks notebooks.
+
+#### get\_set\_variable\_notebook\_content
+
+```python
+def get_set_variable_notebook_content(variable_name: str,
+                                      variable_value: str) -> str
+```
+
+Generates code to set a task value parameter. The notebook evaluates ``variable_value`` and sets a Databricks task
+value parameter.
+
+**Arguments**:
+
+- `variable_name` - ADF variable name (used as the task-value key).
+- `variable_value` - Python expression string produced by the expression parser.
+  
+
+**Returns**:
+
+  Python notebook source string.
 
 #### get\_option\_expressions
 
 ```python
-def get_option_expressions(dataset_definition: dict) -> list[str]
+def get_option_expressions(
+        dataset_definition: dict,
+        credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE) -> list[str]
 ```
 
 Generates code to create a Spark data source options dictionary for the specified dataset definition.
@@ -20,6 +42,7 @@ Generates code to create a Spark data source options dictionary for the specifie
 **Arguments**:
 
 - `dataset_definition` - Dataset definition dictionary.
+- `credentials_scope` - Name of the Databricks secret scope used for storing credentials.
   
 
 **Returns**:
@@ -29,7 +52,10 @@ Generates code to create a Spark data source options dictionary for the specifie
 #### get\_file\_options
 
 ```python
-def get_file_options(dataset_definition: dict, file_type: str) -> list[str]
+def get_file_options(
+        dataset_definition: dict,
+        file_type: str,
+        credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE) -> list[str]
 ```
 
 Generates code to create a Spark data source options dictionary for a file dataset.
@@ -38,6 +64,7 @@ Generates code to create a Spark data source options dictionary for a file datas
 
 - `dataset_definition` - Dataset definition dictionary.
 - `file_type` - File type (for example ``"csv"`` or ``"parquet"``).
+- `credentials_scope` - Name of the Databricks secret scope used for storing credentials.
   
 
 **Returns**:
@@ -47,8 +74,10 @@ Generates code to create a Spark data source options dictionary for a file datas
 #### get\_database\_options
 
 ```python
-def get_database_options(dataset_definition: dict,
-                         database_type: str) -> list[str]
+def get_database_options(
+        dataset_definition: dict,
+        database_type: str,
+        credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE) -> list[str]
 ```
 
 Generates code to create a Spark data source options dictionary for interacting with a database.
@@ -57,6 +86,7 @@ Generates code to create a Spark data source options dictionary for interacting 
 
 - `dataset_definition` - Dataset definition dictionary.
 - `database_type` - Database type (for example ``"sqlserver"``).
+- `credentials_scope` - Name of the Databricks secret scope used for storing credentials.
   
 
 **Returns**:
@@ -107,6 +137,25 @@ Generates code to read data from a data source into a DataFrame.
 **Raises**:
 
 - `ValueError` - If the dataset type is not supported for reading.
+
+#### get\_file\_uri
+
+```python
+def get_file_uri(definition: dict) -> str
+```
+
+Builds the cloud storage URI for a file dataset definition.
+
+**Arguments**:
+
+- `definition` - Dataset definition dictionary containing provider_type, container,
+  folder_path, and (for Azure) storage_account_name.
+  
+
+**Returns**:
+
+  Cloud storage URI string (for example ``s3a://bucket/path`` or
+  ``abfss://container@account.dfs.core.windows.net/path``).
 
 #### get\_file\_read\_expression
 
@@ -164,18 +213,18 @@ Generates code to read data from a database into a DataFrame.
 #### get\_web\_activity\_notebook\_content
 
 ```python
-def get_web_activity_notebook_content(activity_name: str,
-                                      activity_type: str,
-                                      url: str,
-                                      method: str,
-                                      body: Any,
-                                      headers: dict[str, str] | None,
-                                      authentication: Authentication
-                                      | None = None,
-                                      disable_cert_validation: bool = False,
-                                      http_request_timeout_seconds: int
-                                      | None = None,
-                                      turn_off_async: bool = False) -> str
+def get_web_activity_notebook_content(
+        activity_name: str,
+        activity_type: str,
+        url: str,
+        method: str,
+        body: Any,
+        headers: dict[str, str] | None,
+        authentication: Authentication | None = None,
+        disable_cert_validation: bool = False,
+        http_request_timeout_seconds: int | None = None,
+        turn_off_async: bool = False,
+        credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE) -> str
 ```
 
 Generates notebook source for a Web activity.
@@ -195,6 +244,7 @@ and publishes the response body and status code as Databricks task values.
 - `disable_cert_validation` - When ``True``, TLS certificate verification is skipped.
 - `http_request_timeout_seconds` - Optional HTTP request timeout in seconds.
 - `turn_off_async` - When ``True``, noted in the notebook as a comment for visibility.
+- `credentials_scope` - Name of the Databricks secret scope used for storing credentials.
   
 
 **Returns**:

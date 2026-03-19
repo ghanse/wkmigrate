@@ -4,6 +4,10 @@ The activity translator routes each ADF activity to its corresponding translator
 shared metadata (policy, dependencies, cluster specs), and flattens nested control-flow
 constructs. It also captures non-translatable warnings so that callers receive structured
 diagnostics with the translated activities.
+
+Translation state is captured in a ``TranslationContext`` that is threaded through function calls
+and returned alongside results.  No mutable state is shared between functions — each state transition
+produces a new context, making the data flow fully explicit.
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from wkmigrate.models.ir.pipeline import Activity, Dependency, IfConditionActivi
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning, translation_warning_context
+from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 from wkmigrate.translators.activity_translators.copy_activity_translator import translate_copy_activity
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
@@ -26,12 +30,12 @@ from wkmigrate.translators.activity_translators.for_each_activity_translator imp
 from wkmigrate.translators.activity_translators.if_condition_activity_translator import translate_if_condition_activity
 from wkmigrate.translators.activity_translators.lookup_activity_translator import translate_lookup_activity
 from wkmigrate.translators.activity_translators.notebook_activity_translator import translate_notebook_activity
+from wkmigrate.translators.activity_translators.set_variable_activity_translator import translate_set_variable_activity
 from wkmigrate.translators.activity_translators.spark_jar_activity_translator import translate_spark_jar_activity
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import translate_spark_python_activity
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
 from wkmigrate.translators.linked_service_translators import translate_databricks_cluster_spec
-from wkmigrate.translators.activity_translators.utils import normalize_translated_result, parse_activity_timeout_string
-
+from wkmigrate.utils import get_placeholder_activity, normalize_translated_result, parse_timeout_string
 
 TypeTranslator = Callable[[dict, dict], TranslationResult]
 
@@ -145,7 +149,7 @@ def visit_activity(
         return cached, context
 
     activity_type = activity.get("type") or "Unsupported"
-    with translation_warning_context(name, activity_type):
+    with not_translatable_context(name, activity_type):
         base_properties = _get_base_properties(activity, is_conditional_task)
         result, context = _dispatch_activity(activity_type, activity, base_properties, context)
         translated = normalize_translated_result(result, base_properties)
@@ -181,11 +185,13 @@ def _dispatch_activity(
             return translate_if_condition_activity(activity, base_kwargs, context)
         case "ForEach":
             return translate_for_each_activity(activity, base_kwargs, context)
+        case "SetVariable":
+            return translate_set_variable_activity(activity, base_kwargs, context)
         case _:
             translator = context.registry.get(activity_type)
             if translator is not None:
                 return translator(activity, base_kwargs), context
-            return UnsupportedValue(value=activity, message=f"Unsupported activity type '{activity_type}'"), context
+            return get_placeholder_activity(base_kwargs), context
 
 
 def _build_activity_index(activities: list[dict]) -> tuple[dict[str, dict], list[str]]:
@@ -322,14 +328,14 @@ def _parse_policy(policy: dict | None) -> dict:
         Dictionary containing policy settings.
 
     Raises:
-        TranslationWarning: If secure input/output logging is used.
+        NotTranslatableWarning: If secure input/output logging is used.
     """
     if not policy:
         return {}
 
     if "secure_input" in policy:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 "secure_input",
                 "Secure input logging not applicable to Databricks workflows.",
             ),
@@ -337,7 +343,7 @@ def _parse_policy(policy: dict | None) -> dict:
         )
     if "secure_output" in policy:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 "secure_output",
                 "Secure output logging not applicable to Databricks workflows.",
             ),
@@ -348,7 +354,7 @@ def _parse_policy(policy: dict | None) -> dict:
     if "timeout" in policy and policy.get("timeout"):
         timeout_value = policy.get("timeout")
         if timeout_value is not None:
-            parsed_policy["timeout_seconds"] = parse_activity_timeout_string(timeout_value)
+            parsed_policy["timeout_seconds"] = parse_timeout_string(timeout_value)
 
     if "retry" in policy:
         retry_value = policy.get("retry")

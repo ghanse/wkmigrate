@@ -1,0 +1,286 @@
+[
+  {
+    "id": "static_string_value",
+    "description": "SetVariable with a static string value",
+    "input": {
+      "name": "set_customer_name",
+      "type": "SetVariable",
+      "description": "Set the customer name variable",
+      "depends_on": [],
+      "variable_name": "customerName",
+      "value": "Databricks"
+    },
+    "expected": {
+      "name": "set_customer_name",
+      "task_key": "set_customer_name",
+      "description": "Set the customer name variable",
+      "variable_name": "customerName",
+      "variable_value": "'Databricks'"
+    }
+  },
+  {
+    "id": "activity_output_expression",
+    "description": "SetVariable with an activity output expression",
+    "input": {
+      "name": "set_from_lookup",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "lookupResult",
+      "value": {
+        "value": "@activity('GetConfig').output.firstRow",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_lookup",
+      "task_key": "set_from_lookup",
+      "variable_name": "lookupResult",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='result')"
+    }
+  },
+  {
+    "id": "pipeline_run_id",
+    "description": "SetVariable with pipeline RunId system variable",
+    "input": {
+      "name": "set_run_id",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "runId",
+      "value": {
+        "value": "@pipeline().RunId",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_run_id",
+      "task_key": "set_run_id",
+      "variable_name": "runId",
+      "variable_value": "dbutils.jobs.getContext().tags().get('runId', '')"
+    }
+  },
+  {
+    "id": "pipeline_name",
+    "description": "SetVariable with pipeline Pipeline name system variable",
+    "input": {
+      "name": "set_pipeline_name",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "pipelineName",
+      "value": {
+        "value": "@pipeline().Pipeline",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_pipeline_name",
+      "task_key": "set_pipeline_name",
+      "variable_name": "pipelineName",
+      "variable_value": "spark.conf.get('spark.databricks.job.parentName', '')"
+    }
+  },
+  {
+    "id": "bare_expression_string",
+    "description": "SetVariable with a bare expression string (no wrapper dict)",
+    "input": {
+      "name": "set_from_bare_expr",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "outputVal",
+      "value": "@activity('FetchData').output.value"
+    },
+    "expected": {
+      "name": "set_from_bare_expr",
+      "task_key": "set_from_bare_expr",
+      "variable_name": "outputVal",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='FetchData', key='result')"
+    }
+  },
+  {
+    "id": "unsupported_expression_string",
+    "description": "SetVariable with unsupported expression returns placeholder",
+    "input": {
+      "name": "set_unsupported",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "myVar",
+      "value": {
+        "value": "@concat('hello', 'world')",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "unsupported": true,
+      "name": "set_unsupported",
+      "task_key": "set_unsupported"
+    }
+  },
+  {
+    "id": "missing_variable_name",
+    "description": "SetVariable missing variable_name returns placeholder",
+    "input": {
+      "name": "set_missing_name",
+      "type": "SetVariable",
+      "depends_on": [],
+      "value": "someValue"
+    },
+    "expected": {
+      "unsupported": true
+    }
+  },
+  {
+    "id": "variables_reference_known",
+    "description": "SetVariable referencing a known pipeline variable via @variables()",
+    "input": {
+      "name": "set_from_variable",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "copiedVar",
+      "value": {
+        "value": "@variables('sourceVar')",
+        "type": "Expression"
+      }
+    },
+    "context_variables": {
+      "sourceVar": "set_source_var"
+    },
+    "expected": {
+      "name": "set_from_variable",
+      "task_key": "set_from_variable",
+      "variable_name": "copiedVar",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='set_source_var', key='sourceVar')"
+    }
+  },
+  {
+    "id": "activity_output_double_quotes",
+    "description": "SetVariable with double-quoted activity output expression",
+    "input": {
+      "name": "set_from_lookup_dq",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "lookupResult",
+      "value": {
+        "value": "@activity(\"GetConfig\").output.firstRow",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_lookup_dq",
+      "task_key": "set_from_lookup_dq",
+      "variable_name": "lookupResult",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='GetConfig', key='result')"
+    }
+  },
+  {
+    "id": "variables_reference_double_quotes",
+    "description": "SetVariable referencing a known variable via double-quoted @variables()",
+    "input": {
+      "name": "set_from_variable_dq",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "copiedVar",
+      "value": {
+        "value": "@variables(\"sourceVar\")",
+        "type": "Expression"
+      }
+    },
+    "context_variables": {
+      "sourceVar": "set_source_var"
+    },
+    "expected": {
+      "name": "set_from_variable_dq",
+      "task_key": "set_from_variable_dq",
+      "variable_name": "copiedVar",
+      "variable_value": "dbutils.jobs.taskValues.get(taskKey='set_source_var', key='sourceVar')"
+    }
+  },
+  {
+    "id": "variables_reference_unknown",
+    "description": "SetVariable referencing an unknown pipeline variable returns unsupported",
+    "input": {
+      "name": "set_from_unknown_var",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "result",
+      "value": {
+        "value": "@variables('missingVar')",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "unsupported": true,
+      "name": "set_from_unknown_var",
+      "task_key": "set_from_unknown_var"
+    }
+  },
+  {
+    "id": "integer_value",
+    "description": "SetVariable with an integer value",
+    "input": {
+      "name": "set_retry_count",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "retryCount",
+      "value": 42
+    },
+    "expected": {
+      "name": "set_retry_count",
+      "task_key": "set_retry_count",
+      "variable_name": "retryCount",
+      "variable_value": "42"
+    }
+  },
+  {
+    "id": "boolean_value",
+    "description": "SetVariable with a boolean value",
+    "input": {
+      "name": "set_is_enabled",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "isEnabled",
+      "value": true
+    },
+    "expected": {
+      "name": "set_is_enabled",
+      "task_key": "set_is_enabled",
+      "variable_name": "isEnabled",
+      "variable_value": "True"
+    }
+  },
+  {
+    "id": "float_value",
+    "description": "SetVariable with a float value",
+    "input": {
+      "name": "set_threshold",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "threshold",
+      "value": 0.95
+    },
+    "expected": {
+      "name": "set_threshold",
+      "task_key": "set_threshold",
+      "variable_name": "threshold",
+      "variable_value": "0.95"
+    }
+  },
+  {
+    "id": "nested_activity_output",
+    "description": "SetVariable with nested activity output property access (e.g. firstRow.columnName)",
+    "input": {
+      "name": "set_from_column",
+      "type": "SetVariable",
+      "depends_on": [],
+      "variable_name": "columnVal",
+      "value": {
+        "value": "@activity('LookupConfig').output.firstRow.myColumn",
+        "type": "Expression"
+      }
+    },
+    "expected": {
+      "name": "set_from_column",
+      "task_key": "set_from_column",
+      "variable_name": "columnVal",
+      "variable_value": "json.loads(dbutils.jobs.taskValues.get(taskKey='LookupConfig', key='result'))['myColumn']"
+    }
+  }
+]

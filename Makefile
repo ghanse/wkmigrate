@@ -1,4 +1,4 @@
-.PHONY: dev test fmt docs docs-serve docs-clean
+.PHONY: dev test integration fmt docs docs-serve docs-clean docker
 
 dev:
 	pip install poetry==2.2.1
@@ -7,7 +7,10 @@ dev:
 	poetry install
 
 test:
-	poetry run pytest
+	poetry run pytest tests/unit
+
+integration:
+	poetry run pytest -m integration --tb=short -v
 
 fmt:
 	poetry run black .
@@ -34,3 +37,6 @@ docs-clean:
 	rm -rf docs/wkmigrate/.docusaurus docs/wkmigrate/.cache
 	# Remove generated API docs but keep the hand-authored index.mdx
 	find docs/wkmigrate/docs/reference/api -mindepth 1 -not -name 'index.mdx' -exec rm -rf {} +
+
+docker:
+	docker build -t wkmigrate:latest .

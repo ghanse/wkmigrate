@@ -20,6 +20,7 @@ from wkmigrate.models.ir.pipeline import (
     IfConditionActivity,
     LookupActivity,
     RunJobActivity,
+    SetVariableActivity,
     SparkJarActivity,
     SparkPythonActivity,
     WebActivity,
@@ -51,9 +52,39 @@ from wkmigrate.translators.activity_translators.lookup_activity_translator impor
     translate_lookup_activity,
 )
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
+from wkmigrate.translators.activity_translators.set_variable_activity_translator import (
+    translate_set_variable_activity,
+)
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
 )
+from wkmigrate.models.ir.translation_context import TranslationContext
+from wkmigrate.parsers.expression_parsers import parse_variable_value
+from wkmigrate.utils import get_placeholder_activity
+
+NOTEBOOK_ACTIVITY: dict = {
+    "name": "nb_task",
+    "type": "DatabricksNotebook",
+    "depends_on": [],
+    "policy": {"timeout": "0.01:00:00"},
+    "notebook_path": "/notebooks/etl",
+}
+
+SPARK_JAR_ACTIVITY: dict = {
+    "name": "jar_task",
+    "type": "DatabricksSparkJar",
+    "depends_on": [{"activity": "nb_task", "dependency_conditions": ["Succeeded"]}],
+    "policy": {"timeout": "0.02:00:00"},
+    "main_class_name": "com.example.Main",
+}
+
+SET_VARIABLE_ACTIVITY: dict = {
+    "name": "set_my_var",
+    "type": "SetVariable",
+    "depends_on": [],
+    "variable_name": "myVar",
+    "value": "static_value",
+}
 from wkmigrate.translators.activity_translators.copy_activity_translator import (
     translate_copy_activity,
 )
@@ -394,14 +425,6 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
 
     assert result.task_key == fixture["expected"]["task_key"]
     assert result.notebook_path == fixture["expected"]["notebook_path"]
-
-
-def test_set_variable_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
-    """Test that SetVariable activity creates placeholder."""
-    fixture = get_fixture(unsupported_activity_fixtures, "set_variable")
-    result = translate_activity(fixture["input"])
-
-    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
 
 
 def test_execute_pipeline_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
@@ -815,27 +838,103 @@ def test_web_activity_missing_auth_type_returns_unsupported(web_activity_fixture
     assert fixture["expected_message"] in result.message
 
 
-_NOTEBOOK_ACTIVITY: dict = {
-    "name": "nb_task",
-    "type": "DatabricksNotebook",
-    "depends_on": [],
-    "policy": {"timeout": "0.01:00:00"},
-    "notebook_path": "/notebooks/etl",
-}
+def test_set_variable_static_string(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a static string value."""
+    fixture = get_fixture(set_variable_activity_fixtures, "static_string_value")
+    result = translate_activity(fixture["input"])
 
-_SPARK_JAR_ACTIVITY: dict = {
-    "name": "jar_task",
-    "type": "DatabricksSparkJar",
-    "depends_on": [{"activity": "nb_task", "dependency_conditions": ["Succeeded"]}],
-    "policy": {"timeout": "0.02:00:00"},
-    "main_class_name": "com.example.Main",
-}
+    assert isinstance(result, SetVariableActivity)
+    assert result.name == fixture["expected"]["name"]
+    assert result.task_key == fixture["expected"]["task_key"]
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_activity_output_expression(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with an activity output expression dict."""
+    fixture = get_fixture(set_variable_activity_fixtures, "activity_output_expression")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_pipeline_run_id(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with @pipeline().RunId system variable."""
+    fixture = get_fixture(set_variable_activity_fixtures, "pipeline_run_id")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_pipeline_name(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with @pipeline().Pipeline system variable."""
+    fixture = get_fixture(set_variable_activity_fixtures, "pipeline_name")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_bare_expression_string(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a bare expression string (no wrapper dict)."""
+    fixture = get_fixture(set_variable_activity_fixtures, "bare_expression_string")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_unsupported_expression_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with unsupported expression produces an UNSUPPORTED_ADF_ACTIVITY placeholder."""
+    fixture = get_fixture(set_variable_activity_fixtures, "unsupported_expression_string")
+    placeholder = get_placeholder_activity({"name": fixture["input"]["name"], "task_key": fixture["input"]["name"]})
+    result = translate_activity(fixture["input"])
+    assert result == placeholder
+
+
+def test_set_variable_missing_variable_name_returns_unsupported(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with missing variable_name returns UnsupportedValue."""
+    fixture = get_fixture(set_variable_activity_fixtures, "missing_variable_name")
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result, _ = translate_set_variable_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert "variable_name" in result.message
+
+
+def test_set_variable_resolves_known_variable_reference(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with @variables() resolves to taskValues.get when variable is in context."""
+    fixture = get_fixture(set_variable_activity_fixtures, "variables_reference_known")
+    ctx = default_context()
+    for var_name, task_key in fixture["context_variables"].items():
+        ctx = ctx.with_variable(var_name, task_key)
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result, context = translate_set_variable_activity(fixture["input"], base_kwargs, ctx)
+
+    assert context is not None
+    assert context.get_variable_task_key(fixture["expected"]["variable_name"]) == fixture["expected"]["task_key"]
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_unknown_variable_reference_returns_unsupported(
+    set_variable_activity_fixtures: list[dict],
+) -> None:
+    """Test SetVariable with @variables() for unknown variable returns placeholder."""
+    fixture = get_fixture(set_variable_activity_fixtures, "variables_reference_unknown")
+    placeholder = get_placeholder_activity({"name": fixture["input"]["name"], "task_key": fixture["input"]["name"]})
+    result = translate_activity(fixture["input"])
+    assert result == placeholder
 
 
 def test_context_cache_visit_populates_cache() -> None:
     """Visiting a named activity stores it in the returned context."""
     ctx = default_context()
-    translated, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    translated, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert ctx.get_activity("nb_task") is translated
     assert isinstance(translated, DatabricksNotebookActivity)
@@ -844,8 +943,8 @@ def test_context_cache_visit_populates_cache() -> None:
 def test_context_cache_returns_cached_on_second_call() -> None:
     """A second visit for the same name returns the identical cached object."""
     ctx = default_context()
-    first, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
-    second, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    first, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
+    second, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert first is second
 
@@ -853,16 +952,16 @@ def test_context_cache_returns_cached_on_second_call() -> None:
 def test_context_cache_does_not_grow_on_duplicate() -> None:
     """Visiting the same activity twice does not add a second cache entry."""
     ctx = default_context()
-    _, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    _, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
     cache_size_after_first = len(ctx.activity_cache)
-    _, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    _, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert len(ctx.activity_cache) == cache_size_after_first
 
 
 def test_context_cache_populates_all_activities() -> None:
     """All translated activities appear in the final context cache."""
-    activities = [_NOTEBOOK_ACTIVITY, _SPARK_JAR_ACTIVITY]
+    activities = [NOTEBOOK_ACTIVITY, SPARK_JAR_ACTIVITY]
     result, ctx = translate_activities_with_context(activities)
 
     assert result is not None
@@ -894,9 +993,9 @@ def test_context_cache_empty_input() -> None:
 def test_context_cache_returns_pre_populated() -> None:
     """When the context already contains an activity, visit_activity returns it."""
     ctx = default_context()
-    first, ctx = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    first, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
-    second, ctx2 = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx)
+    second, ctx2 = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
 
     assert second is first
     assert ctx2 is ctx
@@ -938,8 +1037,8 @@ def test_context_cache_threads_through_if_condition() -> None:
 def test_context_cache_threads_through_dependency_chain() -> None:
     """Upstream activities are cached before their dependents during topological visit."""
     activities = [
-        _SPARK_JAR_ACTIVITY,
-        _NOTEBOOK_ACTIVITY,
+        SPARK_JAR_ACTIVITY,
+        NOTEBOOK_ACTIVITY,
     ]
     result, ctx = translate_activities_with_context(activities)
 
@@ -955,7 +1054,7 @@ def test_context_cache_threads_through_dependency_chain() -> None:
 def test_context_cache_immutability() -> None:
     """The original context is not mutated when a new activity is added."""
     ctx_before = default_context()
-    _, ctx_after = visit_activity(_NOTEBOOK_ACTIVITY, False, ctx_before)
+    _, ctx_after = visit_activity(NOTEBOOK_ACTIVITY, False, ctx_before)
 
     assert len(ctx_before.activity_cache) == 0
     assert len(ctx_after.activity_cache) == 1
@@ -1052,6 +1151,237 @@ def test_context_cache_foreach_multi_inner_does_not_modify_parent() -> None:
     assert "loop" in final_ctx.activity_cache
     assert "inner_nb" not in final_ctx.activity_cache
     assert "inner_jar" not in final_ctx.activity_cache
+
+
+def test_variable_cache_with_variable_returns_new_context() -> None:
+    """with_variable returns a new context containing the variable mapping."""
+    ctx = TranslationContext()
+    updated = ctx.with_variable("myVar", "set_my_var")
+
+    assert updated.get_variable_task_key("myVar") == "set_my_var"
+    assert ctx.get_variable_task_key("myVar") is None
+
+
+def test_variable_cache_get_missing_returns_none() -> None:
+    """get_variable_task_key returns None for variables not in the cache."""
+    ctx = TranslationContext()
+
+    assert ctx.get_variable_task_key("nonexistent") is None
+
+
+def test_variable_cache_immutability() -> None:
+    """The original context is not mutated when a variable is added."""
+    ctx_before = TranslationContext()
+    ctx_after = ctx_before.with_variable("x", "task_x")
+
+    assert len(ctx_before.variable_cache) == 0
+    assert len(ctx_after.variable_cache) == 1
+
+
+def test_variable_cache_overwrite() -> None:
+    """A later with_variable call for the same name overwrites the previous mapping."""
+    ctx = TranslationContext()
+    ctx = ctx.with_variable("myVar", "first_task")
+    ctx = ctx.with_variable("myVar", "second_task")
+
+    assert ctx.get_variable_task_key("myVar") == "second_task"
+
+
+def test_variable_cache_preserves_activity_cache() -> None:
+    """with_variable preserves the existing activity cache."""
+    ctx = default_context()
+    _, ctx = visit_activity(NOTEBOOK_ACTIVITY, False, ctx)
+    ctx = ctx.with_variable("myVar", "set_my_var")
+
+    assert ctx.get_activity("nb_task") is not None
+    assert ctx.get_variable_task_key("myVar") == "set_my_var"
+
+
+def test_variable_cache_populated_by_set_variable_visit() -> None:
+    """Visiting a SetVariable activity populates the variable cache."""
+    ctx = default_context()
+    _, ctx = visit_activity(SET_VARIABLE_ACTIVITY, False, ctx)
+
+    assert ctx.get_variable_task_key("myVar") == "set_my_var"
+
+
+def test_variable_cache_populated_by_translate_activities_with_context() -> None:
+    """translate_activities_with_context populates the variable cache for SetVariable."""
+    activities = [SET_VARIABLE_ACTIVITY]
+    _, ctx = translate_activities_with_context(activities)
+
+    assert ctx.get_variable_task_key("myVar") == "set_my_var"
+
+
+def test_variable_cache_available_to_downstream_set_variable() -> None:
+    """A downstream SetVariable can reference a variable set by an upstream SetVariable."""
+    upstream = {
+        "name": "set_source",
+        "type": "SetVariable",
+        "depends_on": [],
+        "variable_name": "sourceVar",
+        "value": "hello",
+    }
+    downstream = {
+        "name": "copy_var",
+        "type": "SetVariable",
+        "depends_on": [{"activity": "set_source", "dependency_conditions": ["Succeeded"]}],
+        "variable_name": "copiedVar",
+        "value": {
+            "value": "@variables('sourceVar')",
+            "type": "Expression",
+        },
+    }
+    result, ctx = translate_activities_with_context([upstream, downstream])
+
+    assert result is not None
+    assert len(result) == 2
+    assert ctx.get_variable_task_key("sourceVar") == "set_source"
+    assert ctx.get_variable_task_key("copiedVar") == "copy_var"
+    downstream_activity = ctx.get_activity("copy_var")
+    assert isinstance(downstream_activity, SetVariableActivity)
+    assert downstream_activity.variable_value == "dbutils.jobs.taskValues.get(taskKey='set_source', key='sourceVar')"
+
+
+def test_set_variable_activity_output_double_quotes(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with double-quoted activity output expression."""
+    fixture = get_fixture(set_variable_activity_fixtures, "activity_output_double_quotes")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_resolves_double_quoted_variable_reference(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with double-quoted @variables() resolves when variable is in context."""
+    fixture = get_fixture(set_variable_activity_fixtures, "variables_reference_double_quotes")
+    ctx = default_context()
+    for var_name, task_key in fixture["context_variables"].items():
+        ctx = ctx.with_variable(var_name, task_key)
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result, _ = translate_set_variable_activity(fixture["input"], base_kwargs, ctx)
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_parse_variable_value_activity_output_double_quotes() -> None:
+    """parse_variable_value resolves double-quoted @activity() output references."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": '@activity("LookupTask").output.firstRow', "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='LookupTask', key='result')"
+
+
+def test_parse_variable_value_variables_reference_double_quotes() -> None:
+    """parse_variable_value resolves double-quoted @variables() when variable is in context."""
+    ctx = TranslationContext().with_variable("myVar", "set_my_var")
+    result = parse_variable_value({"value": '@variables("myVar")', "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='set_my_var', key='myVar')"
+
+
+def test_parse_variable_value_variables_reference_found() -> None:
+    """parse_variable_value resolves @variables() when the variable is in the context."""
+    ctx = TranslationContext().with_variable("myVar", "set_my_var")
+    result = parse_variable_value({"value": "@variables('myVar')", "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='set_my_var', key='myVar')"
+
+
+def test_parse_variable_value_variables_reference_not_found() -> None:
+    """parse_variable_value returns UnsupportedValue when the variable is not in context."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": "@variables('unknown')", "type": "Expression"}, ctx)
+
+    assert isinstance(result, UnsupportedValue)
+    assert "unknown" in result.message
+
+
+def test_set_variable_integer_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with an integer value produces a Python int literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "integer_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_boolean_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a boolean value produces a Python bool literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "boolean_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_float_value(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with a float value produces a Python float literal."""
+    fixture = get_fixture(set_variable_activity_fixtures, "float_value")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_set_variable_nested_activity_output(set_variable_activity_fixtures: list[dict]) -> None:
+    """Test SetVariable with nested activity output path like firstRow.columnName."""
+    fixture = get_fixture(set_variable_activity_fixtures, "nested_activity_output")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, SetVariableActivity)
+    assert result.variable_name == fixture["expected"]["variable_name"]
+    assert result.variable_value == fixture["expected"]["variable_value"]
+
+
+def test_parse_variable_value_integer() -> None:
+    """parse_variable_value handles integer values directly."""
+    ctx = TranslationContext()
+    assert parse_variable_value(42, ctx) == "42"
+
+
+def test_parse_variable_value_boolean() -> None:
+    """parse_variable_value handles boolean values directly."""
+    ctx = TranslationContext()
+    assert parse_variable_value(True, ctx) == "True"
+    assert parse_variable_value(False, ctx) == "False"
+
+
+def test_parse_variable_value_nested_output_property() -> None:
+    """parse_variable_value resolves nested activity output like firstRow.myColumn."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": "@activity('Lookup').output.firstRow.col1", "type": "Expression"}, ctx)
+    assert result == "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['col1']"
+
+
+def test_parse_variable_value_static_string() -> None:
+    """parse_variable_value wraps static strings as Python literals."""
+    ctx = TranslationContext()
+    result = parse_variable_value("hello", ctx)
+
+    assert result == "'hello'"
+
+
+def test_parse_variable_value_activity_output() -> None:
+    """parse_variable_value resolves @activity() output references."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": "@activity('LookupTask').output.firstRow", "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.taskValues.get(taskKey='LookupTask', key='result')"
+
+
+def test_parse_variable_value_pipeline_system_var() -> None:
+    """parse_variable_value resolves @pipeline() system variables."""
+    ctx = TranslationContext()
+    result = parse_variable_value({"value": "@pipeline().RunId", "type": "Expression"}, ctx)
+
+    assert result == "dbutils.jobs.getContext().tags().get('runId', '')"
 
 
 def test_copy_postgresql_to_delta(copy_activity_fixtures: list[dict]) -> None:

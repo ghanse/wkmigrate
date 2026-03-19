@@ -5,9 +5,10 @@ options and type-specific metadata. Parsers should emit ``UnsupportedValue`` obj
 for any unparsable inputs.
 """
 
-from datetime import datetime, timedelta
+import json
 from wkmigrate.enums.isolation_level import IsolationLevel
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.utils import parse_timeout_string
 
 
 def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
@@ -22,25 +23,23 @@ def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
         Format options as a ``dict`` object.
     """
     dataset_type = _parse_dataset_type(dataset.get("type", ""))
-    if isinstance(dataset_type, UnsupportedValue):
-        return dataset_type
-    match dataset_type:
-        case "avro":
-            return _parse_avro_format_options(dataset)
-        case "csv":
-            return _parse_delimited_format_options(dataset)
-        case "delta":
-            return _parse_delta_format_options()
-        case "json":
-            return _parse_json_format_options(dataset)
-        case "orc":
-            return _parse_orc_format_options(dataset)
-        case "parquet":
-            return _parse_parquet_format_options(dataset)
-        case "sqlserver" | "postgresql" | "mysql" | "oracle":
-            return _parse_sql_format_options(dataset, dataset_type)
-        case _:
-            return UnsupportedValue(value=dataset, message=f"Unsupported dataset type '{dataset_type}'")
+    if dataset_type is None:
+        return UnsupportedValue(value=dataset, message="Missing property 'type' in dataset definition")
+    if dataset_type == "avro":
+        return _parse_avro_format_options(dataset)
+    if dataset_type == "csv":
+        return _parse_delimited_format_options(dataset)
+    if dataset_type == "delta":
+        return _parse_delta_format_options()
+    if dataset_type == "json":
+        return _parse_json_format_options(dataset)
+    if dataset_type == "orc":
+        return _parse_orc_format_options(dataset)
+    if dataset_type == "parquet":
+        return _parse_parquet_format_options(dataset)
+    if dataset_type in ("sqlserver", "postgresql", "mysql", "oracle"):
+        return _parse_sql_format_options(dataset)
+    return UnsupportedValue(value=dataset, message=f"Unsupported dataset type '{dataset_type}'")
 
 
 def _parse_avro_format_options(dataset: dict) -> dict | UnsupportedValue:
@@ -169,30 +168,6 @@ def _parse_sql_format_options(dataset: dict, dataset_type: str) -> dict | Unsupp
     }
 
 
-_DATASET_TYPE_MAPPINGS: dict[str, str] = {
-    "AvroSource": "avro",
-    "AvroSink": "avro",
-    "AzureDatabricksDeltaLakeSource": "delta",
-    "AzureDatabricksDeltaLakeSink": "delta",
-    "AzureMySqlSource": "mysql",
-    "AzureMySqlSink": "mysql",
-    "AzurePostgreSqlSource": "postgresql",
-    "AzurePostgreSqlSink": "postgresql",
-    "AzureSqlSource": "sqlserver",
-    "AzureSqlSink": "sqlserver",
-    "DelimitedTextSource": "csv",
-    "DelimitedTextSink": "csv",
-    "JsonSource": "json",
-    "JsonSink": "json",
-    "OracleSource": "oracle",
-    "OracleSink": "oracle",
-    "OrcSource": "orc",
-    "OrcSink": "orc",
-    "ParquetSource": "parquet",
-    "ParquetSink": "parquet",
-}
-
-
 def _parse_dataset_type(dataset_type: str) -> str | UnsupportedValue:
     """
     Parses a dataset type from an Azure Data Factory source or sink dataset (e.g. 'DeltaSource') into a Spark data
@@ -205,13 +180,35 @@ def _parse_dataset_type(dataset_type: str) -> str | UnsupportedValue:
     Returns:
         Spark data source or sink format string (e.g., ``csv``, ``json``).
     """
-    result = _DATASET_TYPE_MAPPINGS.get(dataset_type)
+    mappings = {
+        "AvroSource": "avro",
+        "AvroSink": "avro",
+        "AzureDatabricksDeltaLakeSource": "delta",
+        "AzureDatabricksDeltaLakeSink": "delta",
+        "AzureMySqlSource": "mysql",
+        "AzureMySqlSink": "mysql",
+        "AzurePostgreSqlSource": "postgresql",
+        "AzurePostgreSqlSink": "postgresql",
+        "AzureSqlSource": "sqlserver",
+        "AzureSqlSink": "sqlserver",
+        "DelimitedTextSource": "csv",
+        "DelimitedTextSink": "csv",
+        "JsonSource": "json",
+        "JsonSink": "json",
+        "OracleSource": "oracle",
+        "OracleSink": "oracle",
+        "OrcSource": "orc",
+        "OrcSink": "orc",
+        "ParquetSource": "parquet",
+        "ParquetSink": "parquet",
+    }
+    result = mappings.get(dataset_type)
     if result is None:
         return UnsupportedValue(value=dataset_type, message=f"Unsupported dataset type '{dataset_type}'")
     return result
 
 
-def _parse_sql_write_behavior(write_mode: str | None) -> str | None | UnsupportedValue:
+def _parse_sql_write_behavior(write_mode: str) -> str | UnsupportedValue:
     """
     Parses an ADF write mode into a Spark output mode. Any SQL write modes which are not translatable will return an
     ``UnsupportedValue`` object.
@@ -222,8 +219,6 @@ def _parse_sql_write_behavior(write_mode: str | None) -> str | None | Unsupporte
     Returns:
         Normalized Spark output mode.
     """
-    if write_mode is None:
-        return None
     if write_mode == "insert":
         return "append"
     return UnsupportedValue(value=write_mode, message=f"Unsupported SQL write mode '{write_mode}'")
@@ -245,7 +240,7 @@ def _parse_query_timeout_seconds(properties: dict | None) -> int | UnsupportedVa
     query_timeout = properties.get("query_timeout")
     if query_timeout is None:
         return 0
-    return _parse_query_timeout_string(query_timeout)
+    return parse_timeout_string(query_timeout)
 
 
 def _parse_query_isolation_level(properties: dict | None) -> str | None:
@@ -266,20 +261,14 @@ def _parse_query_isolation_level(properties: dict | None) -> str | None:
     return IsolationLevel(isolation_level).name
 
 
-def _parse_query_timeout_string(timeout_string: str) -> int | UnsupportedValue:
+def _parse_character_value(char: str) -> str:
     """
-    Parses an ``hh:mm:ss`` string into seconds.
+    Parses a single character into a JSON-safe representation.
 
     Args:
-        timeout_string: Timeout string in ``HH:MM:SS`` format.
+        char: Character literal extracted from the dataset definition.
 
     Returns:
-        Integer number of seconds represented by the string.
+        JSON-escaped representation of the character.
     """
-    try:
-        time_format = "%H:%M:%S"
-        date_time = datetime.strptime(timeout_string, time_format)
-        time_delta = timedelta(hours=date_time.hour, minutes=date_time.minute, seconds=date_time.second)
-        return int(time_delta.total_seconds())
-    except ValueError:
-        return UnsupportedValue(value=timeout_string, message=f"Invalid query timeout string '{timeout_string}'")
+    return json.dumps(char).strip('"')

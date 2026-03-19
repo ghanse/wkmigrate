@@ -30,14 +30,10 @@ azure-common = "^1.1.28"
 azure-core = "^1.30.2"
 azure-identity = "^1.16.1"
 azure-mgmt-core = "^1.4.0"
-azure-mgmt-datafactory = "^8.0.0"
+azure-mgmt-datafactory = "^9.0.0"
 databricks-sdk = "^0.20.0"
 databricks-bundles = "^0.286.0"
 autopep8 = "^2.3.2"
-click = "^8.1.7"
-
-[tool.poetry.scripts]
-wkmigrate = "wkmigrate.cli:cli"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -93,9 +89,13 @@ module = ["google", "google.*"]  # Google libraries are not type annotated
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 addopts = "--no-header"
 cache_dir = ".venv/pytest-cache"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "integration: marks tests that require a live Azure subscription",
+]
 
 [tool.black]
 target-version = ["py312"]
@@ -110,7 +110,7 @@ line-length = 120
 exclude = ["demos/*", "tests/e2e/notebooks", "ui/*", "sandbox/*"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["databricks.labs.dqx"]
+known-first-party = ["wkmigrate"]
 
 [tool.pylint.main]
 # PyLint configuration is adapted from Google Python Style Guide with modifications.
@@ -417,6 +417,9 @@ max-statements = 50
 
 # Minimum number of public methods for a class (see R0903).
 min-public-methods = 2
+
+# Maximum McCabe complexity rating
+max-complexity = 12
 
 [tool.pylint.exceptions]
 # Exceptions that will emit a warning when caught.

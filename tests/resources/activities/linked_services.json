@@ -320,5 +320,123 @@
     "input": null,
     "expected_unsupported": true,
     "expected_message": "Missing Oracle linked service definition"
+  },
+  {
+    "id": "s3_full",
+    "description": "Amazon S3 linked service - full configuration",
+    "input": {
+      "name": "s3-storage-account",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "AmazonS3",
+        "access_key_id": "MY_ACCESS_KEY_ID",
+        "service_url": "https://s3.amazonaws.com"
+      }
+    },
+    "expected": {
+      "service_name": "s3-storage-account",
+      "service_type": "s3",
+      "access_key_id": "MY_ACCESS_KEY_ID",
+      "service_url": "https://s3.amazonaws.com"
+    }
+  },
+  {
+    "id": "s3_minimal",
+    "description": "Amazon S3 linked service - minimal configuration",
+    "input": {
+      "name": "s3-minimal",
+      "properties": {
+        "type": "AmazonS3"
+      }
+    },
+    "expected": {
+      "service_name": "s3-minimal",
+      "service_type": "s3"
+    }
+  },
+  {
+    "id": "s3_null",
+    "description": "Empty/null S3 linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing S3 linked service definition"
+  },
+  {
+    "id": "gcs_full",
+    "description": "Google Cloud Storage linked service - full configuration",
+    "input": {
+      "name": "gcs-storage-account",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "GoogleCloudStorage",
+        "access_key_id": "my-gcs-access-key",
+        "service_url": "https://storage.googleapis.com"
+      }
+    },
+    "expected": {
+      "service_name": "gcs-storage-account",
+      "service_type": "gcs",
+      "access_key_id": "my-gcs-access-key",
+      "service_url": "https://storage.googleapis.com"
+    }
+  },
+  {
+    "id": "gcs_minimal",
+    "description": "Google Cloud Storage linked service - minimal configuration",
+    "input": {
+      "name": "gcs-minimal",
+      "properties": {
+        "type": "GoogleCloudStorage"
+      }
+    },
+    "expected": {
+      "service_name": "gcs-minimal",
+      "service_type": "gcs"
+    }
+  },
+  {
+    "id": "gcs_null",
+    "description": "Empty/null GCS linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing GCS linked service definition"
+  },
+  {
+    "id": "azure_blob_full",
+    "description": "Azure Blob Storage linked service - full configuration",
+    "input": {
+      "name": "blob-storage-account",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "AzureBlobStorage",
+        "connection_string": "DefaultEndpointsProtocol=https;AccountName=myblobaccount;EndpointSuffix=core.windows.net;",
+        "storage_account_name": "myblobaccount"
+      }
+    },
+    "expected": {
+      "service_name": "blob-storage-account",
+      "service_type": "azure_blob",
+      "url": "https://myblobaccount.blob.core.windows.net/",
+      "storage_account_name": "myblobaccount"
+    }
+  },
+  {
+    "id": "azure_blob_missing_connection",
+    "description": "Azure Blob Storage linked service - missing connection_string and service_endpoint",
+    "input": {
+      "name": "blob-no-conn",
+      "properties": {
+        "type": "AzureBlobStorage"
+      }
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing property 'container_url', 'sas_uri', or 'service_endpoint' in storage account properties"
+  },
+  {
+    "id": "azure_blob_null",
+    "description": "Empty/null Azure Blob Storage linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing Azure Blob linked service definition"
   }
 ]

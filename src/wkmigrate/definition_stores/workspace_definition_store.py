@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
+import re
 from typing import Any
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 import dataclasses
 import yaml
 from databricks.sdk import WorkspaceClient
@@ -37,12 +39,15 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 from typing_extensions import deprecated
 
+from wkmigrate.datasets import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.models.workflows.artifacts import NotebookArtifact
-from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
+from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
 from wkmigrate.preparers.preparer import prepare_workflow
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(slots=True)
@@ -60,7 +65,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         tenant_id: Azure AD tenant identifier used for client-secret authentication.
         client_id: Application (client) ID used for client-secret authentication.
         client_secret: Secret associated with the client ID for client-secret authentication.
-        files_to_delta_sinks: Overrides default behavior when generating DLT sinks from copy tasks.
+        options: Dictionary of options that customize workflow generation and deployment behaviour.
         workspace_client: Databricks workspace client used to interact with the Databricks workspace. Automatically created using the provided credentials.
     """
 
@@ -73,24 +78,97 @@ class WorkspaceDefinitionStore(DefinitionStore):
     tenant_id: str | None = None
     client_id: str | None = None
     client_secret: str | None = None
-    files_to_delta_sinks: bool | None = None
+    options: dict[str, Any] = dataclasses.field(default_factory=dict)
     workspace_client: WorkspaceClient | None = dataclasses.field(init=False, default=None)
     _valid_authentication_types = ["pat", "basic", "azure-client-secret"]
+    _valid_option_keys = frozenset(
+        {
+            "root_path",
+            "files_to_delta_sinks",
+            "compute_type",
+            "catalog",
+            "schema",
+            "workspace_url",
+            "credentials_scope",
+        }
+    )
+    _valid_compute_types = frozenset({"serverless", "classic"})
 
     def __post_init__(self) -> None:
         """
-        Validates credentials and initializes the Databricks workspace client.
+        Validates credentials, option keys, and initializes the Databricks workspace client.
 
         Raises:
             ValueError: If the authentication type is invalid or the host name is not provided.
+            ValueError: If any option key is not a recognised key.
+            ValueError: If the ``compute_type`` option value is not a supported compute type.
         """
         if self.authentication_type not in self._valid_authentication_types:
             raise ValueError(
                 'Invalid value for "authentication_type"; must be "pat", "basic", or "azure-client-secret"'
             )
         if self.host_name is None:
-            raise ValueError('"host_name" must be provided when creating a WorkspaceDefinitionStore')
+            raise ValueError("'host_name' must be provided when creating a WorkspaceDefinitionStore")
+        self._validate_option_keys(self.options.keys())
+        self._validate_compute_type_value(self.options.get('compute_type'))
         self.workspace_client = self._login_workspace_client()
+
+    def set_option(self, key: str, value: Any) -> None:
+        """
+        Sets the value of a single option.
+
+        Args:
+            key: Option name. Must be one of the recognised option keys.
+            value: New value for the option.
+
+        Raises:
+            ValueError: If *key* is not a recognised option.
+            ValueError: If *key* is ``compute_type`` and *value* is not a supported compute type.
+        """
+        self._validate_option_keys([key])
+        if key == 'compute_type':
+            self._validate_compute_type_value(value)
+        self.options[key] = value
+
+    def set_options(self, options: dict[str, Any]) -> None:
+        """
+        Replaces all options with the provided dictionary.
+
+        Args:
+            options: Dictionary of option key-value pairs. All keys must be recognised.
+
+        Raises:
+            ValueError: If any key is not a recognised option.
+            ValueError: If the ``compute_type`` value is not a supported compute type.
+        """
+        self._validate_option_keys(options.keys())
+        self._validate_compute_type_value(options.get('compute_type'))
+        self.options = dict(options)
+
+    def to_jobs(self, pipeline_definitions: list[Pipeline]) -> list[int]:
+        """
+        Uploads artifacts and creates a Databricks job for each pipeline.
+
+        Args:
+            pipeline_definitions: List of ``Pipeline`` dataclasses to deploy.
+
+        Returns:
+            List of job identifiers registered in the workspace.
+        """
+        job_ids: list[int] = []
+        for pipeline_definition in pipeline_definitions:
+            try:
+                job_id = self.to_job(pipeline_definition)
+            except Exception:
+                logger.warning(  # pylint: disable=logging-too-many-args
+                    "Failed to create job for pipeline '%s', skipping",
+                    pipeline_definition.name,
+                    exc_info=True,
+                )
+                continue
+            if job_id is not None:
+                job_ids.append(job_id)
+        return job_ids
 
     def to_job(self, pipeline_definition: Pipeline) -> int | None:
         """
@@ -121,6 +199,76 @@ class WorkspaceDefinitionStore(DefinitionStore):
             raise ValueError("Failed to create workflow")
         return job_id
 
+    def to_asset_bundles(
+        self,
+        pipeline_definitions: list[Pipeline],
+        bundle_directory: str,
+        download_notebooks: bool = True,
+    ) -> None:
+        """
+        Creates a Databricks asset bundle for each pipeline inside a shared parent directory.
+
+        Each pipeline is written to a subdirectory named after the pipeline.
+
+        Args:
+            pipeline_definitions: List of ``Pipeline`` dataclasses to export.
+            bundle_directory: Parent directory for all generated bundles.
+            download_notebooks: If True, downloads referenced notebooks from the workspace.
+        """
+        bundle_dir = os.path.abspath(bundle_directory)
+        seen_names: set[str] = set()
+        for pipeline_definition in pipeline_definitions:
+            safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", pipeline_definition.name)
+            if not safe_name:
+                raise ValueError(f"Pipeline name {pipeline_definition.name!r} is empty after sanitization")
+            if safe_name in seen_names:
+                suffix = 1
+                while f"{safe_name}_{suffix}" in seen_names:
+                    suffix += 1
+                safe_name = f"{safe_name}_{suffix}"
+                logger.warning(  # pylint: disable=logging-too-many-args
+                    "Sanitized pipeline name collides with a previous pipeline; renaming to '%s'",
+                    safe_name,
+                )
+            seen_names.add(safe_name)
+            sub_directory = os.path.join(bundle_dir, safe_name)
+            try:
+                self.to_asset_bundle(pipeline_definition, sub_directory, download_notebooks=download_notebooks)
+            except Exception:
+                logger.warning(  # pylint: disable=logging-too-many-args
+                    "Failed to create asset bundle for pipeline '%s', skipping",
+                    pipeline_definition.name,
+                    exc_info=True,
+                )
+
+    def to_asset_bundle(
+        self,
+        pipeline_definition: Pipeline | dict,
+        bundle_directory: str,
+        download_notebooks: bool = True,
+    ) -> None:
+        """
+        Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
+
+        When ``download_notebooks`` is True, workspace notebook paths are extracted
+        using the original (pre-rewrite) paths so that downloads succeed.  The
+        ``root_path`` rewrite is applied after the download-path mapping.
+
+        Args:
+            pipeline_definition: Prepared pipeline as a ``Pipeline`` or raw dictionary payload.
+            bundle_directory: Destination directory for the bundle artifacts.
+            download_notebooks: If True, downloads referenced notebooks from the workspace to the bundle.
+        """
+        pipeline_ir = (
+            pipeline_definition if isinstance(pipeline_definition, Pipeline) else Pipeline(**pipeline_definition)
+        )
+        if download_notebooks:
+            prepared = self._prepare_workflow(pipeline_ir, defer_root_path=True)
+            self._write_asset_bundle(prepared, bundle_directory, download_notebooks=True)
+        else:
+            prepared = self._prepare_workflow(pipeline_ir)
+            self._write_asset_bundle(prepared, bundle_directory, download_notebooks=False)
+
     @deprecated("Use 'to_job' as of wkmigrate 0.0.3")
     def dump(self, pipeline_definition: Pipeline) -> int | None:
         """
@@ -148,40 +296,328 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         self.to_asset_bundle(pipeline_definition, local_directory, download_notebooks=True)
 
-    def to_asset_bundle(
-        self,
-        pipeline_definition: Pipeline | dict,
-        bundle_directory: str,
-        download_notebooks: bool = True,
-    ) -> None:
+    def _effective_files_to_delta_sinks(self) -> bool | None:
+        """Returns the files_to_delta_sinks value, preferring options over the field."""
+        return self.options.get('files_to_delta_sinks')
+
+    def _effective_root_path(self) -> str | None:
+        """Returns the root_path option, or None if not set."""
+        return self.options.get('root_path')
+
+    def _effective_compute_type(self) -> str | None:
+        """Returns the compute_type option, or None if not set."""
+        return self.options.get('compute_type')
+
+    def _effective_catalog(self) -> str | None:
+        """Returns the catalog option, or None if not set."""
+        return self.options.get('catalog')
+
+    def _effective_schema(self) -> str | None:
+        """Returns the schema option, or None if not set."""
+        return self.options.get('schema')
+
+    def _effective_workspace_url(self) -> str | None:
+        """Returns the workspace_url option, or None if not set."""
+        return self.options.get('workspace_url')
+
+    def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
-        Creates a Databricks asset bundle containing the workflow definition, notebooks, secrets, and unsupported nodes.
+        Validates that all provided keys are recognised option keys.
 
         Args:
-            pipeline_definition: Prepared pipeline as a ``Pipeline`` or raw dictionary payload.
-            bundle_directory: Destination directory for the bundle artifacts.
-            download_notebooks: If True, downloads referenced notebooks from the workspace to the bundle.
-        """
-        pipeline_ir = (
-            pipeline_definition if isinstance(pipeline_definition, Pipeline) else Pipeline(**pipeline_definition)
-        )
-        prepared = self._prepare_workflow(pipeline_ir)
-        self._write_asset_bundle(prepared, bundle_directory, download_notebooks=download_notebooks)
+            keys: Option key names to validate.
 
-    def _prepare_workflow(self, pipeline_definition: Pipeline) -> PreparedWorkflow:
+        Raises:
+            ValueError: If any key is not a recognised option.
         """
-        Translates the pipeline and collects artifacts via ``prepare_workflow``.
+        invalid_keys = set(keys) - self._valid_option_keys
+        if invalid_keys:
+            raise ValueError(f'Invalid option key(s): {", ".join(sorted(invalid_keys))}')
+
+    def _validate_compute_type_value(self, compute_type: Any) -> None:
+        """
+        Validates that a ``compute_type`` value is one of the supported types.
+
+        Args:
+            compute_type: Value to validate, or ``None`` to skip validation.
+
+        Raises:
+            ValueError: If *compute_type* is not ``None`` and not in the supported set.
+        """
+        if compute_type is not None and compute_type not in self._valid_compute_types:
+            raise ValueError(
+                f'Invalid compute_type "{compute_type}"; must be one of: '
+                f'{", ".join(sorted(self._valid_compute_types))}'
+            )
+
+    def _prepare_workflow(self, pipeline_definition: Pipeline, *, defer_root_path: bool = False) -> PreparedWorkflow:
+        """
+        Translates the pipeline and collects artifacts via ``prepare_workflow``, then applies options.
 
         Args:
             pipeline_definition: Pipeline to translate as a ``Pipeline``.
+            defer_root_path: When True, skip the root_path rewrite so the caller
+                can apply it after download-path extraction.
 
         Returns:
-            PreparedWorkflow: Artifacts required to create the job.
+            PreparedWorkflow with configured options applied.
         """
-        return prepare_workflow(
+        prepared = prepare_workflow(
             pipeline=pipeline_definition,
-            files_to_delta_sinks=self.files_to_delta_sinks,
+            files_to_delta_sinks=self._effective_files_to_delta_sinks(),
         )
+        return self._apply_options(prepared, defer_root_path=defer_root_path)
+
+    def _apply_options(self, prepared: PreparedWorkflow, *, defer_root_path: bool = False) -> PreparedWorkflow:
+        """
+        Returns a new ``PreparedWorkflow`` with all configured options applied.
+
+        Applies ``root_path`` (rewrites notebook and pipeline instruction paths),
+        ``compute_type`` (switches tasks to serverless or classic compute),
+        ``catalog`` / ``schema`` (rewrites DLT pipeline targets), and
+        ``workspace_url`` (overrides Databricks linked-service hosts).
+
+        Args:
+            prepared: Source PreparedWorkflow.
+            defer_root_path: When True, skip the root_path rewrite so it can be
+                applied later (e.g. after download-path extraction).
+
+        Returns:
+            A new PreparedWorkflow reflecting the current options.
+        """
+        root_path = self._effective_root_path()
+        compute_type = self._effective_compute_type()
+        catalog = self._effective_catalog()
+        schema = self._effective_schema()
+        workspace_url = self._effective_workspace_url()
+
+        tasks = [dict(t) for t in prepared.tasks]
+        activities = list(prepared.activities)
+
+        if compute_type is not None:
+            tasks = self._apply_compute_type_override(tasks, compute_type)
+
+        if workspace_url is not None:
+            tasks = self._apply_workspace_url_override(tasks, workspace_url)
+
+        if root_path is not None and not defer_root_path:
+            tasks = self._apply_root_path_override(tasks, root_path)
+            activities = self._apply_root_path_to_activities(activities, root_path)
+
+        if catalog is not None or schema is not None:
+            activities = self._apply_catalog_schema_to_activities(activities, catalog, schema)
+
+        result = dataclasses.replace(prepared, activities=activities)
+        for activity, task in zip(result.activities, tasks):
+            activity.task = task
+        return result
+
+    @classmethod
+    def _apply_root_path_to_activities(
+        cls,
+        activities: list[PreparedActivity],
+        root_path: str,
+    ) -> list[PreparedActivity]:
+        """Returns new activity list with root_path applied to notebook and pipeline file_paths.
+
+        Creates copies via ``dataclasses.replace`` so the originals are not mutated.
+        Recurses into inner workflows.  Bundle-relative paths (starting with
+        ``./``) are left unchanged.
+        """
+        new_activities: list[PreparedActivity] = []
+        for activity in activities:
+            replacements: dict[str, Any] = {}
+            if activity.notebooks:
+                replacements['notebooks'] = [
+                    (
+                        dataclasses.replace(
+                            nb,
+                            file_path=f'{root_path.rstrip("/")}/{nb.file_path.lstrip("/")}',
+                        )
+                        if not (nb.file_path.startswith('./') or cls._has_root_prefix(nb.file_path, root_path))
+                        else nb
+                    )
+                    for nb in activity.notebooks
+                ]
+            if activity.pipelines:
+                replacements['pipelines'] = [
+                    (
+                        dataclasses.replace(
+                            pi,
+                            file_path=f'{root_path.rstrip("/")}/{pi.file_path.lstrip("/")}',
+                        )
+                        if not (pi.file_path.startswith('./') or cls._has_root_prefix(pi.file_path, root_path))
+                        else pi
+                    )
+                    for pi in activity.pipelines
+                ]
+            if activity.inner_workflow:
+                inner_activities = cls._apply_root_path_to_activities(
+                    list(activity.inner_workflow.activities), root_path
+                )
+                replacements['inner_workflow'] = dataclasses.replace(
+                    activity.inner_workflow, activities=inner_activities
+                )
+            new_activities.append(dataclasses.replace(activity, **replacements))
+        return new_activities
+
+    @staticmethod
+    def _apply_catalog_schema_to_activities(
+        activities: list[PreparedActivity],
+        catalog: str | None,
+        schema: str | None,
+    ) -> list[PreparedActivity]:
+        """Returns new activity list with catalog/schema applied to pipeline instructions.
+
+        Walks into inner workflows recursively so that pipelines from ForEach
+        activities are correctly updated.
+        """
+        new_activities: list[PreparedActivity] = []
+        for activity in activities:
+            replacements: dict[str, Any] = {}
+            if activity.pipelines:
+                replacements['pipelines'] = [
+                    dataclasses.replace(
+                        pi,
+                        catalog=catalog if catalog is not None else pi.catalog,
+                        target=schema if schema is not None else pi.target,
+                    )
+                    for pi in activity.pipelines
+                ]
+            if activity.inner_workflow:
+                inner_activities = WorkspaceDefinitionStore._apply_catalog_schema_to_activities(
+                    list(activity.inner_workflow.activities), catalog, schema
+                )
+                replacements['inner_workflow'] = dataclasses.replace(
+                    activity.inner_workflow, activities=inner_activities
+                )
+            new_activities.append(dataclasses.replace(activity, **replacements))
+        return new_activities
+
+    @staticmethod
+    def _has_root_prefix(path: str, root_path: str) -> bool:
+        """
+        Checks whether *path* already starts with the *root_path* directory prefix.
+
+        Uses a normalised form ``root_path + '/'`` so that ``/migrated`` does not
+        falsely match ``/migrated_old/notebook``.
+
+        Args:
+            path: File path to test.
+            root_path: Expected root directory prefix.
+
+        Returns:
+            True when *path* is already rooted under *root_path*.
+        """
+        prefix = root_path.rstrip('/') + '/'
+        return path.startswith(prefix) or path.rstrip('/') == root_path.rstrip('/')
+
+    @staticmethod
+    def _apply_task_override(
+        tasks: list[dict[str, Any]],
+        rewrite_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Applies *rewrite_fn* to each task dict, recursing into ``for_each_task``.
+
+        This is the shared recursion skeleton used by the individual override
+        helpers so the ``for_each_task`` traversal logic is defined once.
+
+        Args:
+            tasks: Job task dicts to process.
+            rewrite_fn: Function that receives a shallow-copied task dict and
+                returns the modified task dict.
+
+        Returns:
+            New list of task dicts with *rewrite_fn* applied.
+        """
+        result: list[dict[str, Any]] = []
+        for task in tasks:
+            task = rewrite_fn(dict(task))
+            for_each_task = task.get('for_each_task')
+            if for_each_task:
+                for_each_task = dict(for_each_task)
+                nested = for_each_task.get('task')
+                if isinstance(nested, dict):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_task_override([nested], rewrite_fn)[0]
+                elif isinstance(nested, list):
+                    for_each_task['task'] = WorkspaceDefinitionStore._apply_task_override(nested, rewrite_fn)
+                task['for_each_task'] = for_each_task
+            result.append(task)
+        return result
+
+    @staticmethod
+    def _apply_root_path_override(tasks: list[dict[str, Any]], root_path: str) -> list[dict[str, Any]]:
+        """Returns a new tasks list with notebook paths rooted under *root_path*.
+
+        Args:
+            tasks: Job task dicts to rewrite.
+            root_path: New root directory for notebook paths.
+
+        Returns:
+            New list of task dicts with rewritten paths.
+        """
+        prefix = root_path.rstrip('/') + '/'
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
+            notebook_task = task.get('notebook_task')
+            if notebook_task:
+                notebook_task = dict(notebook_task)
+                original = notebook_task.get('notebook_path') or ''
+                if (
+                    not original.startswith('./')
+                    and not original.startswith(prefix)
+                    and original.rstrip('/') != root_path.rstrip('/')
+                ):
+                    notebook_task['notebook_path'] = f'{root_path.rstrip("/")}/{original.lstrip("/")}'
+                task['notebook_task'] = notebook_task
+            return task
+
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
+
+    @staticmethod
+    def _apply_compute_type_override(tasks: list[dict[str, Any]], compute_type: str) -> list[dict[str, Any]]:
+        """Returns a new tasks list switched to the requested compute type.
+
+        When *compute_type* is ``"serverless"``, existing ``new_cluster`` definitions
+        are removed so the task runs on serverless compute.
+
+        Args:
+            tasks: Job task dicts to process.
+            compute_type: Desired compute type (``"serverless"`` or ``"classic"``).
+
+        Returns:
+            New list of task dicts with compute settings applied.
+        """
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
+            if compute_type == 'serverless':
+                task.pop('new_cluster', None)
+                task.pop('existing_cluster_id', None)
+            return task
+
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
+
+    @staticmethod
+    def _apply_workspace_url_override(tasks: list[dict[str, Any]], workspace_url: str) -> list[dict[str, Any]]:
+        """Returns a new tasks list with Databricks linked-service hosts set to *workspace_url*.
+
+        Args:
+            tasks: Job task dicts to process.
+            workspace_url: Databricks workspace URL to set on every linked service.
+
+        Returns:
+            New list of task dicts with workspace URLs applied.
+        """
+
+        def _rewrite(task: dict[str, Any]) -> dict[str, Any]:
+            new_cluster = task.get('new_cluster')
+            if isinstance(new_cluster, dict) and 'host_name' in new_cluster:
+                new_cluster = dict(new_cluster)
+                new_cluster['host_name'] = workspace_url
+                task['new_cluster'] = new_cluster
+            return task
+
+        return WorkspaceDefinitionStore._apply_task_override(tasks, _rewrite)
 
     @staticmethod
     def _upload_notebooks(client: WorkspaceClient, notebooks: Iterable[NotebookArtifact]) -> None:
@@ -221,7 +657,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         for instruction in pipelines:
             response = client.pipelines.create(
                 allow_duplicate_names=True,
-                catalog="wkmigrate",
+                catalog=instruction.catalog,
                 channel="CURRENT",
                 continuous=False,
                 development=False,
@@ -229,7 +665,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 name=instruction.name,
                 photon=True,
                 serverless=True,
-                target="wkmigrate",
+                target=instruction.target,
             )
             pipeline_id = response.pipeline_id
             if pipeline_id is None:
@@ -255,8 +691,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         if not secrets_to_create:
             return
         scopes = [scope.name for scope in client.secrets.list_scopes()]
-        if "wkmigrate_credentials_scope" not in scopes:
-            client.secrets.create_scope(scope="wkmigrate_credentials_scope")
+        if DEFAULT_CREDENTIALS_SCOPE not in scopes:
+            client.secrets.create_scope(scope=DEFAULT_CREDENTIALS_SCOPE)
         for secret in secrets_to_create:
             value = secret.provided_value or "PLACEHOLDER_SECRET_VALUE"
             client.secrets.put_secret(scope=secret.scope, key=secret.key, string_value=value)
@@ -321,6 +757,11 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         Writes an asset bundle layout containing job configuration and related artifacts.
 
+        When *download_notebooks* is True the workflow is expected to have been
+        prepared with ``defer_root_path=True`` so that workspace paths are still
+        in their original form for downloading.  After extraction the root_path
+        rewrite is applied to the prepared workflow.
+
         Args:
             prepared: Prepared workflow artifacts.
             bundle_dir: Destination directory for the bundle.
@@ -328,26 +769,45 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         os.makedirs(bundle_dir, exist_ok=True)
         bundle_name = prepared.pipeline.name or "workflow"
-        resources_dir = os.path.join(bundle_dir, "resources")
-        jobs_dir = os.path.join(resources_dir, "jobs")
-        pipelines_dir = os.path.join(resources_dir, "pipelines")
+        jobs_dir = os.path.join(bundle_dir, "resources", "jobs")
+        pipelines_dir = os.path.join(bundle_dir, "resources", "pipelines")
         notebooks_dir = os.path.join(bundle_dir, "notebooks")
 
         os.makedirs(jobs_dir, exist_ok=True)
         os.makedirs(pipelines_dir, exist_ok=True)
         os.makedirs(notebooks_dir, exist_ok=True)
 
-        inner_workflows = prepared.inner_workflows
-        all_tasks = prepared.tasks + [task for workflow in inner_workflows for task in workflow.tasks]
+        all_tasks = prepared.tasks + [t for wf in prepared.inner_workflows for t in wf.tasks]
 
         if download_notebooks:
-            workspace_paths = self._extract_workspace_notebook_paths(all_tasks)
-            workspace_paths = {p for p in workspace_paths if not p.startswith("/wkmigrate/")}
+            workspace_paths = {
+                p for p in self._extract_workspace_notebook_paths(all_tasks) if not p.startswith("/wkmigrate/")
+            }
             if workspace_paths:
-                path_mapping = self._download_workspace_notebooks(workspace_paths, notebooks_dir)
-                self._update_notebook_paths_for_bundle(all_tasks, path_mapping)
+                self._update_notebook_paths_for_bundle(
+                    all_tasks,
+                    self._download_workspace_notebooks(workspace_paths, notebooks_dir),
+                )
 
-        if inner_workflows:
+        # Apply deferred root_path rewrite after download-path extraction.
+        # Skip bundle-relative paths (starting with './') that were already
+        # rewritten by _update_notebook_paths_for_bundle.
+        root_path = self._effective_root_path()
+        if root_path is not None and download_notebooks:
+            for activity, task in zip(prepared.activities, self._apply_root_path_override(prepared.tasks, root_path)):
+                activity.task = task
+            prepared = dataclasses.replace(
+                prepared,
+                activities=self._apply_root_path_to_activities(list(prepared.activities), root_path),
+            )
+            # Also rewrite task dicts inside inner workflows so that inner job
+            # YAML files receive the root_path prefix.
+            for inner_wf in prepared.inner_workflows:
+                rewritten = self._apply_root_path_override(inner_wf.tasks, root_path)
+                for activity, task in zip(inner_wf.activities, rewritten):
+                    activity.task = task
+
+        if prepared.inner_workflows:
             self._assign_inner_job_refs(prepared.tasks)
 
         job_settings = {
@@ -362,7 +822,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         with open(job_file, "w", encoding="utf-8") as job_handle:
             yaml.safe_dump(job_resource, job_handle, sort_keys=False)
 
-        for inner_wf in inner_workflows:
+        for inner_wf in prepared.inner_workflows:
             inner_name = inner_wf.pipeline.name or "inner_job"
             inner_job_file = os.path.join(jobs_dir, f"{inner_name}.yml")
             self._assign_inner_job_refs(inner_wf.tasks)
@@ -381,8 +841,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
         self._write_secrets(prepared.all_secrets, bundle_dir)
         self._write_unsupported(prepared.pipeline.not_translatable or [], bundle_dir)
-        self._write_warnings(prepared.pipeline.warnings or [], bundle_dir)
-        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, inner_workflows)
+        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, prepared.inner_workflows)
 
     def _write_notebooks(self, notebooks: Iterable[NotebookArtifact], output_dir: str) -> None:
         """
@@ -542,12 +1001,13 @@ class WorkspaceDefinitionStore(DefinitionStore):
                         instruction.name: {
                             "name": instruction.name,
                             "allow_duplicate_names": True,
+                            "catalog": instruction.catalog,
                             "channel": "CURRENT",
                             "development": False,
                             "continuous": False,
                             "photon": True,
                             "serverless": True,
-                            "target": "wkmigrate",
+                            "target": instruction.target,
                             "libraries": [{"notebook": {"path": instruction.file_path}}],
                         }
                     }
@@ -670,19 +1130,6 @@ class WorkspaceDefinitionStore(DefinitionStore):
         formatted = self._format_unsupported_entries(unsupported)
         with open(unsupported_file, "w", encoding="utf-8") as unsupported_handle:
             json.dump(formatted, unsupported_handle, indent=2, ensure_ascii=False)
-
-    @staticmethod
-    def _write_warnings(translation_warnings: Iterable[dict], output_dir: str) -> None:
-        """
-        Writes translation warnings to a ``warnings.json`` file in the output directory.
-
-        Args:
-            translation_warnings: Warning entries collected during translation.
-            output_dir: Destination directory for the ``warnings.json`` file.
-        """
-        warnings_file = os.path.join(output_dir, "warnings.json")
-        with open(warnings_file, "w", encoding="utf-8") as warnings_handle:
-            json.dump(list(translation_warnings), warnings_handle, indent=2, ensure_ascii=False)
 
     def _login_workspace_client(self) -> WorkspaceClient:
         """

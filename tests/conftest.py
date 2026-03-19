@@ -111,6 +111,12 @@ def lookup_activity_fixtures() -> list[dict]:
 
 
 @pytest.fixture
+def set_variable_activity_fixtures() -> list[dict]:
+    """Load SetVariable activity test fixtures."""
+    return load_fixtures("set_variable_activities.json")
+
+
+@pytest.fixture
 def linked_service_fixtures() -> list[dict]:
     """Load linked service test fixtures."""
     return load_fixtures("linked_services.json")
@@ -134,6 +140,16 @@ class MockFactoryClient:
 
     test_json_path: str = JSON_PATH
 
+    def list_pipelines(self) -> list[str]:
+        """Return all pipeline names from the fixture file.
+
+        Returns:
+            Pipeline names as a ``list[str]``.
+        """
+        with open(os.path.join(self.test_json_path, "test_pipelines.json"), "rb") as file:
+            pipelines = json.load(file)
+        return [pipeline["name"] for pipeline in pipelines if "name" in pipeline]
+
     def get_pipeline(self, pipeline_name: str) -> dict:
         """Return a pipeline definition.
 
@@ -146,26 +162,23 @@ class MockFactoryClient:
         Raises:
             ValueError: If no pipeline matches the provided name.
         """
-        with open(f"{self.test_json_path}/test_pipelines.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_pipelines.json"), "rb") as file:
             pipelines = json.load(file)
         for pipeline in pipelines:
             if pipeline.get("name") == pipeline_name:
                 return pipeline
         raise ValueError(f'No pipeline found with name "{pipeline_name}"')
 
-    def get_trigger(self, pipeline_name: str) -> dict:
+    def get_trigger(self, pipeline_name: str) -> dict | None:
         """Return the trigger associated with a pipeline.
 
         Args:
             pipeline_name: Name of the pipeline the trigger belongs to.
 
         Returns:
-            Trigger definition as a ``dict``.
-
-        Raises:
-            ValueError: If no trigger is associated with the pipeline.
+            Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
         """
-        with open(f"{self.test_json_path}/test_triggers.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_triggers.json"), "rb") as file:
             triggers = json.load(file)
         for trigger in triggers:
             properties = trigger.get("properties")
@@ -180,7 +193,7 @@ class MockFactoryClient:
             ]
             if pipeline_name in pipeline_names:
                 return trigger
-        raise ValueError(f'No trigger found for pipeline with name "{pipeline_name}"')
+        return None
 
     def get_dataset(self, dataset_name: str) -> dict:
         """
@@ -195,7 +208,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If no dataset matches ``dataset_name``.
         """
-        with open(f"{self.test_json_path}/test_datasets.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_datasets.json"), "rb") as file:
             datasets = json.load(file)
         for dataset in datasets:
             properties = dataset.get("properties")
@@ -222,7 +235,7 @@ class MockFactoryClient:
         Raises:
             ValueError: If the linked service does not exist in fixtures.
         """
-        with open(f"{self.test_json_path}/test_linked_services.json", "rb") as file:
+        with open(os.path.join(self.test_json_path, "test_linked_services.json"), "rb") as file:
             linked_services = json.load(file)
         for linked_service in linked_services:
             if linked_service.get("name") == linked_service_name:
@@ -243,6 +256,9 @@ def mock_factory_client(monkeypatch: pytest.MonkeyPatch) -> MockFactoryClient:
         def __init__(self, **_: Any) -> None:
             self._delegate = delegate
 
+        def list_pipelines(self) -> list[str]:
+            return self._delegate.list_pipelines()
+
         def get_pipeline(self, pipeline_name: str) -> dict:
             return self._delegate.get_pipeline(pipeline_name)
 
@@ -257,6 +273,19 @@ def mock_factory_client(monkeypatch: pytest.MonkeyPatch) -> MockFactoryClient:
 
     monkeypatch.setattr(factory_definition_store, "FactoryClient", _FakeFactoryClient)
     return delegate
+
+
+@pytest.fixture
+def mock_factory_store(mock_factory_client: MockFactoryClient) -> factory_definition_store.FactoryDefinitionStore:
+    """Return a ``FactoryDefinitionStore`` wired to the mock factory client."""
+    return factory_definition_store.FactoryDefinitionStore(
+        tenant_id="TENANT_ID",
+        client_id="CLIENT_ID",
+        client_secret="SECRET",
+        subscription_id="SUBSCRIPTION_ID",
+        resource_group_name="RESOURCE_GROUP",
+        factory_name="FACTORY_NAME",
+    )
 
 
 @dataclass

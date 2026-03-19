@@ -37,6 +37,18 @@ def __post_init__() -> None
 
 Sets up the Data Factory management client for the provided credentials.
 
+#### list\_pipelines
+
+```python
+def list_pipelines() -> list[str]
+```
+
+Lists the names of all pipelines available in the Data Factory.
+
+**Returns**:
+
+  Pipeline names as a ``list[str]``.
+
 #### get\_pipeline
 
 ```python
@@ -74,7 +86,7 @@ Gets a linked-service definition with the specified name.
 #### get\_trigger
 
 ```python
-def get_trigger(pipeline_name: str) -> dict
+def get_trigger(pipeline_name: str) -> dict | None
 ```
 
 Gets the trigger associated with a pipeline.
@@ -86,7 +98,7 @@ Gets the trigger associated with a pipeline.
 
 **Returns**:
 
-  Trigger definition as a ``dict``.
+  Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
 
 #### get\_dataset
 

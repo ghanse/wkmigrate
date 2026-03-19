@@ -54,6 +54,48 @@ Linked-service metadata for ABFS/ADLS storage accounts.
 - `storage_account_name` - Storage account name for the ABFS endpoint.
 - `url` - Fully qualified base URL for the storage account.
 
+## S3LinkedService Objects
+
+```python
+@dataclass(slots=True)
+class S3LinkedService(LinkedService)
+```
+
+Linked-service metadata for Amazon S3.
+
+**Attributes**:
+
+- `access_key_id` - AWS access key identifier used for authentication.
+- `service_url` - Custom S3-compatible endpoint URL, when applicable.
+
+## GcsLinkedService Objects
+
+```python
+@dataclass(slots=True)
+class GcsLinkedService(LinkedService)
+```
+
+Linked-service metadata for Google Cloud Storage.
+
+**Attributes**:
+
+- `access_key_id` - HMAC access key identifier used for authentication.
+- `service_url` - Custom GCS-compatible endpoint URL, when applicable.
+
+## AzureBlobLinkedService Objects
+
+```python
+@dataclass(slots=True)
+class AzureBlobLinkedService(LinkedService)
+```
+
+Linked-service metadata for Azure Blob Storage.
+
+**Attributes**:
+
+- `storage_account_name` - Storage account name parsed from the connection string.
+- `url` - Storage account URL (can be a container URL, SAS URI, or service endpoint URL).
+
 ## DatabricksClusterLinkedService Objects
 
 ```python

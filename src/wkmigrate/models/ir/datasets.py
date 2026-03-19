@@ -31,15 +31,17 @@ class Dataset:
 @dataclass(slots=True)
 class FileDataset(Dataset):
     """
-    Dataset definition for file-based sources and sinks in an ABFS/ADLS storage account.
+    Dataset definition for file-based sources and sinks.
 
     Attributes:
-        container: Storage container name hosting the files.
+        container: Storage container or bucket name hosting the files.
         folder_path: Directory or path prefix inside the container.
-        storage_account_name: Storage account name for ABFS/ADLS access.
+        storage_account_name: Storage account name for ABFS/Azure Blob access.
         url: Fully qualified URL to the storage endpoint, when available.
         format_options: File-format specific options (delimiter, header flags, compression, and so on).
         records_per_file: Maximum number of rows per file when writing out data.
+        provider_type: Cloud provider identifier (``"abfs"``, ``"s3"``, ``"gcs"``, or ``"azure_blob"``).
+            Used to select the correct URI scheme and credential configuration during code generation.
     """
 
     container: str | None = None
@@ -48,6 +50,7 @@ class FileDataset(Dataset):
     url: str | None = None
     format_options: dict[str, Any] = field(default_factory=dict)
     records_per_file: int | None = None
+    provider_type: str | None = None
 
 
 @dataclass(slots=True)

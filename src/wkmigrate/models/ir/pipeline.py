@@ -235,6 +235,20 @@ class IfConditionActivity(Activity):
     child_activities: list[Activity] = field(default_factory=list)
 
 
+@dataclass(slots=True, kw_only=True)
+class SetVariableActivity(Activity):
+    """
+    SetVariable activity metadata.
+
+    Attributes:
+        variable_name: Variable name to set.
+        variable_value: Python expression string that evaluates to the variable value.
+    """
+
+    variable_name: str
+    variable_value: str
+
+
 @dataclass(slots=True)
 class ColumnMapping:
     """

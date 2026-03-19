@@ -1,0 +1,42 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+.eggs
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE / editor
+.idea
+.cursor
+.vscode
+*.swp
+*.swo
+
+# CI / tooling caches
+.mypy_cache
+.ruff_cache
+.pytest_cache
+htmlcov
+.coverage
+.coverage.*
+coverage.xml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-specific
+sandbox
+docs
+examples
+tests

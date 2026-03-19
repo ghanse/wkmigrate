@@ -15,28 +15,6 @@
     }
   },
   {
-    "id": "set_variable",
-    "description": "Set Variable activity creates placeholder",
-    "input": {
-      "name": "set_variable",
-      "type": "SetVariable",
-      "description": "Set pipeline variable",
-      "depends_on": [],
-      "policy": {
-        "timeout": "0.00:05:00"
-      },
-      "variable_name": "current_date",
-      "value": "2024-01-01"
-    },
-    "expected": {
-      "name": "set_variable",
-      "task_key": "set_variable",
-      "activity_type": "SetVariable",
-      "timeout_seconds": 300,
-      "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"
-    }
-  },
-  {
     "id": "execute_pipeline",
     "description": "Execute Pipeline activity creates placeholder",
     "input": {

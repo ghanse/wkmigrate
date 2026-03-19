@@ -2,26 +2,30 @@
 
 This module tests all linked service translators against realistic ADF payloads
 loaded from JSON fixture files. Tests cover Databricks cluster configurations,
-SQL Server connections, and ABFS storage accounts.
+SQL Server connections, ABFS storage accounts, and cloud file services (S3, GCS, ADLS).
 """
 
 from __future__ import annotations
 
-import pytest
-
 from tests.conftest import get_fixture
 from wkmigrate.models.ir.linked_services import (
     AbfsLinkedService,
+    AzureBlobLinkedService,
     DatabricksClusterLinkedService,
+    GcsLinkedService,
+    S3LinkedService,
     SqlLinkedService,
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.linked_service_translators import (
     translate_abfs_spec,
+    translate_azure_blob_spec,
     translate_databricks_cluster_spec,
+    translate_gcs_spec,
     translate_mysql_spec,
     translate_oracle_spec,
     translate_postgresql_spec,
+    translate_s3_spec,
     translate_sql_server_spec,
 )
 
@@ -386,6 +390,7 @@ def test_uuid_generated_when_no_name() -> None:
     result = translate_databricks_cluster_spec(spec)
 
     assert isinstance(result, DatabricksClusterLinkedService)
+    # UUID format check - should be a non-empty string
     assert result.service_name is not None
     assert len(result.service_name) > 0
 
@@ -454,3 +459,99 @@ def test_sql_spec_custom_port(translate_fn) -> None:
 
     assert isinstance(result, SqlLinkedService)
     assert result.port == 9999
+
+
+def test_full_s3_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of S3 linked service with full configuration."""
+    fixture = get_fixture(linked_service_fixtures, "s3_full")
+    result = translate_s3_spec(fixture["input"])
+
+    assert isinstance(result, S3LinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.access_key_id == fixture["expected"]["access_key_id"]
+    assert result.service_url == fixture["expected"]["service_url"]
+
+
+def test_minimal_s3_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of S3 linked service with minimal configuration."""
+    fixture = get_fixture(linked_service_fixtures, "s3_minimal")
+    result = translate_s3_spec(fixture["input"])
+
+    assert isinstance(result, S3LinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.access_key_id is None
+    assert result.service_url is None
+
+
+def test_s3_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null input returns UnsupportedValue."""
+    fixture = get_fixture(linked_service_fixtures, "s3_null")
+    result = translate_s3_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_full_gcs_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of GCS linked service with full configuration."""
+    fixture = get_fixture(linked_service_fixtures, "gcs_full")
+    result = translate_gcs_spec(fixture["input"])
+
+    assert isinstance(result, GcsLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.access_key_id == fixture["expected"]["access_key_id"]
+    assert result.service_url == fixture["expected"]["service_url"]
+
+
+def test_minimal_gcs_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of GCS linked service with minimal configuration."""
+    fixture = get_fixture(linked_service_fixtures, "gcs_minimal")
+    result = translate_gcs_spec(fixture["input"])
+
+    assert isinstance(result, GcsLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.access_key_id is None
+    assert result.service_url is None
+
+
+def test_gcs_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null input returns UnsupportedValue."""
+    fixture = get_fixture(linked_service_fixtures, "gcs_null")
+    result = translate_gcs_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_full_azure_blob_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of Azure Blob linked service with full configuration."""
+    fixture = get_fixture(linked_service_fixtures, "azure_blob_full")
+    result = translate_azure_blob_spec(fixture["input"])
+
+    assert isinstance(result, AzureBlobLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.url == fixture["expected"]["url"]
+    assert result.storage_account_name == fixture["expected"]["storage_account_name"]
+
+
+def test_azure_blob_missing_connection_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that missing connection_string and service_endpoint returns UnsupportedValue."""
+    fixture = get_fixture(linked_service_fixtures, "azure_blob_missing_connection")
+    result = translate_azure_blob_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_azure_blob_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null input returns UnsupportedValue."""
+    fixture = get_fixture(linked_service_fixtures, "azure_blob_null")
+    result = translate_azure_blob_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message

@@ -25,18 +25,20 @@ class TranslationContext:
 
     Attributes:
         activity_cache: Read-only mapping of activity names to translated ``Activity`` objects.
-        registry: Read-only mapping of ADF activity type strings to their translator callables.
+        registry: Read-only mapping of activity type strings to their translator callables.
+        variable_cache: Read-only mapping of variable names to the task keys of the task that sets the variable value.
     """
 
     activity_cache: MappingProxyType[str, Activity] = field(default_factory=lambda: MappingProxyType({}))
     registry: MappingProxyType[str, Any] = field(default_factory=lambda: MappingProxyType({}))
+    variable_cache: MappingProxyType[str, str] = field(default_factory=lambda: MappingProxyType({}))
 
     def with_activity(self, name: str, activity: Activity) -> TranslationContext:
         """
         Returns a new context with an activity added to the cache.
 
         Args:
-            name: Logical activity name used as the cache key.
+            name: Activity name used as the cache key.
             activity: Translated ``Activity`` to store.
 
         Returns:
@@ -45,16 +47,46 @@ class TranslationContext:
         return TranslationContext(
             activity_cache=MappingProxyType({**self.activity_cache, name: activity}),
             registry=self.registry,
+            variable_cache=self.variable_cache,
         )
 
-    def get_activity(self, name: str) -> Activity | None:
+    def get_activity(self, activity_name: str) -> Activity | None:
         """
         Looks up a previously translated activity by name.
 
         Args:
-            name: Logical activity name.
+            activity_name: Activity name.
 
         Returns:
             Cached ``Activity`` or ``None`` if the name has not been visited.
         """
-        return self.activity_cache.get(name)
+        return self.activity_cache.get(activity_name)
+
+    def with_variable(self, variable_name: str, task_key: str) -> TranslationContext:
+        """
+        Returns a new context with a variable added to the cache.
+
+        Args:
+            variable_name: Variable name used as the cache key.
+            task_key: Task key for the task which set the variable value.
+
+        Returns:
+            New ``TranslationContext`` containing the updated variable cache.
+        """
+        return TranslationContext(
+            activity_cache=self.activity_cache,
+            registry=self.registry,
+            variable_cache=MappingProxyType({**self.variable_cache, variable_name: task_key}),
+        )
+
+    def get_variable_task_key(self, variable_name: str) -> str | None:
+        """
+        Looks up the task key which set a variable.
+
+        Args:
+            variable_name: Variable name.
+
+        Returns:
+            Cached task key of the task that set the variable value.
+        """
+        return self.variable_cache.get(variable_name)
