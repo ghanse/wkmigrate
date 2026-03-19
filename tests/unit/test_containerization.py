@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 
 def _read(filename: str) -> str:

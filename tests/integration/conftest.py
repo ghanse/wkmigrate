@@ -61,10 +61,6 @@ from wkmigrate.definition_stores.factory_definition_store import FactoryDefiniti
 
 _T = TypeVar("_T", LinkedServiceResource, DatasetResource, PipelineResource)
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _require_env(name: str) -> str:
     """Return the value of an environment variable or skip the test."""
@@ -85,10 +81,6 @@ class AzureTestConfig:
     resource_group: str
     factory_name: str
 
-
-# ---------------------------------------------------------------------------
-# Resource deployment helper
-# ---------------------------------------------------------------------------
 
 # Name-keyword and resource-keyword mappings for the three ADF management
 # sub-clients.  Each tuple is (name_kwarg, resource_kwarg) passed to both
@@ -138,11 +130,6 @@ def _deploy_adf_resource(
         factory_name=azure_config.factory_name,
         **{name_kwarg: resource_name},
     )
-
-
-# ---------------------------------------------------------------------------
-# Session-scoped fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -221,11 +208,6 @@ def adf_factory(
         factory=Factory(location="eastus2"),
     )
     yield factory
-
-
-# ---------------------------------------------------------------------------
-# Linked-service fixtures (session-scoped)
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -453,11 +435,6 @@ def databricks_linked_service(
         ),
     ) as ls:
         yield ls
-
-
-# ---------------------------------------------------------------------------
-# Dataset fixtures (session-scoped)
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -778,11 +755,6 @@ def delta_dataset(
         ),
     ) as ds:
         yield ds
-
-
-# ---------------------------------------------------------------------------
-# Pipeline fixtures (session-scoped)
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -1473,11 +1445,6 @@ def set_variable_pipeline(
         ),
     ) as pl:
         yield pl
-
-
-# ---------------------------------------------------------------------------
-# High-level store fixtures (session-scoped)
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")

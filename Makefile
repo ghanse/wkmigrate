@@ -7,10 +7,10 @@ dev:
 	poetry install
 
 test:
-	poetry run pytest
+	poetry run pytest tests/unit
 
 integration:
-	poetry run pytest -m integration --tb=short -v
+	poetry run pytest tests/integration --tb=short -v
 
 fmt:
 	poetry run black .

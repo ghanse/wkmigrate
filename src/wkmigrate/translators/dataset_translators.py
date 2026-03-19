@@ -1,4 +1,4 @@
-"""Translators for normalizing ADF dataset payloads into internal representations.
+"""This module defines translators for normalizing ADF dataset payloads into internal representations.
 
 Each translator validates required fields, coerces connection settings, and emits
 ``UnsupportedValue`` objects for any unparsable inputs.
