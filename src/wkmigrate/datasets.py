@@ -177,7 +177,6 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:
     """
     service_type = definition.get("type")
     service_name = definition.get("service_name")
-    provider_type = definition.get("provider_type")
     if service_type is None or service_name is None:
         return []
 
