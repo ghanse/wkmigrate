@@ -10,12 +10,12 @@ properties, and emit ``UnsupportedValue`` objects for any unparsable inputs.
 from wkmigrate.models.ir.pipeline import LookupActivity
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translators.activity_translators.utils import (
+from wkmigrate.utils import (
     get_data_source_definition,
     get_data_source_properties,
+    get_value_or_unsupported,
     merge_unsupported_values,
 )
-from wkmigrate.utils import get_value_or_unsupported
 
 
 def translate_lookup_activity(activity: dict, base_kwargs: dict) -> LookupActivity | UnsupportedValue:

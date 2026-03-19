@@ -23,14 +23,6 @@ from wkmigrate.translators.linked_service_translators import (
     translate_s3_spec,
 )
 
-_NORMALIZED_FILE_TYPES: dict[str, str] = {
-    "Avro": "avro",
-    "DelimitedText": "csv",
-    "Json": "json",
-    "Orc": "orc",
-    "Parquet": "parquet",
-}
-
 _CLOUD_TRANSLATORS: dict[str, callable] = {
     "s3": translate_s3_spec,
     "gcs": translate_gcs_spec,

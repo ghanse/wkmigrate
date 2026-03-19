@@ -27,9 +27,6 @@ DEFAULT_PORTS: dict[str, int] = {
     "mysql": 3306,
     "oracle": 1521,
 }
-FILE_DATASET_TYPES = {"Avro", "DelimitedText", "Json", "Orc", "Parquet"}
-SQL_DATASET_TYPES = {"AzureSqlTable"}
-DELTA_DATASET_TYPES = {"AzureDatabricksDeltaLakeDataset"}
 CLOUD_LOCATION_TYPES: dict[str, str] = {
     "AmazonS3Location": "s3",
     "GoogleCloudStorageLocation": "gcs",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from wkmigrate.models.ir.pipeline import Authentication
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translators.activity_translators.utils import parse_authentication
+from wkmigrate.utils import parse_authentication
 
 
 def test_parse_authentication_none_returns_none() -> None:
