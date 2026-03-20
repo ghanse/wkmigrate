@@ -5,7 +5,7 @@ translator validates required fields, coerces connection settings, and emits
 ``UnsupportedValue`` objects for any unparsable inputs.
 """
 
-from wkmigrate.datasets import CLOUD_LOCATION_TYPES
+from wkmigrate.parsers.dataset_parsers import CLOUD_LOCATION_TYPES
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators.delta_table_dataset_translator import translate_delta_table_dataset

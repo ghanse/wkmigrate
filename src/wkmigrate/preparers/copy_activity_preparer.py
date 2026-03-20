@@ -12,7 +12,7 @@ from dataclasses import asdict
 
 import autopep8  # type: ignore
 
-from wkmigrate.datasets import (
+from wkmigrate.parsers.dataset_parsers import (
     collect_data_source_secrets,
     merge_dataset_definition,
     parse_spark_data_type,

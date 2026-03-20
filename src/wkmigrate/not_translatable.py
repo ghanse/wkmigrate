@@ -1,4 +1,4 @@
-"""Helpers for tracking translation warnings.
+"""Helpers for tracking non-translatable pipeline properties.
 
 These utilities capture contextual metadata (activity name/type) for any warnings
 raised during translation. They centralize warning creation to ensure a consistent
@@ -28,7 +28,7 @@ def not_translatable_context(activity_name: str | None, activity_type: str | Non
 
 
 class NotTranslatableWarning(UserWarning):
-    """Warning emitted when a property cannot be fully translated."""
+    """Pipeline property that could not be translated."""
 
     def __init__(self, property_name: str, message: str) -> None:
         """

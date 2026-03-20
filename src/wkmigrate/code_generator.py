@@ -11,7 +11,12 @@ from typing import Any
 
 import autopep8  # type: ignore
 
-from wkmigrate.datasets import DATASET_OPTIONS, DATASET_PROVIDER_SECRETS, DEFAULT_CREDENTIALS_SCOPE, DEFAULT_PORTS
+from wkmigrate.parsers.dataset_parsers import (
+    DATASET_OPTIONS,
+    DATASET_PROVIDER_SECRETS,
+    DEFAULT_CREDENTIALS_SCOPE,
+    DEFAULT_PORTS,
+)
 from wkmigrate.models.ir.pipeline import Authentication
 from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 

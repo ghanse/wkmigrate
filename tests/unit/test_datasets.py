@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from wkmigrate.datasets import parse_spark_data_type
+from wkmigrate.parsers.dataset_parsers import parse_spark_data_type
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.dataset_translators import translate_dataset

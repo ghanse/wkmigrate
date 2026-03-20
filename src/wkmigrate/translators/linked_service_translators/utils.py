@@ -65,23 +65,6 @@ def parse_init_scripts(init_scripts: list[str] | None) -> list[dict] | None:
     ]
 
 
-def _get_init_script_type(init_script_path: str) -> str:
-    """
-    Determines the init script type from its path prefix.
-
-    Args:
-        init_script_path: Init script path string.
-
-    Returns:
-        Init script type as a ``str``.
-    """
-    if init_script_path.startswith("dbfs:"):
-        return InitScriptType.DBFS.value
-    if init_script_path.startswith("/Volumes"):
-        return InitScriptType.VOLUMES.value
-    return InitScriptType.WORKSPACE.value
-
-
 def parse_storage_account_connection_string(connection_string: str) -> str | UnsupportedValue:
     """
     Parses an Azure Storage account connection string into a URL.
@@ -123,3 +106,20 @@ def parse_storage_account_name(connection_string: str) -> str | UnsupportedValue
         Storage account name as a ``str``.
     """
     return extract_group(connection_string, r"AccountName=([a-zA-Z0-9]+);")
+
+
+def _get_init_script_type(init_script_path: str) -> str:
+    """
+    Determines the init script type from its path prefix.
+
+    Args:
+        init_script_path: Init script path string.
+
+    Returns:
+        Init script type as a ``str``.
+    """
+    if init_script_path.startswith("dbfs:"):
+        return InitScriptType.DBFS.value
+    if init_script_path.startswith("/Volumes"):
+        return InitScriptType.VOLUMES.value
+    return InitScriptType.WORKSPACE.value

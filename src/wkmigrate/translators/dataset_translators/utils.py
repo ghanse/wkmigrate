@@ -21,9 +21,9 @@ def get_linked_service_definition(dataset: dict) -> dict | UnsupportedValue:
         Linked service definition as a ``dict`` or an ``UnsupportedValue``.
     """
     linked_service_definition = get_value_or_unsupported(dataset, "linked_service_definition", "dataset")
-    if isinstance(linked_service_definition, UnsupportedValue):
-        return linked_service_definition
     if not isinstance(linked_service_definition, dict):
+        if isinstance(linked_service_definition, UnsupportedValue):
+            return linked_service_definition
         return UnsupportedValue(dataset, "Invalid value for 'linked_service_definition'")
     return linked_service_definition
 

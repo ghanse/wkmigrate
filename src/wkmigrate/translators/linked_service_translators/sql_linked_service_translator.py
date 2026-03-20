@@ -6,7 +6,7 @@ payloads into ``SqlLinkedService`` objects.
 
 from uuid import uuid4
 
-from wkmigrate.datasets import DEFAULT_PORTS
+from wkmigrate.parsers.dataset_parsers import DEFAULT_PORTS
 from wkmigrate.models.ir.linked_services import SqlLinkedService
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.utils import get_value_or_unsupported

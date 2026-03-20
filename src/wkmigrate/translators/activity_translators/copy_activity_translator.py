@@ -38,11 +38,11 @@ def translate_copy_activity(activity: dict, base_kwargs: dict) -> CopyActivity |
     """
     source_dataset = get_data_source_definition(get_value_or_unsupported(activity, "input_dataset_definitions"))
     if isinstance(source_dataset, UnsupportedValue):
-        return UnsupportedValue(value=activity, message=source_dataset.message)
+        return UnsupportedValue(value=activity, message=f"Could not translate copy activity. {source_dataset.message}")
 
     sink_dataset = get_data_source_definition(get_value_or_unsupported(activity, "output_dataset_definitions"))
     if isinstance(sink_dataset, UnsupportedValue):
-        return UnsupportedValue(value=activity, message=sink_dataset.message)
+        return UnsupportedValue(value=activity, message=f"Could not translate copy activity. {sink_dataset.message}")
 
     source_properties = get_data_source_properties(get_value_or_unsupported(activity, "source"))
     sink_properties = get_data_source_properties(get_value_or_unsupported(activity, "sink"))
@@ -88,13 +88,23 @@ def _parse_type_translator(type_translator: dict, sink_system: str) -> list[Colu
         sink_system: Normalized sink dataset type (e.g. ``"sqlserver"``), used for type conversion.
 
     Returns:
-        List of column mapping definitions as ``ColumnMapping`` objects.
+        List of column mapping definitions as ``ColumnMapping`` or ``UnsupportedValue`` objects.
     """
     mappings = type_translator.get("mappings") or []
     return [_parse_dataset_mapping(mapping, sink_system) for mapping in mappings]
 
 
 def _parse_dataset_mapping(mapping: dict[str, dict], sink_system: str) -> ColumnMapping | UnsupportedValue:
+    """
+    Parses a single column mapping entry from the ADF type translator into a ``ColumnMapping``.
+
+    Args:
+        mapping: Single column mapping dictionary containing ``source`` and ``sink`` keys.
+        sink_system: Normalized sink dataset type (e.g. ``"sqlserver"``), used for type conversion.
+
+    Returns:
+        Parsed ``ColumnMapping`` or ``UnsupportedValue`` when required fields are missing.
+    """
     source = get_value_or_unsupported(mapping, "source", "column mapping")
     if isinstance(source, UnsupportedValue):
         return source

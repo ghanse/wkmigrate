@@ -5,7 +5,7 @@ parsing storage paths, linked-service metadata, and format options for ABFS,
 Amazon S3, Google Cloud Storage, and Azure Blob Storage locations.
 """
 
-from wkmigrate.datasets import CLOUD_LOCATION_TYPES
+from wkmigrate.parsers.dataset_parsers import CLOUD_LOCATION_TYPES
 from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators.utils import (
@@ -73,7 +73,16 @@ def translate_file_dataset(
 def _translate_abfs_file_dataset(
     dataset_type: str, dataset: dict, provider_type: str
 ) -> FileDataset | UnsupportedValue:
-    """Translate an ABFS-backed file dataset."""
+    """Translate an ABFS-backed file dataset.
+
+    Args:
+        dataset_type: ADF dataset type (e.g. ``"DelimitedText"``, ``"Parquet"``).
+        dataset: Raw dataset definition from Azure Data Factory.
+        provider_type: Cloud provider identifier (always ``"abfs"`` for this translator).
+
+    Returns:
+        File dataset as a ``FileDataset`` object, or ``UnsupportedValue`` when parsing fails.
+    """
     properties = dataset.get("properties", {})
 
     container_name = parse_abfs_container_name(properties)
@@ -112,7 +121,16 @@ def _translate_abfs_file_dataset(
 def _translate_cloud_file_dataset(
     dataset_type: str, dataset: dict, provider_type: str
 ) -> FileDataset | UnsupportedValue:
-    """Translate a cloud-storage-backed file dataset (S3, GCS, Azure Blob)."""
+    """Translate a cloud-storage-backed file dataset (S3, GCS, Azure Blob).
+
+    Args:
+        dataset_type: ADF dataset type (e.g. ``"DelimitedText"``, ``"Parquet"``).
+        dataset: Raw dataset definition from Azure Data Factory.
+        provider_type: Cloud provider identifier (e.g. ``"s3"``, ``"gcs"``, ``"azure_blob"``).
+
+    Returns:
+        File dataset as a ``FileDataset`` object, or ``UnsupportedValue`` when parsing fails.
+    """
     properties = dataset.get("properties", {})
 
     container_name = parse_cloud_bucket_name(properties)
