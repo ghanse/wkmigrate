@@ -1,8 +1,8 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials. They are consumed by the Copy, Lookup, and Web activity preparers
-to build Databricks notebooks.
+and manage credentials. They are consumed by the Copy, Lookup, Web, and SetVariable
+activity preparers to build Databricks notebooks.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import autopep8  # type: ignore
 
 from wkmigrate.datasets import DATASET_OPTIONS, DATASET_PROVIDER_SECRETS, DEFAULT_CREDENTIALS_SCOPE, DEFAULT_PORTS
 from wkmigrate.models.ir.pipeline import Authentication
-from wkmigrate.translation_warnings import TranslationWarning, translation_warning_context
+from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 
 
 def get_set_variable_notebook_content(variable_name: str, variable_value: str) -> str:
@@ -178,7 +178,7 @@ def get_read_expression(source_definition: dict, source_query: str | None = None
         return get_file_read_expression(source_definition)
     if source_type == "delta":
         return get_delta_read_expression(source_definition)
-    if source_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
+    if source_type in ("sqlserver", "postgresql", "mysql", "oracle"):
         return get_jdbc_read_expression(source_definition, source_query)
 
     raise ValueError(f'Reading data from "{source_type}" not supported')
@@ -462,12 +462,12 @@ def _get_authentication_lines(
     Returns:
         List of Python source lines to append to the notebook script.
     """
-    with translation_warning_context(activity_name, activity_type):
+    with not_translatable_context(activity_name, activity_type):
         match authentication.auth_type.lower():
             case "basic":
                 return _get_basic_authentication_lines(authentication, credentials_scope)
             case _:
-                raise TranslationWarning(
+                raise NotTranslatableWarning(
                     "authentication_type", f"Unsupported authentication type '{authentication.auth_type}'"
                 )
 

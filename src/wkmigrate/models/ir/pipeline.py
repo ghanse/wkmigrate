@@ -27,7 +27,6 @@ class Pipeline:
         tasks: Ordered list of ``PipelineTask`` wrappers that make up the workflow.
         tags: Dictionary of system and user-defined tags attached to the workflow.
         not_translatable: Collection of entries describing properties that could not be translated.
-        warnings: Translation warnings emitted during translation (written to ``warnings.json``).
     """
 
     name: str
@@ -36,7 +35,6 @@ class Pipeline:
     tasks: list[Activity]
     tags: dict
     not_translatable: list[dict] = field(default_factory=list)
-    warnings: list[dict] = field(default_factory=list)
 
 
 @dataclass(slots=True)

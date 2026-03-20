@@ -234,61 +234,21 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
     assert job_id is not None
 
 
-def test_asset_bundle_writes_warnings_json(mock_workspace_client, tmp_path) -> None:
-    """Asset bundle writes a warnings.json file."""
-    store = _make_workspace_store(mock_workspace_client)
-    bundle_dir = str(tmp_path / "bundle")
-    store.to_asset_bundle(_simple_pipeline(), bundle_dir, download_notebooks=False)
-
-    warnings_file = os.path.join(bundle_dir, "warnings.json")
-    assert os.path.isfile(warnings_file)
-    with open(warnings_file) as f:
-        content = json.load(f)
-    assert isinstance(content, list)
-
-
-def test_asset_bundle_warnings_json_contains_translation_warnings(mock_workspace_client, tmp_path) -> None:
-    """Pipeline with translation warnings writes them to warnings.json."""
-    store = _make_workspace_store(mock_workspace_client)
-    pipeline = _simple_pipeline()
-    pipeline.warnings = [
-        {"property": "test_prop", "message": "Test warning message"},
-    ]
-    bundle_dir = str(tmp_path / "bundle")
-    store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=False)
-
-    warnings_file = os.path.join(bundle_dir, "warnings.json")
-    with open(warnings_file) as f:
-        content = json.load(f)
-    assert len(content) == 1
-    assert content[0]["property"] == "test_prop"
-    assert content[0]["message"] == "Test warning message"
-
-
-def test_asset_bundle_unsupported_json_separate_from_warnings(mock_workspace_client, tmp_path) -> None:
-    """unsupported.json and warnings.json are separate files with different content."""
+def test_asset_bundle_unsupported_json_written(mock_workspace_client, tmp_path) -> None:
+    """unsupported.json is written with not_translatable entries."""
     store = _make_workspace_store(mock_workspace_client)
     pipeline = _simple_pipeline()
     pipeline.not_translatable = [
         {"activity_name": "unsupported_task", "activity_type": "SetVariable", "message": "Not supported"},
     ]
-    pipeline.warnings = [
-        {"property": "schedule", "message": "Schedule approximated"},
-    ]
     bundle_dir = str(tmp_path / "bundle")
     store.to_asset_bundle(pipeline, bundle_dir, download_notebooks=False)
 
     unsupported_file = os.path.join(bundle_dir, "unsupported.json")
-    warnings_file = os.path.join(bundle_dir, "warnings.json")
     assert os.path.isfile(unsupported_file)
-    assert os.path.isfile(warnings_file)
 
     with open(unsupported_file) as f:
         unsupported = json.load(f)
-    with open(warnings_file) as f:
-        warns = json.load(f)
 
     assert len(unsupported) == 1
     assert unsupported[0]["activity_name"] == "unsupported_task"
-    assert len(warns) == 1
-    assert warns[0]["property"] == "schedule"

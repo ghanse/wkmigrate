@@ -12,7 +12,7 @@ _WARNING_CONTEXT: ContextVar[dict | None] = ContextVar("_WARNING_CONTEXT", defau
 
 
 @contextmanager
-def translation_warning_context(activity_name: str | None, activity_type: str | None):
+def not_translatable_context(activity_name: str | None, activity_type: str | None):
     """
     Captures activity metadata for warnings raised inside the context.
 
@@ -27,7 +27,7 @@ def translation_warning_context(activity_name: str | None, activity_type: str | 
         _WARNING_CONTEXT.reset(token)
 
 
-class TranslationWarning(UserWarning):
+class NotTranslatableWarning(UserWarning):
     """Warning emitted when a property cannot be fully translated."""
 
     def __init__(self, property_name: str, message: str) -> None:
@@ -47,10 +47,3 @@ class TranslationWarning(UserWarning):
         else:
             self.activity_name = context.get("activity_name")
             self.activity_type = context.get("activity_type")
-
-
-class UnsupportedActivityWarning(TranslationWarning):
-    """Warning emitted when an activity or property cannot be translated at all.
-
-    These warnings are routed to ``unsupported.json`` rather than ``warnings.json``.
-    """

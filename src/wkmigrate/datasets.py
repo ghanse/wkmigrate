@@ -15,7 +15,7 @@ from typing import Any
 
 from wkmigrate.models.ir.datasets import Dataset, DatasetProperties
 from wkmigrate.models.workflows.instructions import SecretInstruction
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.utils import parse_mapping
 
 
@@ -203,7 +203,7 @@ def parse_spark_data_type(sink_type: str, sink_system: str) -> str:
     mapping = _JDBC_TYPE_MAPPINGS.get(sink_system)
     if mapping is None:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 "sink_type",
                 f"No data type mapping available for target system '{sink_system}'; "
                 f"using ADF type '{sink_type}' as-is.",
@@ -214,7 +214,7 @@ def parse_spark_data_type(sink_type: str, sink_system: str) -> str:
     mapped = mapping.get(sink_type)
     if mapped is None:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 "sink_type",
                 f"No data type mapping for '{sink_system}' type '{sink_type}'; " f"using ADF type '{sink_type}' as-is.",
             ),

@@ -9,7 +9,7 @@ import warnings
 
 from wkmigrate.translators.activity_translators.activity_translator import translate_activities_with_context
 from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.translation_warnings import TranslationWarning, UnsupportedActivityWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.pipeline_translators.parameter_translator import translate_parameters
 from wkmigrate.translators.trigger_translators.schedule_trigger_translator import translate_schedule_trigger
 from wkmigrate.utils import append_system_tags
@@ -33,7 +33,7 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
         warnings.simplefilter("always", UserWarning)
         if "name" not in pipeline:
             warnings.warn(
-                TranslationWarning(
+                NotTranslatableWarning(
                     "pipeline.name", "No pipeline name in source definition, setting to UNNAMED_WORKFLOW"
                 ),
                 stacklevel=2,
@@ -47,7 +47,6 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
             tags=append_system_tags(pipeline.get("tags")),
         )
 
-    translation_warnings: list[dict] = []
     not_translatable: list[dict] = []
     for warning in caught_warnings:
         if not issubclass(warning.category, UserWarning):
@@ -64,10 +63,6 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
             entry["activity_name"] = activity_name
         if activity_type is not None:
             entry["activity_type"] = activity_type
-        if isinstance(warning.message, UnsupportedActivityWarning):
-            not_translatable.append(entry)
-        else:
-            translation_warnings.append(entry)
+        not_translatable.append(entry)
     pipeline_ir.not_translatable = not_translatable
-    pipeline_ir.warnings = translation_warnings
     return pipeline_ir

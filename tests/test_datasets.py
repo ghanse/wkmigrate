@@ -6,7 +6,7 @@ import pytest
 
 from wkmigrate.datasets import parse_spark_data_type
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.dataset_translators import translate_dataset
 from wkmigrate.translators.dataset_translators.utils import parse_abfs_container_name
 
@@ -35,7 +35,7 @@ def test_known_sqlserver_types(adf_type: str, expected: str) -> None:
 
 
 def test_unknown_sqlserver_type_warns_and_returns_original() -> None:
-    with pytest.warns(TranslationWarning, match="UnknownDotNetType"):
+    with pytest.warns(NotTranslatableWarning, match="UnknownDotNetType"):
         result = parse_spark_data_type("UnknownDotNetType", "sqlserver")
     assert result == "UnknownDotNetType"
 
@@ -106,13 +106,13 @@ def test_passthrough_delta_types(spark_type: str) -> None:
 
 
 def test_unknown_system_warns_and_returns_original() -> None:
-    with pytest.warns(TranslationWarning, match="No data type mapping available"):
+    with pytest.warns(NotTranslatableWarning, match="No data type mapping available"):
         result = parse_spark_data_type("varchar", "cosmosdb")
     assert result == "varchar"
 
 
 def test_unknown_type_warns_and_returns_original() -> None:
-    with pytest.warns(TranslationWarning, match="No data type mapping for"):
+    with pytest.warns(NotTranslatableWarning, match="No data type mapping for"):
         result = parse_spark_data_type("GEOGRAPHY", "sqlserver")
     assert result == "GEOGRAPHY"
 

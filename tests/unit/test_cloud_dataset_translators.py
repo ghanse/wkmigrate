@@ -13,7 +13,7 @@ import pytest
 
 from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.dataset_translators import (
     translate_file_dataset,
     translate_dataset,
@@ -320,7 +320,7 @@ def test_translate_azure_blob_dataset_csv() -> None:
         },
     )
     with pytest.warns(
-        TranslationWarning,
+        NotTranslatableWarning,
         match="Cannot use service principal or managed identity authentication with Azure Blob linked service",
     ):
         result = translate_file_dataset("DelimitedText", dataset, "azure_blob")

@@ -13,7 +13,7 @@ from wkmigrate.models.ir.linked_services import (
     S3LinkedService,
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.linked_service_translators.utils import (
     parse_storage_account_connection_string,
     parse_storage_account_name,
@@ -128,7 +128,7 @@ def _get_storage_account_url(storage_account_properties: dict) -> str | Unsuppor
     service_endpoint = storage_account_properties.get("service_endpoint")
     if service_endpoint is not None:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 property_name="azure_blob_linked_service",
                 message="Cannot use service principal or managed identity authentication with Azure Blob linked service",
             )

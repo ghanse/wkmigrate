@@ -14,7 +14,7 @@ from typing import Any
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.pipeline import Activity, Authentication, DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning, UnsupportedActivityWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 DEFAULT_TIMEOUT_SECONDS = 43200
 
@@ -93,7 +93,7 @@ def parse_timeout_string(timeout_string: str, prefix: str = "") -> int:
     - ``"00:30:00"`` (30 minutes, no day prefix)
 
     When the timeout string cannot be parsed or represents a zero/negative duration,
-    a ``TranslationWarning`` is emitted and the ADF default of 12 hours
+    a ``NotTranslatableWarning`` is emitted and the ADF default of 12 hours
     (``DEFAULT_TIMEOUT_SECONDS``) is returned instead of raising an exception.
 
     Args:
@@ -105,7 +105,7 @@ def parse_timeout_string(timeout_string: str, prefix: str = "") -> int:
         when the value cannot be parsed.
 
     Warns:
-        TranslationWarning: If the timeout string is not in a recognised format
+        NotTranslatableWarning: If the timeout string is not in a recognised format
             or represents zero/negative duration.
     """
     if prefix:
@@ -114,7 +114,7 @@ def parse_timeout_string(timeout_string: str, prefix: str = "") -> int:
     match = _TIMEOUT_PATTERN.match(timeout_string)
     if not match:
         warnings.warn(
-            TranslationWarning(
+            NotTranslatableWarning(
                 "timeout", f"Invalid timeout format: '{timeout_string}'. Expected 'd.hh:mm:ss' or 'hh:mm:ss'."
             )
         )
@@ -127,7 +127,7 @@ def parse_timeout_string(timeout_string: str, prefix: str = "") -> int:
 
     total = days * 86400 + hours * 3600 + minutes * 60 + seconds
     if total <= 0:
-        warnings.warn(TranslationWarning("timeout", f"Timeout must be positive: '{timeout_string}'"))
+        warnings.warn(NotTranslatableWarning("timeout", f"Timeout must be positive: '{timeout_string}'"))
         return DEFAULT_TIMEOUT_SECONDS
     return total
 
@@ -315,13 +315,6 @@ def normalize_translated_result(result: Activity | UnsupportedValue, base_kwargs
         A placeholder DatabricksNotebookActivity for any UnsupportedValue; Otherwise the input Activity
     """
     if isinstance(result, UnsupportedValue):
-        warnings.warn(
-            UnsupportedActivityWarning(
-                base_kwargs.get("name", "unknown"),
-                f"Activity could not be translated: {result.message}",
-            ),
-            stacklevel=3,
-        )
         return get_placeholder_activity(base_kwargs)
 
     return result

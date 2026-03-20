@@ -8,7 +8,7 @@ and emit ``UnsupportedValue`` objects for any unparsable inputs.
 import warnings
 from wkmigrate.models.ir.pipeline import DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def translate_notebook_activity(activity: dict, base_kwargs: dict) -> DatabricksNotebookActivity | UnsupportedValue:
@@ -44,7 +44,7 @@ def _parse_notebook_parameters(parameters: dict | None) -> dict | None:
         Mapping of parameter names to their default values.
 
     Raises:
-        TranslationWarning: If a parameter cannot be resolved.
+        NotTranslatableWarning: If a parameter cannot be resolved.
     """
     if parameters is None:
         return None
@@ -53,7 +53,7 @@ def _parse_notebook_parameters(parameters: dict | None) -> dict | None:
     for name, value in parameters.items():
         if not isinstance(value, str):
             warnings.warn(
-                TranslationWarning(
+                NotTranslatableWarning(
                     f"parameters.{name}",
                     f'Could not resolve default value for parameter {name}, setting to ""',
                 ),

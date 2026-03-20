@@ -4,7 +4,7 @@ from contextlib import nullcontext as does_not_raise
 
 import pytest
 
-from wkmigrate.translation_warnings import TranslationWarning
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.linked_service_translators import (
     translate_azure_blob_spec,
     translate_databricks_cluster_spec,
@@ -382,7 +382,7 @@ def test_translate_azure_blob_spec_parses_result(linked_service_definition, expe
 
 
 def test_translate_azure_blob_spec_service_endpoint_warns():
-    """Test that service_endpoint auth emits a TranslationWarning."""
+    """Test that service_endpoint auth emits a NotTranslatableWarning."""
     spec = {
         "name": "blob-endpoint",
         "properties": {
@@ -391,7 +391,7 @@ def test_translate_azure_blob_spec_service_endpoint_warns():
     }
 
     with pytest.warns(
-        TranslationWarning,
+        NotTranslatableWarning,
         match="Cannot use service principal or managed identity authentication",
     ):
         result = translate_azure_blob_spec(spec)

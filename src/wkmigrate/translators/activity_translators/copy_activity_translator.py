@@ -111,8 +111,9 @@ def _parse_dataset_mapping(mapping: dict[str, dict], sink_system: str) -> Column
     if isinstance(sink_column_type, UnsupportedValue):
         return sink_column_type
 
+    source_name = (mapping.get("source") or {}).get("name")
     return ColumnMapping(
-        source_column_name=source.get("name") or f"_c{source.get('ordinal', 1) - 1}",
+        source_column_name=source_name or f"_c{source.get('ordinal', 1) - 1}",
         sink_column_name=sink_column_name,
         sink_column_type=sink_column_type,
     )
