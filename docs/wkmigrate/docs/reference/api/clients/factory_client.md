@@ -40,14 +40,25 @@ Sets up the Data Factory management client for the provided credentials.
 #### list\_pipelines
 
 ```python
-def list_pipelines() -> list[str]
+def list_pipelines(include_metadata: bool = False) -> list[str] | list[dict]
 ```
 
-Lists the names of all pipelines available in the Data Factory.
+Lists pipelines available in the Data Factory.
+
+When ``include_metadata`` is *False* (the default) only pipeline names
+are returned, preserving backward compatibility.  When *True*, full
+pipeline definitions are returned as dictionaries.
+
+**Arguments**:
+
+- `include_metadata` - If ``True``, return full pipeline dicts instead
+  of name strings.
+  
 
 **Returns**:
 
-  Pipeline names as a ``list[str]``.
+  Pipeline names as ``list[str]`` or full definitions as
+  ``list[dict]``.
 
 #### get\_pipeline
 
@@ -100,6 +111,18 @@ Gets the trigger associated with a pipeline.
 
   Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
 
+#### list\_triggers
+
+```python
+def list_triggers() -> list[dict]
+```
+
+Lists triggers available in the source Data Factory.
+
+**Returns**:
+
+  List of trigger definitions as ``list[dict]``.
+
 #### get\_dataset
 
 ```python
@@ -116,4 +139,40 @@ Gets the dataset definition for a specified dataset name.
 **Returns**:
 
   Dataset definition as a ``dict``.
+
+#### list\_datasets
+
+```python
+def list_datasets() -> list[dict]
+```
+
+Lists dataset definitions available in the source Data Factory.
+
+**Returns**:
+
+  List of dataset definitions as ``list[dict]``.
+
+#### list\_linked\_services
+
+```python
+def list_linked_services() -> list[dict]
+```
+
+Lists all linked-service definitions available in the Data Factory.
+
+**Returns**:
+
+  Linked-service definitions as a ``list[dict]``.
+
+#### list\_integration\_runtimes
+
+```python
+def list_integration_runtimes() -> list[dict]
+```
+
+Lists all integration-runtime definitions available in the Data Factory.
+
+**Returns**:
+
+  Integration-runtime definitions as a ``list[dict]``.
 
