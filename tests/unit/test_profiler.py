@@ -18,8 +18,6 @@ from wkmigrate.profiler import (
     format_profile,
     profile_factory,
 )
-from wkmigrate.profiler.profiler import _collect_activities
-
 
 def test_counts_pipelines() -> None:
     client = StubFactoryClient(
@@ -209,11 +207,10 @@ def test_format_integration_runtime_details() -> None:
 def test_foreach_nesting() -> None:
     inner = make_activity("inner", "Copy")
     foreach = make_activity("foreach", "ForEach", activities=[inner])
-    result: list[dict] = []
-    _collect_activities([foreach], result)
-    assert len(result) == 2
-    assert result[0]["name"] == "foreach"
-    assert result[1]["name"] == "inner"
+    client = StubFactoryClient(_pipelines=[make_pipeline([foreach])])
+    result = profile_factory(client)  # type: ignore[arg-type]
+    assert result.activities.total == 2
+    assert result.activities.supported == 2
 
 
 def test_if_condition_branches() -> None:
@@ -225,25 +222,22 @@ def test_if_condition_branches() -> None:
         if_true_activities=[true_act],
         if_false_activities=[false_act],
     )
-    result: list[dict] = []
-    _collect_activities([if_cond], result)
-    assert len(result) == 3
-    names = [a["name"] for a in result]
-    assert "if_cond" in names
-    assert "true_act" in names
-    assert "false_act" in names
+    client = StubFactoryClient(_pipelines=[make_pipeline([if_cond])])
+    result = profile_factory(client)  # type: ignore[arg-type]
+    assert result.activities.total == 3
+    assert result.activities.supported == 3
 
 
 def test_deeply_nested() -> None:
     inner = make_activity("inner", "Copy")
     foreach = make_activity("foreach", "ForEach", activities=[inner])
     if_cond = make_activity("if_cond", "IfCondition", if_true_activities=[foreach])
-    result: list[dict] = []
-    _collect_activities([if_cond], result)
-    assert len(result) == 3
+    client = StubFactoryClient(_pipelines=[make_pipeline([if_cond])])
+    result = profile_factory(client)  # type: ignore[arg-type]
+    assert result.activities.total == 3
 
 
 def test_empty_activities() -> None:
-    result: list[dict] = []
-    _collect_activities([], result)
-    assert result == []
+    client = StubFactoryClient(_pipelines=[make_pipeline([])])
+    result = profile_factory(client)  # type: ignore[arg-type]
+    assert result.activities.total == 0

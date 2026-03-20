@@ -405,10 +405,6 @@ def mock_workspace_client() -> MockWorkspaceClient:
     return delegate
 
 
-# ---------------------------------------------------------------------------
-# Profiler test helpers
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class StubFactoryClient:
