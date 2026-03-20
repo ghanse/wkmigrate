@@ -405,7 +405,6 @@ def mock_workspace_client() -> MockWorkspaceClient:
     return delegate
 
 
-
 @dataclass
 class StubFactoryClient:
     """Minimal stand-in for FactoryClient used by profile_factory."""

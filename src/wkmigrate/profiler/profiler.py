@@ -1,6 +1,7 @@
 """Profile an Azure Data Factory resource to assess migration readiness."""
 
 from __future__ import annotations
+import logging
 
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.profiler.profile import (
@@ -9,6 +10,8 @@ from wkmigrate.profiler.profile import (
     IntegrationRuntimeDetail,
     ObjectCount,
 )
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_ACTIVITY_TYPES = {
     "Copy",
@@ -135,12 +138,7 @@ def format_profile(profile: FactoryProfile) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
-
-def _count_activities(pipelines: list[dict]) -> tuple[ObjectCount, list[str]]:
+def _count_activities(pipelines: list) -> tuple[ObjectCount, list[str]]:
     """Walk nested activities, classify supported/unsupported.
 
     Returns:
@@ -148,6 +146,9 @@ def _count_activities(pipelines: list[dict]) -> tuple[ObjectCount, list[str]]:
     """
     all_activities: list[dict] = []
     for pipeline in pipelines:
+        if not isinstance(pipeline, dict):
+            logger.warning("Skipping non-dictionary pipeline")
+            continue
         _collect_activities(pipeline.get("activities") or [], all_activities)
 
     supported = 0

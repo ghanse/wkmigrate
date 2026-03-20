@@ -19,6 +19,7 @@ from wkmigrate.profiler import (
     profile_factory,
 )
 
+
 def test_counts_pipelines() -> None:
     client = StubFactoryClient(
         _pipelines=[make_pipeline([]), make_pipeline([])],

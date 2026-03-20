@@ -107,7 +107,7 @@ class FactoryDefinitionStore(DefinitionStore):
         """
         if self._factory_client is None:
             raise ValueError("Factory client is not initialized")
-        return self._factory_client.list_pipelines()
+        return [pipeline for pipeline in self._factory_client.list_pipelines() if isinstance(pipeline, str)]
 
     def load_all(self, pipeline_names: list[str] | None = None) -> list[Pipeline]:
         """
