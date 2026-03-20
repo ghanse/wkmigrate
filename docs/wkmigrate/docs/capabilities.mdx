@@ -51,7 +51,10 @@ Datasets are translated from the ADF dataset properties and linked service defin
 | Orc files                                 | `FileDataset`           | Captures ORC compression and storage layout. Supports ABFS, S3, GCS, and Azure Blob storage providers.                                                                     |
 | Parquet files                             | `FileDataset`           | Captures Parquet compression and storage layout. Supports ABFS, S3, GCS, and Azure Blob storage providers.                                                                 |
 | Azure Databricks Delta Lake tables        | `DeltaTableDataset`     | Captures database/schema, table, and optional catalog information for Delta tables.                                                                                         |
-| Azure SQL Database tables                 | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.                                                                   |
+| Azure SQL Server tables                   | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.                                                                   |
+| Azure Database for PostgreSQL tables      | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.                                                                   |
+| Azure Database for MySQL tables           | `SqlTableDataset`       | Captures server host, database, table name, and connection options such as timeout and isolation.                                                                           |
+| Oracle Database tables                    | `SqlTableDataset`       | Captures server host, database, schema, table name, and connection options such as timeout and isolation.                                                                   |
 
 <Admonition type="warning" title="Unsupported dataset types">
 When calling `to_job` or `to_asset_bundle`, unsupported datasets will not generate valid code or job configuration. A
@@ -72,7 +75,10 @@ The following linked services are supported:
 | Amazon S3                         | `S3LinkedService`                | Captures access key identifier and service URL; used when translating file-based datasets stored in S3.                                                                |
 | Google Cloud Storage              | `GcsLinkedService`               | Captures HMAC access key identifier and service URL; used when translating file-based datasets stored in GCS.                                                          |
 | Azure Blob Storage                | `AzureBlobLinkedService`         | Captures connection string and service endpoint; used when translating file-based datasets stored in Azure Blob Storage.                                               |
-| Azure SQL Server                  | `SqlLinkedService`               | Captures host name, database, and authentication details (for example user name and authentication type); used when translating Azure SQL datasets.                    |
+| Azure SQL Server                  | `SqlLinkedService`               | Captures host name, database, and authentication details (for example user name and authentication type); used when translating SQL Server datasets.                  |
+| Azure Database for PostgreSQL     | `SqlLinkedService`               | Captures host name, database, and authentication details; used when translating PostgreSQL datasets.                                                                        |
+| Azure Database for MySQL          | `SqlLinkedService`               | Captures host name, database, and authentication details; used when translating MySQL datasets.                                                                             |
+| Oracle Database                   | `SqlLinkedService`               | Captures host name, database, and authentication details; used when translating Oracle datasets.                                                                            |
 
 <Admonition type="warning" title="Unsupported linked services">
 When calling `to_job` or `to_asset_bundle`, unsupported datasets will not generate valid code or job configuration. A
