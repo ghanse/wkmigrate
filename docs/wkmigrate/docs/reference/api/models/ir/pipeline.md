@@ -30,7 +30,6 @@ Pipeline IR object produced by the translator.
 - `tasks` - Ordered list of ``PipelineTask`` wrappers that make up the workflow.
 - `tags` - Dictionary of system and user-defined tags attached to the workflow.
 - `not_translatable` - Collection of entries describing properties that could not be translated.
-- `warnings` - Translation warnings emitted during translation (written to ``warnings.json``).
 
 ## Activity Objects
 

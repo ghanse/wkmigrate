@@ -10,6 +10,10 @@ shared metadata (policy, dependencies, cluster specs), and flattens nested contr
 constructs. It also captures non-translatable warnings so that callers receive structured
 diagnostics with the translated activities.
 
+Translation state is captured in a ``TranslationContext`` that is threaded through function calls
+and returned alongside results.  No mutable state is shared between functions — each state transition
+produces a new context, making the data flow fully explicit.
+
 #### default\_context
 
 ```python

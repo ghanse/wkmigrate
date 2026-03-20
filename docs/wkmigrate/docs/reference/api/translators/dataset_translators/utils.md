@@ -61,6 +61,43 @@ Parses the ABFS container name from dataset properties.
 
   Storage container name.
 
+#### parse\_cloud\_bucket\_name
+
+```python
+def parse_cloud_bucket_name(properties: dict) -> str | UnsupportedValue
+```
+
+Parses the cloud storage bucket/container name from dataset properties.
+
+Checks ``bucket_name``, ``container``, and ``file_system`` keys in the
+dataset location block.
+
+**Arguments**:
+
+- `properties` - File properties block.
+  
+
+**Returns**:
+
+  Bucket or container name.
+
+#### parse\_cloud\_file\_path
+
+```python
+def parse_cloud_file_path(properties: dict) -> str | UnsupportedValue
+```
+
+Parses the file path from a cloud dataset definition.
+
+**Arguments**:
+
+- `properties` - File properties from the dataset definition.
+  
+
+**Returns**:
+
+  Full path to the dataset file.
+
 #### parse\_abfs\_file\_path
 
 ```python

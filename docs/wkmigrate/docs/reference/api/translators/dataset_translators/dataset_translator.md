@@ -1,11 +1,11 @@
 ---
-sidebar_label: dataset_translators
-title: wkmigrate.translators.dataset_translators
+sidebar_label: dataset_translator
+title: wkmigrate.translators.dataset_translators.dataset_translator
 ---
 
-Dataset translators for Azure Data Factory definitions.
+Top-level dataset translator that dispatches to type-specific translators.
 
-This package normalizes dataset payloads into internal representations. Each
+This module normalizes dataset payloads into internal representations. Each
 translator validates required fields, coerces connection settings, and emits
 ``UnsupportedValue`` objects for any unparsable inputs.
 

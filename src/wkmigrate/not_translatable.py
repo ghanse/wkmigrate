@@ -35,7 +35,7 @@ class NotTranslatableWarning(UserWarning):
         Initializes the warning and attaches contextual metadata.
 
         Args:
-            property_name: Pipeline property that triggered the warning.
+            property_name: Pipeline property that could not be translated.
             message: Human-readable warning message.
         """
         super().__init__(message)

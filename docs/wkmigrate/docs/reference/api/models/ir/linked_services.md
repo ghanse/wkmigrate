@@ -37,7 +37,9 @@ Linked-service metadata for SQL/JDBC connections to a relational database.
 
 - `host` - Hostname or address of the database server.
 - `database` - Logical database name within the server.
+- `port` - TCP port number for the database connection.
 - `user_name` - Username used to authenticate with the database.
+- `password` - Password used to authenticate with the database.
 - `authentication_type` - Authentication mechanism (for example ``SQL`` or ``AAD``).
 
 ## AbfsLinkedService Objects

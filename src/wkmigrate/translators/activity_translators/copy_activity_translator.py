@@ -46,13 +46,7 @@ def translate_copy_activity(activity: dict, base_kwargs: dict) -> CopyActivity |
 
     source_properties = get_data_source_properties(get_value_or_unsupported(activity, "source"))
     sink_properties = get_data_source_properties(get_value_or_unsupported(activity, "sink"))
-
-    sink_system: str = (
-        sink_properties.get("type", sink_dataset.dataset_type)
-        if isinstance(sink_properties, dict)
-        else sink_dataset.dataset_type
-    )
-    column_mapping = _parse_type_translator(activity.get("translator") or {}, sink_system)
+    column_mapping = _parse_type_translator(activity.get("translator") or {})
     if any(isinstance(mapping, UnsupportedValue) for mapping in column_mapping):
         unsupported_value_messages = [item.message for item in column_mapping if isinstance(item, UnsupportedValue)]
         return UnsupportedValue(
@@ -78,29 +72,27 @@ def translate_copy_activity(activity: dict, base_kwargs: dict) -> CopyActivity |
     return merge_unsupported_values([source_dataset, sink_dataset, source_properties, sink_properties])
 
 
-def _parse_type_translator(type_translator: dict, sink_system: str) -> list[ColumnMapping | UnsupportedValue]:
+def _parse_type_translator(type_translator: dict) -> list[ColumnMapping | UnsupportedValue]:
     """
     Parses a type translator from one set of data columns to another, converting ADF column types
     to Spark equivalents using the sink system's type mapping.
 
     Args:
         type_translator: Tabular type translator with data column mappings.
-        sink_system: Normalized sink dataset type (e.g. ``"sqlserver"``), used for type conversion.
 
     Returns:
         List of column mapping definitions as ``ColumnMapping`` or ``UnsupportedValue`` objects.
     """
     mappings = type_translator.get("mappings") or []
-    return [_parse_dataset_mapping(mapping, sink_system) for mapping in mappings]
+    return [_parse_dataset_mapping(mapping) for mapping in mappings]
 
 
-def _parse_dataset_mapping(mapping: dict[str, dict], sink_system: str) -> ColumnMapping | UnsupportedValue:
+def _parse_dataset_mapping(mapping: dict[str, dict]) -> ColumnMapping | UnsupportedValue:
     """
     Parses a single column mapping entry from the ADF type translator into a ``ColumnMapping``.
 
     Args:
         mapping: Single column mapping dictionary containing ``source`` and ``sink`` keys.
-        sink_system: Normalized sink dataset type (e.g. ``"sqlserver"``), used for type conversion.
 
     Returns:
         Parsed ``ColumnMapping`` or ``UnsupportedValue`` when required fields are missing.

@@ -96,7 +96,6 @@
                 "reference/api/wkmigrate/translators/activity_translators/set_variable_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/spark_jar_activity_translator",
                 "reference/api/wkmigrate/translators/activity_translators/spark_python_activity_translator",
-                "reference/api/wkmigrate/translators/activity_translators/utils",
                 "reference/api/wkmigrate/translators/activity_translators/web_activity_translator"
               ],
               "label": "wkmigrate.translators.activity_translators",
@@ -104,7 +103,7 @@
             },
             {
               "items": [
-                "reference/api/wkmigrate/translators/dataset_translators/__init__",
+                "reference/api/wkmigrate/translators/dataset_translators/dataset_translator",
                 "reference/api/wkmigrate/translators/dataset_translators/delta_table_dataset_translator",
                 "reference/api/wkmigrate/translators/dataset_translators/file_dataset_translator",
                 "reference/api/wkmigrate/translators/dataset_translators/sql_dataset_translator",
@@ -115,9 +114,9 @@
             },
             {
               "items": [
-                "reference/api/wkmigrate/translators/linked_service_translators/abfs_translator",
-                "reference/api/wkmigrate/translators/linked_service_translators/databricks_translator",
-                "reference/api/wkmigrate/translators/linked_service_translators/sql_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/databricks_linked_service_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/sql_linked_service_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/storage_linked_service_translator",
                 "reference/api/wkmigrate/translators/linked_service_translators/utils"
               ],
               "label": "wkmigrate.translators.linked_service_translators",
@@ -145,8 +144,7 @@
           "type": "category"
         },
         "reference/api/wkmigrate/code_generator",
-        "reference/api/wkmigrate/datasets",
-        "reference/api/wkmigrate/translation_warnings",
+        "reference/api/wkmigrate/not_translatable",
         "reference/api/wkmigrate/utils"
       ],
       "label": "wkmigrate",

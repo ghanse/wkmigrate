@@ -58,6 +58,9 @@ from wkmigrate.translators.activity_translators.set_variable_activity_translator
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import (
     translate_spark_python_activity,
 )
+from wkmigrate.translators.activity_translators.copy_activity_translator import (
+    translate_copy_activity,
+)
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.parsers.expression_parsers import parse_variable_value
 from wkmigrate.utils import get_placeholder_activity
@@ -85,9 +88,6 @@ SET_VARIABLE_ACTIVITY: dict = {
     "variable_name": "myVar",
     "value": "static_value",
 }
-from wkmigrate.translators.activity_translators.copy_activity_translator import (
-    translate_copy_activity,
-)
 
 
 def test_basic_notebook_activity(notebook_activity_fixtures: list[dict]) -> None:

@@ -132,9 +132,6 @@ def test_dataset_missing_linked_service_returns_unsupported() -> None:
     assert "linked_service" in result.message.lower()
 
 
-# --- parse_abfs_container_name ---
-
-
 def test_parse_abfs_container_name_missing_location() -> None:
     """Properties without 'location' returns UnsupportedValue."""
     result = parse_abfs_container_name({})

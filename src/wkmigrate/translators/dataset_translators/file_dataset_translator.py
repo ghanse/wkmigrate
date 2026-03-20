@@ -5,6 +5,7 @@ parsing storage paths, linked-service metadata, and format options for ABFS,
 Amazon S3, Google Cloud Storage, and Azure Blob Storage locations.
 """
 
+from collections.abc import Callable
 from wkmigrate.parsers.dataset_parsers import CLOUD_LOCATION_TYPES
 from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
@@ -23,7 +24,7 @@ from wkmigrate.translators.linked_service_translators import (
     translate_s3_spec,
 )
 
-_CLOUD_TRANSLATORS: dict[str, callable] = {
+_CLOUD_TRANSLATORS: dict[str, Callable] = {
     "s3": translate_s3_spec,
     "gcs": translate_gcs_spec,
     "azure_blob": translate_azure_blob_spec,

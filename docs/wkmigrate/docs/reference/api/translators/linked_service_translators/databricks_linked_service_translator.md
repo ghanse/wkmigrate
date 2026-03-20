@@ -1,6 +1,6 @@
 ---
-sidebar_label: databricks_translator
-title: wkmigrate.translators.linked_service_translators.databricks_translator
+sidebar_label: databricks_linked_service_translator
+title: wkmigrate.translators.linked_service_translators.databricks_linked_service_translator
 ---
 
 Translator for Databricks cluster linked service definitions.

@@ -1,6 +1,6 @@
 ---
-sidebar_label: sql_translator
-title: wkmigrate.translators.linked_service_translators.sql_translator
+sidebar_label: sql_linked_service_translator
+title: wkmigrate.translators.linked_service_translators.sql_linked_service_translator
 ---
 
 Translators for SQL-based linked service definitions.

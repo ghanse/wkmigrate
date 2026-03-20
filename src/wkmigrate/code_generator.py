@@ -1,7 +1,7 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials. They are consumed by the Copy, Lookup, Web, and SetVariable
+and manage credentials. They are consumed by the Copy, Lookup, SetVariable, and Web
 activity preparers to build Databricks notebooks.
 """
 
@@ -63,7 +63,7 @@ def get_option_expressions(dataset_definition: dict, credentials_scope: str = DE
     dataset_type = dataset_definition.get("type")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
-    if dataset_type in ("sqlserver", "postgresql", "mysql", "oracle"):
+    if dataset_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return get_database_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     return []
 
@@ -183,7 +183,7 @@ def get_read_expression(source_definition: dict, source_query: str | None = None
         return get_file_read_expression(source_definition)
     if source_type == "delta":
         return get_delta_read_expression(source_definition)
-    if source_type in ("sqlserver", "postgresql", "mysql", "oracle"):
+    if source_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return get_jdbc_read_expression(source_definition, source_query)
 
     raise ValueError(f'Reading data from "{source_type}" not supported')
