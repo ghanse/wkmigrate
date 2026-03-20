@@ -111,6 +111,27 @@
             },
             {
               "items": [
+                "reference/api/wkmigrate/translators/dataset_translators/dataset_translator",
+                "reference/api/wkmigrate/translators/dataset_translators/delta_table_dataset_translator",
+                "reference/api/wkmigrate/translators/dataset_translators/file_dataset_translator",
+                "reference/api/wkmigrate/translators/dataset_translators/sql_dataset_translator",
+                "reference/api/wkmigrate/translators/dataset_translators/utils"
+              ],
+              "label": "wkmigrate.translators.dataset_translators",
+              "type": "category"
+            },
+            {
+              "items": [
+                "reference/api/wkmigrate/translators/linked_service_translators/databricks_linked_service_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/sql_linked_service_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/storage_linked_service_translator",
+                "reference/api/wkmigrate/translators/linked_service_translators/utils"
+              ],
+              "label": "wkmigrate.translators.linked_service_translators",
+              "type": "category"
+            },
+            {
+              "items": [
                 "reference/api/wkmigrate/translators/pipeline_translators/parameter_translator",
                 "reference/api/wkmigrate/translators/pipeline_translators/parsers",
                 "reference/api/wkmigrate/translators/pipeline_translators/pipeline_translator"
@@ -125,15 +146,12 @@
               ],
               "label": "wkmigrate.translators.trigger_translators",
               "type": "category"
-            },
-            "reference/api/wkmigrate/translators/dataset_translators",
-            "reference/api/wkmigrate/translators/linked_service_translators"
+            }
           ],
           "label": "wkmigrate.translators",
           "type": "category"
         },
         "reference/api/wkmigrate/code_generator",
-        "reference/api/wkmigrate/datasets",
         "reference/api/wkmigrate/not_translatable",
         "reference/api/wkmigrate/utils"
       ],

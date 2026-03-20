@@ -47,7 +47,7 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
             tags=append_system_tags(pipeline.get("tags")),
         )
 
-    not_translatable = []
+    not_translatable: list[dict] = []
     for warning in caught_warnings:
         if not issubclass(warning.category, UserWarning):
             continue
@@ -55,7 +55,7 @@ def translate_pipeline(pipeline: dict) -> Pipeline:
         property_name = getattr(warning.message, "property_name", "unknown")
         activity_name = getattr(warning.message, "activity_name", None)
         activity_type = getattr(warning.message, "activity_type", None)
-        entry = {
+        entry: dict = {
             "property": property_name,
             "message": message,
         }

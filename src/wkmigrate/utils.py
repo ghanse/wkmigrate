@@ -179,20 +179,21 @@ def extract_group(input_string: str, regex: str) -> str | UnsupportedValue:
     return match.group(1)
 
 
-def get_value_or_unsupported(items: dict, key: str) -> Any | UnsupportedValue:
+def get_value_or_unsupported(items: dict, key: str, item_type: str = "dictionary") -> Any | UnsupportedValue:
     """
     Gets a value from a dictionary or returns an ``UnsupportedValue`` object if the key is not found.
 
     Args:
         items: Dictionary to search.
         key: Key to look up.
+        item_type: Item type for error messages (default ``"dictionary"``).
 
     Returns:
         Value as a ``Any`` or ``UnsupportedValue`` object if the key is not found.
     """
     value = items.get(key)
     if value is None:
-        return UnsupportedValue(value=items, message=f"Missing value for key '{key}' in dictionary")
+        return UnsupportedValue(value=items, message=f"Missing value for key '{key}' in {item_type}")
     return value
 
 

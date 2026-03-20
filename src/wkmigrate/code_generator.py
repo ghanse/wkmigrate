@@ -1,7 +1,7 @@
 """This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy, Lookup, SetVariable, and Web
+and manage credentials. They are consumed by the Copy, Lookup, SetVariable, and Web
 activity preparers to build Databricks notebooks.
 """
 
@@ -11,7 +11,12 @@ from typing import Any
 
 import autopep8  # type: ignore
 
-from wkmigrate.datasets import DATASET_OPTIONS, DATASET_PROVIDER_SECRETS, DEFAULT_CREDENTIALS_SCOPE
+from wkmigrate.parsers.dataset_parsers import (
+    DATASET_OPTIONS,
+    DATASET_PROVIDER_SECRETS,
+    DEFAULT_CREDENTIALS_SCOPE,
+    DEFAULT_PORTS,
+)
 from wkmigrate.models.ir.pipeline import Authentication
 from wkmigrate.not_translatable import NotTranslatableWarning, not_translatable_context
 
@@ -58,7 +63,7 @@ def get_option_expressions(dataset_definition: dict, credentials_scope: str = DE
     dataset_type = dataset_definition.get("type")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
-    if dataset_type == "sqlserver":
+    if dataset_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return get_database_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     return []
 
@@ -108,6 +113,8 @@ def get_database_options(
     """
     dataset_name = dataset_definition["dataset_name"]
     service_name = dataset_definition["service_name"]
+    jdbc_url = get_jdbc_url(dataset_definition)
+    url_line = f'{dataset_name}_options["url"] = "{jdbc_url}"'
     secrets_lines = [
         f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
                 scope="{credentials_scope}",
@@ -121,7 +128,39 @@ def get_database_options(
         for option in DATASET_OPTIONS.get(database_type, [])
         if dataset_definition.get(option)
     ]
-    return [f"{dataset_name}_options = {{}}", *secrets_lines, *options_lines]
+    return [f"{dataset_name}_options = {{}}", url_line, *secrets_lines, *options_lines]
+
+
+def get_jdbc_url(dataset_definition: dict) -> str:
+    """
+    Constructs a JDBC connection URL from a flattened dataset definition.
+
+    The URL format varies by database type and respects the default port for
+    each engine when no explicit port is provided.
+
+    Args:
+        dataset_definition: Flat dataset definition dictionary containing at
+            least ``type``, ``host``, and ``database``, and optionally ``port``.
+
+    Returns:
+        JDBC connection URL string.
+    """
+    db_type = dataset_definition.get("type", "")
+    host = dataset_definition.get("host", "")
+    database = dataset_definition.get("database", "")
+    port = dataset_definition.get("port") or DEFAULT_PORTS.get(db_type)
+
+    match db_type:
+        case "sqlserver":
+            return f"jdbc:sqlserver://{host}:{port};databaseName={database}"
+        case "postgresql":
+            return f"jdbc:postgresql://{host}:{port}/{database}"
+        case "mysql":
+            return f"jdbc:mysql://{host}:{port}/{database}"
+        case "oracle":
+            return f"jdbc:oracle:thin:@{host}:{port}:{database}"
+        case _:
+            return ""
 
 
 def get_read_expression(source_definition: dict, source_query: str | None = None) -> str:
@@ -144,7 +183,7 @@ def get_read_expression(source_definition: dict, source_query: str | None = None
         return get_file_read_expression(source_definition)
     if source_type == "delta":
         return get_delta_read_expression(source_definition)
-    if source_type == "sqlserver":
+    if source_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return get_jdbc_read_expression(source_definition, source_query)
 
     raise ValueError(f'Reading data from "{source_type}" not supported')
@@ -190,12 +229,11 @@ def get_file_read_expression(source_definition: dict) -> str:
     """
     source_name = source_definition["dataset_name"]
     source_type = source_definition["type"]
-    uri = get_file_uri(source_definition)
 
     return f"""{source_name}_df = (
                         spark.read.format("{source_type}")
                             .options(**{source_name}_options)
-                            .load("{uri}")
+                            .load("{get_file_uri(source_definition)}")
                         )
                     """
 
@@ -236,7 +274,7 @@ def get_jdbc_read_expression(source_definition: dict, source_query: str | None =
 
     lines = [
         f"{source_name}_df = (",
-        f'    spark.read.format("{source_definition.get("type")}")',
+        '    spark.read.format("jdbc")',
         f"        .options(**{source_name}_options)",
     ]
 
@@ -244,7 +282,8 @@ def get_jdbc_read_expression(source_definition: dict, source_query: str | None =
         escaped_query = source_query.replace('"', '\\"')
         lines.append(f'        .option("query", "{escaped_query}")')
     else:
-        lines.append(f'        .option("dbtable", "{schema_name}.{table_name}")')
+        dbtable = source_definition.get("dbtable") or f"{schema_name}.{table_name}"
+        lines.append(f'        .option("dbtable", "{dbtable}")')
 
     lines.append("        .load()")
     lines.append(")")

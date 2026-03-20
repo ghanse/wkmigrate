@@ -39,7 +39,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 from typing_extensions import deprecated
 
-from wkmigrate.datasets import DEFAULT_CREDENTIALS_SCOPE
+from wkmigrate.parsers.dataset_parsers import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity

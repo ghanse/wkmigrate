@@ -61,3 +61,24 @@ def test_translate_pipeline(pipeline_definition, expected_result, context):
     with context:
         result = translate_pipeline(pipeline_definition)
         assert result == expected_result
+
+
+def test_mixed_warnings_and_unsupported() -> None:
+    """A pipeline with both unsupported activities and translation warnings collects all in not_translatable."""
+    pipeline = {
+        "name": "mixed_test",
+        "activities": [
+            {
+                "name": "good_notebook",
+                "type": "DatabricksNotebook",
+                "depends_on": [],
+                "policy": {"timeout": "0.01:00:00", "secure_input": True},
+                "notebook_path": "/notebooks/etl",
+            },
+        ],
+    }
+    result = translate_pipeline(pipeline)
+
+    # secure_input warning should appear in not_translatable
+    warning_properties = [w["property"] for w in result.not_translatable]
+    assert "secure_input" in warning_properties

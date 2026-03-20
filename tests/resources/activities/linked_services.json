@@ -238,6 +238,90 @@
     "expected_message": "Missing ABFS linked service definition"
   },
   {
+    "description": "PostgreSQL linked service - full configuration",
+    "input": {
+      "name": "postgres-production",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "AzurePostgreSql",
+        "server": "pg-prod.postgres.database.azure.com",
+        "database": "sales_db",
+        "user_name": "etl_user",
+        "authentication_type": "Basic"
+      }
+    },
+    "expected": {
+      "service_name": "postgres-production",
+      "service_type": "postgresql",
+      "host": "pg-prod.postgres.database.azure.com",
+      "database": "sales_db",
+      "user_name": "etl_user",
+      "authentication_type": "Basic"
+    }
+  },
+  {
+    "description": "Empty/null PostgreSQL linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing PostgreSQL linked service definition"
+  },
+  {
+    "description": "MySQL linked service - full configuration",
+    "input": {
+      "name": "mysql-production",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "AzureMySql",
+        "server": "mysql-prod.mysql.database.azure.com",
+        "database": "inventory_db",
+        "user_name": "etl_user",
+        "authentication_type": "Basic"
+      }
+    },
+    "expected": {
+      "service_name": "mysql-production",
+      "service_type": "mysql",
+      "host": "mysql-prod.mysql.database.azure.com",
+      "database": "inventory_db",
+      "user_name": "etl_user",
+      "authentication_type": "Basic"
+    }
+  },
+  {
+    "description": "Empty/null MySQL linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing MySQL linked service definition"
+  },
+  {
+    "description": "Oracle linked service - full configuration",
+    "input": {
+      "name": "oracle-production",
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "properties": {
+        "type": "Oracle",
+        "server": "oracle-prod.example.com",
+        "database": "ORCL",
+        "user_name": "etl_user",
+        "authentication_type": "Basic"
+      }
+    },
+    "expected": {
+      "service_name": "oracle-production",
+      "service_type": "oracle",
+      "host": "oracle-prod.example.com",
+      "database": "ORCL",
+      "user_name": "etl_user",
+      "authentication_type": "Basic"
+    }
+  },
+  {
+    "description": "Empty/null Oracle linked service",
+    "input": null,
+    "expected_unsupported": true,
+    "expected_message": "Missing Oracle linked service definition"
+  },
+  {
     "id": "s3_full",
     "description": "Amazon S3 linked service - full configuration",
     "input": {

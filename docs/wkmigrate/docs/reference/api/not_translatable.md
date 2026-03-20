@@ -30,7 +30,7 @@ Captures activity metadata for warnings raised inside the context.
 class NotTranslatableWarning(UserWarning)
 ```
 
-Custom warning for properties that cannot be translated.
+Pipeline property that could not be translated.
 
 #### \_\_init\_\_
 

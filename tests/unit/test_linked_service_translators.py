@@ -7,6 +7,8 @@ SQL Server connections, ABFS storage accounts, and cloud file services (S3, GCS,
 
 from __future__ import annotations
 
+import pytest
+
 from tests.conftest import get_fixture
 from wkmigrate.models.ir.linked_services import (
     AbfsLinkedService,
@@ -22,6 +24,9 @@ from wkmigrate.translators.linked_service_translators import (
     translate_azure_blob_spec,
     translate_databricks_cluster_spec,
     translate_gcs_spec,
+    translate_mysql_spec,
+    translate_oracle_spec,
+    translate_postgresql_spec,
     translate_s3_spec,
     translate_sql_server_spec,
 )
@@ -194,6 +199,75 @@ def test_abfs_null_input_returns_unsupported(linked_service_fixtures: list[dict]
     assert fixture["expected_message"] in result.message
 
 
+def test_full_postgresql_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of PostgreSQL linked service with full configuration."""
+    fixture = next(f for f in linked_service_fixtures if "PostgreSQL linked service - full" in f["description"])
+    result = translate_postgresql_spec(fixture["input"])
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.host == fixture["expected"]["host"]
+    assert result.database == fixture["expected"]["database"]
+    assert result.user_name == fixture["expected"]["user_name"]
+    assert result.authentication_type == fixture["expected"]["authentication_type"]
+
+
+def test_postgresql_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null PostgreSQL input returns UnsupportedValue."""
+    fixture = next(f for f in linked_service_fixtures if "Empty/null PostgreSQL" in f["description"])
+    result = translate_postgresql_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_full_mysql_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of MySQL linked service with full configuration."""
+    fixture = next(f for f in linked_service_fixtures if "MySQL linked service - full" in f["description"])
+    result = translate_mysql_spec(fixture["input"])
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.host == fixture["expected"]["host"]
+    assert result.database == fixture["expected"]["database"]
+    assert result.user_name == fixture["expected"]["user_name"]
+    assert result.authentication_type == fixture["expected"]["authentication_type"]
+
+
+def test_mysql_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null MySQL input returns UnsupportedValue."""
+    fixture = next(f for f in linked_service_fixtures if "Empty/null MySQL" in f["description"])
+    result = translate_mysql_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_full_oracle_configuration(linked_service_fixtures: list[dict]) -> None:
+    """Test translation of Oracle linked service with full configuration."""
+    fixture = next(f for f in linked_service_fixtures if "Oracle linked service - full" in f["description"])
+    result = translate_oracle_spec(fixture["input"])
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.service_name == fixture["expected"]["service_name"]
+    assert result.service_type == fixture["expected"]["service_type"]
+    assert result.host == fixture["expected"]["host"]
+    assert result.database == fixture["expected"]["database"]
+    assert result.user_name == fixture["expected"]["user_name"]
+    assert result.authentication_type == fixture["expected"]["authentication_type"]
+
+
+def test_oracle_null_input_returns_unsupported(linked_service_fixtures: list[dict]) -> None:
+    """Test that null Oracle input returns UnsupportedValue."""
+    fixture = next(f for f in linked_service_fixtures if "Empty/null Oracle" in f["description"])
+    result = translate_oracle_spec(fixture["input"])
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
 def test_single_worker_as_string() -> None:
     """Test parsing of single worker count as string."""
     spec = {
@@ -321,6 +395,72 @@ def test_uuid_generated_when_no_name() -> None:
     # UUID format check - should be a non-empty string
     assert result.service_name is not None
     assert len(result.service_name) > 0
+
+
+def test_sql_missing_server_returns_unsupported() -> None:
+    """Spec without 'server' in properties returns UnsupportedValue."""
+    spec = {"name": "no-server", "properties": {"database": "mydb"}}
+    result = translate_sql_server_spec(spec)
+
+    assert isinstance(result, UnsupportedValue)
+    assert "server" in result.message
+
+
+def test_sql_missing_database_returns_unsupported() -> None:
+    """Spec without 'database' in properties returns UnsupportedValue."""
+    spec = {"name": "no-db", "properties": {"server": "host.example.com"}}
+    result = translate_sql_server_spec(spec)
+
+    assert isinstance(result, UnsupportedValue)
+    assert "database" in result.message
+
+
+def test_sql_spec_parses_password() -> None:
+    """Password from properties is included in the linked service."""
+    spec = {
+        "name": "sql-with-password",
+        "properties": {
+            "server": "host.example.com",
+            "database": "mydb",
+            "user_name": "admin",
+            "password": "s3cret",
+        },
+    }
+    result = translate_sql_server_spec(spec)
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.password == "s3cret"
+
+
+@pytest.mark.parametrize(
+    "translate_fn, expected_port",
+    [
+        (translate_sql_server_spec, 1433),
+        (translate_postgresql_spec, 5432),
+        (translate_mysql_spec, 3306),
+        (translate_oracle_spec, 1521),
+    ],
+)
+def test_sql_spec_default_port(translate_fn, expected_port: int) -> None:
+    """Each SQL translator uses its standard default port when none is provided."""
+    spec = {"name": "test-svc", "properties": {"server": "host.example.com", "database": "mydb"}}
+    result = translate_fn(spec)
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.port == expected_port
+
+
+@pytest.mark.parametrize(
+    "translate_fn",
+    [translate_sql_server_spec, translate_postgresql_spec, translate_mysql_spec, translate_oracle_spec],
+)
+def test_sql_spec_custom_port(translate_fn) -> None:
+    """An explicit port in properties overrides the default."""
+    spec = {"name": "test-svc", "properties": {"server": "host.example.com", "database": "mydb", "port": 9999}}
+    result = translate_fn(spec)
+
+    assert isinstance(result, SqlLinkedService)
+    assert result.port == 9999
 
 
 def test_full_s3_configuration(linked_service_fixtures: list[dict]) -> None:

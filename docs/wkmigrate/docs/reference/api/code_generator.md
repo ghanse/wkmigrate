@@ -6,7 +6,7 @@ title: wkmigrate.code_generator
 This module defines shared Spark code-generation helpers used by activity preparers.
 
 Helpers in this module emit Python source fragments that read data, configure options,
-and manage credentials.  They are consumed by the Copy, Lookup, SetVariable, and Web
+and manage credentials. They are consumed by the Copy, Lookup, SetVariable, and Web
 activity preparers to build Databricks notebooks.
 
 #### get\_set\_variable\_notebook\_content
@@ -92,6 +92,27 @@ Generates code to create a Spark data source options dictionary for interacting 
 **Returns**:
 
   List of Python source lines that create the options dictionary.
+
+#### get\_jdbc\_url
+
+```python
+def get_jdbc_url(dataset_definition: dict) -> str
+```
+
+Constructs a JDBC connection URL from a flattened dataset definition.
+
+The URL format varies by database type and respects the default port for
+each engine when no explicit port is provided.
+
+**Arguments**:
+
+- `dataset_definition` - Flat dataset definition dictionary containing at
+  least ``type``, ``host``, and ``database``, and optionally ``port``.
+  
+
+**Returns**:
+
+  JDBC connection URL string.
 
 #### get\_read\_expression
 

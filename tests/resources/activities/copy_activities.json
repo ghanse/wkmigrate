@@ -528,5 +528,411 @@
     },
     "expected_unsupported": true,
     "expected_message": "Unsupported dataset type"
+  },
+  {
+    "description": "Copy activity - PostgreSQL to Delta",
+    "input": {
+      "name": "copy_postgresql_to_delta",
+      "type": "Copy",
+      "description": "Copy PostgreSQL table to Delta Lake",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "AzurePostgreSqlSource"
+      },
+      "sink": {
+        "type": "AzureDatabricksDeltaLakeSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_postgres",
+          "properties": {
+            "type": "AzurePostgreSqlTable",
+            "schema_type_properties_schema": "public",
+            "table": "orders"
+          },
+          "linked_service_definition": {
+            "name": "postgres-prod",
+            "properties": {
+              "type": "AzurePostgreSql",
+              "server": "pg-prod.postgres.database.azure.com",
+              "database": "sales_db",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "sales",
+            "table": "orders_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_postgresql_to_delta",
+      "task_key": "copy_postgresql_to_delta",
+      "activity_type": "Copy",
+      "source_dataset_type": "postgresql",
+      "sink_dataset_type": "delta"
+    }
+  },
+  {
+    "description": "Copy activity - MySQL to Delta",
+    "input": {
+      "name": "copy_mysql_to_delta",
+      "type": "Copy",
+      "description": "Copy MySQL table to Delta Lake",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "AzureMySqlSource"
+      },
+      "sink": {
+        "type": "AzureDatabricksDeltaLakeSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_mysql",
+          "properties": {
+            "type": "AzureMySqlTable",
+            "table": "products"
+          },
+          "linked_service_definition": {
+            "name": "mysql-prod",
+            "properties": {
+              "type": "AzureMySql",
+              "server": "mysql-prod.mysql.database.azure.com",
+              "database": "inventory_db",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "inventory",
+            "table": "products_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_mysql_to_delta",
+      "task_key": "copy_mysql_to_delta",
+      "activity_type": "Copy",
+      "source_dataset_type": "mysql",
+      "sink_dataset_type": "delta"
+    }
+  },
+  {
+    "description": "Copy activity - Oracle to Delta",
+    "input": {
+      "name": "copy_oracle_to_delta",
+      "type": "Copy",
+      "description": "Copy Oracle table to Delta Lake",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "OracleSource"
+      },
+      "sink": {
+        "type": "AzureDatabricksDeltaLakeSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_oracle",
+          "properties": {
+            "type": "OracleTable",
+            "schema_type_properties_schema": "HR",
+            "table": "EMPLOYEES"
+          },
+          "linked_service_definition": {
+            "name": "oracle-prod",
+            "properties": {
+              "type": "Oracle",
+              "server": "oracle-prod.example.com",
+              "database": "ORCL",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "hr",
+            "table": "employees_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_oracle_to_delta",
+      "task_key": "copy_oracle_to_delta",
+      "activity_type": "Copy",
+      "source_dataset_type": "oracle",
+      "sink_dataset_type": "delta"
+    }
+  },
+  {
+    "description": "Copy activity - Delta to PostgreSQL",
+    "input": {
+      "name": "copy_delta_to_postgresql",
+      "type": "Copy",
+      "description": "Copy Delta Lake table to PostgreSQL",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "AzureDatabricksDeltaLakeSource"
+      },
+      "sink": {
+        "type": "AzurePostgreSqlSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "sales",
+            "table": "orders_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_postgres",
+          "properties": {
+            "type": "AzurePostgreSqlTable",
+            "schema_type_properties_schema": "public",
+            "table": "orders"
+          },
+          "linked_service_definition": {
+            "name": "postgres-prod",
+            "properties": {
+              "type": "AzurePostgreSql",
+              "server": "pg-prod.postgres.database.azure.com",
+              "database": "sales_db",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_delta_to_postgresql",
+      "task_key": "copy_delta_to_postgresql",
+      "activity_type": "Copy",
+      "source_dataset_type": "delta",
+      "sink_dataset_type": "postgresql"
+    }
+  },
+  {
+    "description": "Copy activity - Delta to MySQL",
+    "input": {
+      "name": "copy_delta_to_mysql",
+      "type": "Copy",
+      "description": "Copy Delta Lake table to MySQL",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "AzureDatabricksDeltaLakeSource"
+      },
+      "sink": {
+        "type": "AzureMySqlSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "inventory",
+            "table": "products_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_mysql",
+          "properties": {
+            "type": "AzureMySqlTable",
+            "table": "products"
+          },
+          "linked_service_definition": {
+            "name": "mysql-prod",
+            "properties": {
+              "type": "AzureMySql",
+              "server": "mysql-prod.mysql.database.azure.com",
+              "database": "inventory_db",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_delta_to_mysql",
+      "task_key": "copy_delta_to_mysql",
+      "activity_type": "Copy",
+      "source_dataset_type": "delta",
+      "sink_dataset_type": "mysql"
+    }
+  },
+  {
+    "description": "Copy activity - Delta to Oracle",
+    "input": {
+      "name": "copy_delta_to_oracle",
+      "type": "Copy",
+      "description": "Copy Delta Lake table to Oracle",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 30
+      },
+      "source": {
+        "type": "AzureDatabricksDeltaLakeSource"
+      },
+      "sink": {
+        "type": "OracleSink"
+      },
+      "input_dataset_definitions": [
+        {
+          "name": "source_delta",
+          "properties": {
+            "type": "AzureDatabricksDeltaLakeDataset",
+            "database": "hr",
+            "table": "employees_delta",
+            "catalog": "prod"
+          },
+          "linked_service_definition": {
+            "name": "databricks-prod",
+            "properties": {
+              "type": "AzureDatabricks",
+              "domain": "https://adb-999999999.1.azuredatabricks.net",
+              "new_cluster_node_type": "Standard_D8s_v3",
+              "new_cluster_version": "14.0.x-scala2.12",
+              "new_cluster_num_of_worker": "4"
+            }
+          }
+        }
+      ],
+      "output_dataset_definitions": [
+        {
+          "name": "sink_oracle",
+          "properties": {
+            "type": "OracleTable",
+            "schema_type_properties_schema": "HR",
+            "table": "EMPLOYEES"
+          },
+          "linked_service_definition": {
+            "name": "oracle-prod",
+            "properties": {
+              "type": "Oracle",
+              "server": "oracle-prod.example.com",
+              "database": "ORCL",
+              "user_name": "etl_user",
+              "authentication_type": "Basic"
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "name": "copy_delta_to_oracle",
+      "task_key": "copy_delta_to_oracle",
+      "activity_type": "Copy",
+      "source_dataset_type": "delta",
+      "sink_dataset_type": "oracle"
+    }
   }
 ]

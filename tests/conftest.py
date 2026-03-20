@@ -57,6 +57,12 @@ def get_base_kwargs(activity: dict) -> dict[str, Any]:
 
 
 @pytest.fixture
+def copy_activity_fixtures() -> list[dict]:
+    """Load Copy activity test fixtures."""
+    return load_fixtures("copy_activities.json")
+
+
+@pytest.fixture
 def notebook_activity_fixtures() -> list[dict]:
     """Load notebook activity test fixtures."""
     return load_fixtures("notebook_activities.json")

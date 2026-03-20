@@ -15,7 +15,7 @@ from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.translators.dataset_translators import (
-    translate_cloud_file_dataset,
+    translate_file_dataset,
     translate_dataset,
 )
 
@@ -65,7 +65,7 @@ def test_translate_s3_dataset_delimited_text() -> None:
             },
         },
     )
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "s3")
+    result = translate_file_dataset("DelimitedText", dataset, "s3")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "s3_csv_dataset"
@@ -94,7 +94,7 @@ def test_translate_s3_dataset_parquet() -> None:
             },
         },
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "s3")
+    result = translate_file_dataset("Parquet", dataset, "s3")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "s3_parquet_dataset"
@@ -120,7 +120,7 @@ def test_translate_s3_dataset_no_folder() -> None:
             "properties": {},
         },
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "s3")
+    result = translate_file_dataset("Parquet", dataset, "s3")
 
     assert isinstance(result, FileDataset)
     assert result.folder_path == "data.parquet"
@@ -133,7 +133,7 @@ def test_translate_s3_dataset_missing_location() -> None:
         "properties": {"type": "DelimitedText"},
         "linked_service_definition": {"name": "svc", "properties": {}},
     }
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "s3")
+    result = translate_file_dataset("DelimitedText", dataset, "s3")
 
     assert isinstance(result, UnsupportedValue)
     assert "location" in result.message
@@ -141,7 +141,7 @@ def test_translate_s3_dataset_missing_location() -> None:
 
 def test_translate_s3_dataset_null_returns_unsupported() -> None:
     """Test null S3 dataset returns UnsupportedValue."""
-    result = translate_cloud_file_dataset("DelimitedText", {}, "s3")
+    result = translate_file_dataset("DelimitedText", {}, "s3")
 
     assert isinstance(result, UnsupportedValue)
     assert "s3" in result.message.lower()
@@ -185,7 +185,7 @@ def test_translate_gcs_dataset_delimited_text() -> None:
             },
         },
     )
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "gcs")
+    result = translate_file_dataset("DelimitedText", dataset, "gcs")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "gcs_csv_dataset"
@@ -214,7 +214,7 @@ def test_translate_gcs_dataset_parquet() -> None:
             },
         },
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "gcs")
+    result = translate_file_dataset("Parquet", dataset, "gcs")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "gcs_parquet_dataset"
@@ -236,7 +236,7 @@ def test_translate_gcs_dataset_missing_file_name() -> None:
         },
         "linked_service_definition": {"name": "svc", "properties": {}},
     }
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "gcs")
+    result = translate_file_dataset("DelimitedText", dataset, "gcs")
 
     assert isinstance(result, UnsupportedValue)
     assert "file_name" in result.message
@@ -244,7 +244,7 @@ def test_translate_gcs_dataset_missing_file_name() -> None:
 
 def test_translate_gcs_dataset_null_returns_unsupported() -> None:
     """Test null GCS dataset returns UnsupportedValue."""
-    result = translate_cloud_file_dataset("DelimitedText", {}, "gcs")
+    result = translate_file_dataset("DelimitedText", {}, "gcs")
 
     assert isinstance(result, UnsupportedValue)
     assert "gcs" in result.message.lower()
@@ -290,7 +290,7 @@ def test_translate_azure_blob_dataset_parquet() -> None:
         },
         container_key="container",
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "azure_blob")
+    result = translate_file_dataset("Parquet", dataset, "azure_blob")
 
     assert isinstance(result, FileDataset)
     assert result.url == "https://myblob.blob.core.windows.net/"
@@ -323,7 +323,7 @@ def test_translate_azure_blob_dataset_csv() -> None:
         NotTranslatableWarning,
         match="Cannot use service principal or managed identity authentication with Azure Blob linked service",
     ):
-        result = translate_cloud_file_dataset("DelimitedText", dataset, "azure_blob")
+        result = translate_file_dataset("DelimitedText", dataset, "azure_blob")
 
     assert isinstance(result, FileDataset)
     assert result.url == "https://myaccount.blob.core.windows.net/"
@@ -345,7 +345,7 @@ def test_translate_azure_blob_dataset_missing_linked_service_connection() -> Non
             "properties": {},
         },
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "azure_blob")
+    result = translate_file_dataset("Parquet", dataset, "azure_blob")
 
     assert isinstance(result, UnsupportedValue)
     assert (
@@ -356,7 +356,7 @@ def test_translate_azure_blob_dataset_missing_linked_service_connection() -> Non
 
 def test_translate_azure_blob_dataset_null_returns_unsupported() -> None:
     """Test null Azure Blob dataset returns UnsupportedValue."""
-    result = translate_cloud_file_dataset("Parquet", {}, "azure_blob")
+    result = translate_file_dataset("Parquet", {}, "azure_blob")
 
     assert isinstance(result, UnsupportedValue)
     assert "azure_blob" in result.message.lower()
@@ -408,7 +408,7 @@ def test_translate_abfs_dataset_delimited_text() -> None:
         },
         container_key="container",
     )
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "abfs")
+    result = translate_file_dataset("DelimitedText", dataset, "abfs")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "abfs_csv_dataset"
@@ -439,7 +439,7 @@ def test_translate_abfs_dataset_parquet() -> None:
         },
         container_key="container",
     )
-    result = translate_cloud_file_dataset("Parquet", dataset, "abfs")
+    result = translate_file_dataset("Parquet", dataset, "abfs")
 
     assert isinstance(result, FileDataset)
     assert result.dataset_name == "abfs_parquet_dataset"
@@ -453,7 +453,7 @@ def test_translate_abfs_dataset_parquet() -> None:
 
 def test_translate_abfs_dataset_null_returns_unsupported() -> None:
     """Test null ABFS dataset returns UnsupportedValue."""
-    result = translate_cloud_file_dataset("Parquet", {}, "abfs")
+    result = translate_file_dataset("Parquet", {}, "abfs")
 
     assert isinstance(result, UnsupportedValue)
     assert "abfs" in result.message.lower()
@@ -466,7 +466,7 @@ def test_translate_abfs_dataset_missing_location() -> None:
         "properties": {"type": "DelimitedText"},
         "linked_service_definition": {"name": "svc", "properties": {}},
     }
-    result = translate_cloud_file_dataset("DelimitedText", dataset, "abfs")
+    result = translate_file_dataset("DelimitedText", dataset, "abfs")
 
     assert isinstance(result, UnsupportedValue)
     assert "location" in result.message

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import autopep8  # type: ignore
 
-from wkmigrate.datasets import collect_data_source_secrets, merge_dataset_definition
+from wkmigrate.parsers.dataset_parsers import collect_data_source_secrets, merge_dataset_definition
 from wkmigrate.code_generator import get_option_expressions, get_read_expression
 from wkmigrate.models.ir.pipeline import LookupActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity

@@ -26,7 +26,7 @@ class Pipeline:
         schedule: Serialized schedule definition for the pipeline trigger, if any.
         tasks: Ordered list of ``PipelineTask`` wrappers that make up the workflow.
         tags: Dictionary of system and user-defined tags attached to the workflow.
-        not_translatable: Collection of warnings describing properties that could not be translated.
+        not_translatable: Collection of entries describing properties that could not be translated.
     """
 
     name: str

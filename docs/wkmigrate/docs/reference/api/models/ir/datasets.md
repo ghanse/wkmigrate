@@ -76,6 +76,7 @@ Dataset definition for JDBC-accessible tables in a relational database.
 - `dbtable` - Fully qualified ``schema.table`` name used by JDBC.
 - `host` - Hostname or address of the database server.
 - `database` - Logical database name within the server.
+- `port` - Port number for the database server.
 - `user_name` - Username used for JDBC authentication.
 - `authentication_type` - Authentication mechanism used by the connection.
 - `connection_options` - Additional JDBC options (for example fetch size, partitioning).

@@ -140,7 +140,10 @@ Extracts a regex group from an input string.
 #### get\_value\_or\_unsupported
 
 ```python
-def get_value_or_unsupported(items: dict, key: str) -> Any | UnsupportedValue
+def get_value_or_unsupported(
+        items: dict,
+        key: str,
+        item_type: str = "dictionary") -> Any | UnsupportedValue
 ```
 
 Gets a value from a dictionary or returns an ``UnsupportedValue`` object if the key is not found.
@@ -149,6 +152,7 @@ Gets a value from a dictionary or returns an ``UnsupportedValue`` object if the 
 
 - `items` - Dictionary to search.
 - `key` - Key to look up.
+- `item_type` - Item type for error messages (default ``"dictionary"``).
   
 
 **Returns**:

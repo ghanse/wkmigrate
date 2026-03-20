@@ -12,7 +12,7 @@ from dataclasses import asdict
 
 import autopep8  # type: ignore
 
-from wkmigrate.datasets import (
+from wkmigrate.parsers.dataset_parsers import (
     collect_data_source_secrets,
     merge_dataset_definition,
     parse_spark_data_type,
@@ -173,7 +173,7 @@ def _get_dlt_definition(source_dataset: dict, sink_dataset: dict, column_mapping
                         comment="Data copied from {source_name}; Previously targeted {sink_name}."
                         tbl_properties={{'delta.createdBy.wkmigrate': 'true'}}
                     )
-                    def {sink_name}:
+                    def {sink_name}():
                         {get_read_expression(source_dataset)}
                         {_get_mapping(source_dataset, sink_dataset, column_mapping, True)}
                         return {sink_name}_df
@@ -264,7 +264,7 @@ def _get_write_expression(sink_definition: dict) -> str:
                         .mode("overwrite")  \
                         .save("{get_file_uri(sink_definition)}")
                     """
-    if sink_type == "sqlserver":
+    if sink_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
         return rf"""{sink_name}_df.write.format("jdbc")  \
                         .options(**{sink_name}_options)  \
                         .save()

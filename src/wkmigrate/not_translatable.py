@@ -28,7 +28,7 @@ def not_translatable_context(activity_name: str | None, activity_type: str | Non
 
 
 class NotTranslatableWarning(UserWarning):
-    """Custom warning for properties that cannot be translated."""
+    """Pipeline property that could not be translated."""
 
     def __init__(self, property_name: str, message: str) -> None:
         """

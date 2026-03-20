@@ -7,8 +7,8 @@ This module defines a translator for translating Copy activities.
 
 Translators in this module normalize Copy Data activity payloads into internal representations.
 Each translator must validate required fields, coerce connection settings, source and sink dataset
-properties, and column mappings.Translators should emit ``UnsupportedValue`` objects for any unparsable
-inputs.
+properties, and column mappings.  Translators should emit ``UnsupportedValue`` objects for any
+unparsable inputs.
 
 #### translate\_copy\_activity
 
@@ -17,7 +17,9 @@ def translate_copy_activity(
         activity: dict, base_kwargs: dict) -> CopyActivity | UnsupportedValue
 ```
 
-Translates an ADF Copy activity into a ``CopyActivity`` object. Copy activities are translated into Lakeflow Declarative Pipelines tasks or Notebook tasks depending on the source and target dataset types.
+Translates an ADF Copy activity into a ``CopyActivity`` object. Copy activities are translated
+into Lakeflow Declarative Pipelines tasks or Notebook tasks depending on the source and target
+dataset types.
 
 This method returns an ``UnsupportedValue`` if the activity cannot be translated. This can be due to:
 * Missing or invalid dataset definitions
