@@ -63,7 +63,7 @@ def get_option_expressions(dataset_definition: dict, credentials_scope: str = DE
     dataset_type = dataset_definition.get("type")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
-    if dataset_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
+    if dataset_type in ("sqlserver", "postgresql", "mysql", "oracle"):
         return get_database_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     return []
 

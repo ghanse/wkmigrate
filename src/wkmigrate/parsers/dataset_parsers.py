@@ -23,10 +23,6 @@ from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.utils import parse_mapping, parse_timeout_string
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 _JDBC_SECRETS = ["user_name", "password"]
 _JDBC_OPTIONS = ["dbtable", "numPartitions", "batchsize", "sessionInitStatement"]
 DEFAULT_PORTS: dict[str, int] = {
@@ -73,10 +69,6 @@ DATASET_OPTIONS: dict[str, list[str]] = {
     "postgresql": _JDBC_OPTIONS,
     "sqlserver": _JDBC_OPTIONS,
 }
-
-# ---------------------------------------------------------------------------
-# Type mappings
-# ---------------------------------------------------------------------------
 
 _sql_server_type_mapping: dict[str, str] = {
     "Boolean": "boolean",
@@ -200,11 +192,6 @@ _JDBC_TYPE_MAPPINGS: dict[str, dict[str, str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Type-mapping helpers
-# ---------------------------------------------------------------------------
-
-
 def parse_spark_data_type(sink_type: str, sink_system: str) -> str:
     """
     Converts a source-system data type to the Spark equivalent.
@@ -240,11 +227,6 @@ def parse_spark_data_type(sink_type: str, sink_system: str) -> str:
         )
         return sink_type
     return mapped
-
-
-# ---------------------------------------------------------------------------
-# Dataset / DatasetProperties helpers
-# ---------------------------------------------------------------------------
 
 
 def merge_dataset_definition(dataset: Dataset | dict | None, properties: DatasetProperties | dict | None) -> dict:
@@ -355,10 +337,6 @@ def collect_data_source_secrets(definition: dict) -> list[SecretInstruction]:
         for secret in secret_keys
     ]
 
-
-# ---------------------------------------------------------------------------
-# Format-option parsers (activity source/sink)
-# ---------------------------------------------------------------------------
 
 _SQL_DATASET_TYPES = frozenset({"sqlserver", "postgresql", "mysql", "oracle"})
 
