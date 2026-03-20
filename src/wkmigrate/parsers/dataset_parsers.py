@@ -10,6 +10,8 @@ from wkmigrate.enums.isolation_level import IsolationLevel
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.utils import parse_timeout_string
 
+_SQL_DATASET_TYPES = frozenset({"sqlserver", "postgresql", "mysql", "oracle"})
+
 
 def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
     """
@@ -23,23 +25,28 @@ def parse_format_options(dataset: dict) -> dict | UnsupportedValue:
         Format options as a ``dict`` object.
     """
     dataset_type = _parse_dataset_type(dataset.get("type", ""))
+    if isinstance(dataset_type, UnsupportedValue):
+        return dataset_type
     if dataset_type is None:
         return UnsupportedValue(value=dataset, message="Missing property 'type' in dataset definition")
-    if dataset_type == "avro":
-        return _parse_avro_format_options(dataset)
-    if dataset_type == "csv":
-        return _parse_delimited_format_options(dataset)
-    if dataset_type == "delta":
-        return _parse_delta_format_options()
-    if dataset_type == "json":
-        return _parse_json_format_options(dataset)
-    if dataset_type == "orc":
-        return _parse_orc_format_options(dataset)
-    if dataset_type == "parquet":
-        return _parse_parquet_format_options(dataset)
-    if dataset_type in ("sqlserver", "postgresql", "mysql", "oracle"):
-        return _parse_sql_format_options(dataset, dataset_type)
-    return UnsupportedValue(value=dataset, message=f"Unsupported dataset type '{dataset_type}'")
+
+    match dataset_type:
+        case "avro":
+            return _parse_avro_format_options(dataset)
+        case "csv":
+            return _parse_delimited_format_options(dataset)
+        case "delta":
+            return _parse_delta_format_options()
+        case "json":
+            return _parse_json_format_options(dataset)
+        case "orc":
+            return _parse_orc_format_options(dataset)
+        case "parquet":
+            return _parse_parquet_format_options(dataset)
+        case sql_type if sql_type in _SQL_DATASET_TYPES:
+            return _parse_sql_format_options(dataset, sql_type)
+        case _:
+            return UnsupportedValue(value=dataset, message=f"Unsupported dataset type '{dataset_type}'")
 
 
 def _parse_avro_format_options(dataset: dict) -> dict | UnsupportedValue:
