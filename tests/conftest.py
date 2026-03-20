@@ -397,3 +397,66 @@ def mock_workspace_client() -> MockWorkspaceClient:
 
     workspace_definition_store.WorkspaceDefinitionStore._login_workspace_client = _fake_login  # type: ignore[assignment]
     return delegate
+
+
+# ---------------------------------------------------------------------------
+# Profiler test helpers
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StubFactoryClient:
+    """Minimal stand-in for FactoryClient used by profile_factory."""
+
+    factory_name: str = "test-factory"
+    _pipelines: list[dict] | None = None
+    _datasets: list[dict] | None = None
+    _linked_services: list[dict] | None = None
+    _triggers: list[dict] | None = None
+    _integration_runtimes: list[dict] | None = None
+
+    def list_pipelines(self, include_metadata: bool = False) -> list[str] | list[dict]:
+        pipelines = self._pipelines or []
+        if include_metadata:
+            return pipelines
+        return [p.get("name", "") for p in pipelines]
+
+    def list_datasets(self) -> list[dict]:
+        return self._datasets or []
+
+    def list_linked_services(self) -> list[dict]:
+        return self._linked_services or []
+
+    def list_triggers(self) -> list[dict]:
+        return self._triggers or []
+
+    def list_integration_runtimes(self) -> list[dict]:
+        return self._integration_runtimes or []
+
+
+def make_pipeline(activities: list[dict]) -> dict:
+    return {"name": "pipeline1", "activities": activities}
+
+
+def make_activity(name: str, activity_type: str, **extra: object) -> dict:
+    result: dict = {"name": name, "type": activity_type}
+    result.update(extra)
+    return result
+
+
+def make_dataset(name: str, ds_type: str, ls_name: str | None = None) -> dict:
+    props: dict = {"type": ds_type}
+    if ls_name is not None:
+        props["linked_service_name"] = {"reference_name": ls_name}
+    return {"name": name, "properties": props}
+
+
+def make_linked_service(name: str, ls_type: str) -> dict:
+    return {"name": name, "properties": {"type": ls_type}}
+
+
+def make_integration_runtime(name: str, rt_type: str, node_count: int | None = None) -> dict:
+    props: dict = {"type": rt_type}
+    if node_count is not None:
+        props["type_properties"] = {"compute_properties": {"number_of_nodes": node_count}}
+    return {"name": name, "properties": props}

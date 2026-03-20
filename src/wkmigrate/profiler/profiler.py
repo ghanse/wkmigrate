@@ -137,42 +137,6 @@ def profile_factory(client: FactoryClient) -> FactoryProfile:
     )
 
 
-def _collect_activities(activities: list[dict], result: list[dict]) -> None:
-    """Recursively collect all activities including nested ones.
-
-    Args:
-        activities: List of activity dicts to process.
-        result: Accumulator list where discovered activities are appended.
-    """
-    for activity in activities:
-        result.append(activity)
-        # ForEach inner activities
-        inner = activity.get("activities", [])
-        if inner:
-            _collect_activities(inner, result)
-        # IfCondition branches
-        for branch_key in ("if_true_activities", "if_false_activities"):
-            branch = activity.get(branch_key, [])
-            if branch:
-                _collect_activities(branch, result)
-
-
-def _resolve_linked_service_type(name: str, linked_services: list[dict]) -> str | None:
-    """Find the type of a linked service by name.
-
-    Args:
-        name: Reference name of the linked service.
-        linked_services: Full list of linked service dicts.
-
-    Returns:
-        The linked service type string, or ``None`` if not found.
-    """
-    for ls_item in linked_services:
-        if ls_item.get("name") == name:
-            return ls_item.get("properties", {}).get("type")
-    return None
-
-
 def format_profile(profile: FactoryProfile) -> str:
     """Format a FactoryProfile as human-readable text.
 
@@ -222,3 +186,39 @@ def format_profile(profile: FactoryProfile) -> str:
             lines.append(f"  - {irt.name} ({irt.runtime_type}{node_info})")
 
     return "\n".join(lines)
+
+
+def _collect_activities(activities: list[dict], result: list[dict]) -> None:
+    """Recursively collect all activities including nested ones.
+
+    Args:
+        activities: List of activity dicts to process.
+        result: Accumulator list where discovered activities are appended.
+    """
+    for activity in activities:
+        result.append(activity)
+        # ForEach inner activities
+        inner = activity.get("activities", [])
+        if inner:
+            _collect_activities(inner, result)
+        # IfCondition branches
+        for branch_key in ("if_true_activities", "if_false_activities"):
+            branch = activity.get(branch_key, [])
+            if branch:
+                _collect_activities(branch, result)
+
+
+def _resolve_linked_service_type(name: str, linked_services: list[dict]) -> str | None:
+    """Find the type of a linked service by name.
+
+    Args:
+        name: Reference name of the linked service.
+        linked_services: Full list of linked service dicts.
+
+    Returns:
+        The linked service type string, or ``None`` if not found.
+    """
+    for ls_item in linked_services:
+        if ls_item.get("name") == name:
+            return ls_item.get("properties", {}).get("type")
+    return None
