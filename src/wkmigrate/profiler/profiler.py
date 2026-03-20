@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from wkmigrate.clients.factory_client import FactoryClient
-from wkmigrate.models.ir.profile import (
+from wkmigrate.profiler.profile import (
     DatasetDetail,
     FactoryProfile,
     IntegrationRuntimeDetail,
@@ -58,7 +58,7 @@ def profile_factory(client: FactoryClient) -> FactoryProfile:
     Returns:
         A ``FactoryProfile`` summarising the factory contents.
     """
-    pipelines = client.list_pipelines_full()
+    pipelines = client.list_pipelines(include_metadata=True)
     datasets = client.list_datasets()
     linked_services = client.list_linked_services()
     triggers = client.list_triggers()
@@ -98,9 +98,7 @@ def profile_factory(client: FactoryClient) -> FactoryProfile:
         else:
             unsupported_datasets.append(dset)
 
-    unsupported_dataset_types = sorted(
-        {ds.get("properties", {}).get("type", "Unknown") for ds in unsupported_datasets}
-    )
+    unsupported_dataset_types = sorted({ds.get("properties", {}).get("type", "Unknown") for ds in unsupported_datasets})
 
     # Count linked services
     supported_ls = [
@@ -113,9 +111,7 @@ def profile_factory(client: FactoryClient) -> FactoryProfile:
         props = irt.get("properties", {})
         node_count = None
         if props.get("type") == "SelfHosted":
-            node_count = (
-                props.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
-            )
+            node_count = props.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
         ir_details.append(
             IntegrationRuntimeDetail(
                 name=irt.get("name", "Unknown"),

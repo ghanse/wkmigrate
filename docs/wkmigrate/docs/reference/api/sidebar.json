@@ -84,6 +84,14 @@
         },
         {
           "items": [
+            "reference/api/wkmigrate/profiler/profile",
+            "reference/api/wkmigrate/profiler/profiler"
+          ],
+          "label": "wkmigrate.profiler",
+          "type": "category"
+        },
+        {
+          "items": [
             {
               "items": [
                 "reference/api/wkmigrate/translators/activity_translators/activity_translator",

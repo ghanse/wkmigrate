@@ -52,18 +52,29 @@ class FactoryClient:
         )
         self.management_client = DataFactoryManagementClient(credential, self.subscription_id)
 
-    def list_pipelines(self) -> list[str]:
+    def list_pipelines(self, include_metadata: bool = False) -> list[str] | list[dict]:
         """
-        Lists the names of all pipelines available in the Data Factory.
+        Lists pipelines available in the Data Factory.
+
+        When ``include_metadata`` is *False* (the default) only pipeline names
+        are returned, preserving backward compatibility.  When *True*, full
+        pipeline definitions are returned as dictionaries.
+
+        Args:
+            include_metadata: If ``True``, return full pipeline dicts instead
+                of name strings.
 
         Returns:
-            Pipeline names as a ``list[str]``.
+            Pipeline names as ``list[str]`` or full definitions as
+            ``list[dict]``.
         """
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         pipelines = self.management_client.pipelines.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
+        if include_metadata:
+            return [dict(pipeline.as_dict()) for pipeline in pipelines]
         return [pipeline.name for pipeline in pipelines if pipeline.name is not None]  # type: ignore[misc]
 
     def get_pipeline(self, pipeline_name: str) -> dict:
@@ -194,20 +205,6 @@ class FactoryClient:
         if datasets is None:
             raise ValueError(f'No datasets found for factory "{self.factory_name}"')
         return [dict(dataset.as_dict()) for dataset in datasets]
-
-    def list_pipelines_full(self) -> list[dict]:
-        """
-        Lists all pipeline definitions available in the Data Factory.
-
-        Returns:
-            Full pipeline definitions as a ``list[dict]``.
-        """
-        if self.management_client is None:
-            raise ValueError("management_client is not initialized")
-        pipelines = self.management_client.pipelines.list_by_factory(
-            resource_group_name=self.resource_group_name, factory_name=self.factory_name
-        )
-        return [dict(pipeline.as_dict()) for pipeline in pipelines]
 
     def list_linked_services(self) -> list[dict]:
         """
