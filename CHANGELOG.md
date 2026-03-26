@@ -3,7 +3,7 @@
 ## Change History
 All notable changes to the Workflow Migrator will be documented in this file.
 
-### Version 0.2.0
+### Version 0.1.0-post1
 
 #### Added
 * Added `JsonDefinitionStore` for translating ADF pipelines exported as JSON files without Azure credentials (#23)

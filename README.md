@@ -77,19 +77,19 @@ workspace_store.to_asset_bundle(
 
 ## Supported Activity Types
 
-| ADF Activity Type | Databricks Equivalent |
-|---|---|
-| DatabricksNotebook | Notebook task |
-| DatabricksSparkJar | Spark JAR task |
-| DatabricksSparkPython | Spark Python task |
-| DatabricksJob | Run job task |
-| Copy Data | Generated notebook (Spark read/write) |
-| Lookup | Generated notebook (Spark read + task value) |
-| ForEach | For-each task |
-| IfCondition | If/else task |
-| SetVariable | Set variable task |
-| Web Activity | Generated notebook (HTTP request) |
-| Unsupported types | Placeholder notebook |
+| ADF Activity Type     | Databricks Equivalent                        |
+|-----------------------|----------------------------------------------|
+| DatabricksNotebook    | Notebook task                                |
+| DatabricksSparkJar    | Spark JAR task                               |
+| DatabricksSparkPython | Spark Python task                            |
+| DatabricksJob         | Run job task                                 |
+| Copy Data             | Generated notebook (Spark read/write)        |
+| Lookup                | Generated notebook (Spark read + task value) |
+| ForEach               | For-each task                                |
+| IfCondition           | If/else task                                 |
+| SetVariable           | Set variable task                            |
+| Web Activity          | Generated notebook (HTTP request)            |
+| Unsupported types     | Placeholder notebook                         |
 
 ## Supported Dataset Types
 
