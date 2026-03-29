@@ -22,7 +22,7 @@ Example:
 
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed  # pylint: disable=no-name-in-module
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 from wkmigrate.clients.factory_client import FactoryClient

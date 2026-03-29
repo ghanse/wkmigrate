@@ -1,26 +1,22 @@
 # ---------- build stage ----------
-FROM python:3.12-slim AS builder
+FROM python:3.12.10-slim AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN pip install --no-cache-dir poetry==2.2.1
+COPY --from=ghcr.io/astral-sh/uv:0.8.4 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
 # Copy only dependency manifests first so Docker can cache the install layer
-COPY pyproject.toml poetry.lock poetry.toml ./
+COPY pyproject.toml uv.lock ./
 
-# Install runtime dependencies only (no dev group)
-RUN poetry config virtualenvs.create true --local \
-    && poetry config virtualenvs.in-project true --local \
-    && poetry install --only main --no-root --no-interaction
+RUN uv sync --frozen --no-dev --no-editable
 
 COPY src/ src/
 COPY README.md ./
-RUN poetry install --only main --no-interaction
+
+RUN uv sync --frozen --no-dev
 
 # ---------- runtime stage ----------
-FROM python:3.12-slim AS runtime
+FROM python:3.12.10-slim AS runtime
 
 # Create a non-root user for runtime security
 RUN useradd --create-home appuser

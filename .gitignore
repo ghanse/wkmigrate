@@ -164,5 +164,5 @@ cython_debug/
 /sandbox/
 /examples/convert_downld_adf_pipeline.py
 /poetry.toml
-/poetry.lock
 /yarn.lock
+/uv.lock

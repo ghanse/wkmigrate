@@ -32,8 +32,8 @@ class TestDockerfile:
     def test_multi_stage_build(self) -> None:
         assert self.content.count("FROM ") >= 2, "Expected a multi-stage build"
 
-    def test_installs_poetry(self) -> None:
-        assert "poetry" in self.content
+    def test_installs_uv(self) -> None:
+        assert "uv" in self.content
 
     def test_copies_dependency_manifests_before_source(self) -> None:
         manifest_pos = self.content.index("COPY pyproject.toml")
@@ -45,7 +45,7 @@ class TestDockerfile:
         assert "PATH" in self.content
 
     def test_no_dev_dependencies_in_runtime(self) -> None:
-        assert "--only main" in self.content
+        assert "--no-dev" in self.content
 
     def test_runs_as_non_root_user(self) -> None:
         assert "useradd" in self.content, "Expected a non-root user to be created"

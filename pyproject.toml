@@ -1,9 +1,10 @@
-[tool.poetry]
+[project]
 name = "wkmigrate"
-version = "0.0.2-post1"
+version = "0.1.0"
 description = "wkmigrate is a Python library for converting orchestration definitions between various systems"
-authors = ["Greg Hansen <gregory.hansen@databricks.com>"]
 readme = "README.md"
+requires-python = ">=3.12"
+authors = [{name = "Greg Hansen", email = "gregory.hansen@databricks.com"}]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: Other/Proprietary License",
@@ -19,41 +20,36 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
 ]
-packages = [
-    { include = "wkmigrate", from = "src"}
+dependencies = [
+    "PyYAML>=6.0.2,<7",
+    "azure-common>=1.1.28,<2",
+    "azure-core>=1.30.2,<2",
+    "azure-identity>=1.16.1,<2",
+    "azure-mgmt-core>=1.4.0,<2",
+    "azure-mgmt-datafactory>=9.0.0,<10",
+    "databricks-sdk>=0.20.0,<1",
+    "databricks-bundles>=0.286.0,<1",
+    "autopep8>=2.3.2,<3",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-PyYAML = "^6.0.2"
-azure-common = "^1.1.28"
-azure-core = "^1.30.2"
-azure-identity = "^1.16.1"
-azure-mgmt-core = "^1.4.0"
-azure-mgmt-datafactory = "^9.0.0"
-databricks-sdk = "^0.20.0"
-databricks-bundles = "^0.286.0"
-autopep8 = "^2.3.2"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.3"
-coverage = "^7.6.1"
-black = "^25.9.0"
-ruff = "^0.14.0"
-pylint = "^3.3.9"
-mypy = "^1.18.2"
-types-pyyaml = "^6.0.12.20250915"
-pydoc-markdown = ">=4.8.2"
-
-
-[[tool.poetry.source]]
-name = "pypi-proxy"
-url = "https://pypi-proxy.dev.databricks.com/simple/"
-priority = "primary"
+[dependency-groups]
+dev = [
+    "pytest>=8.3.3,<9",
+    "coverage>=7.6.1,<8",
+    "black>=25.9.0,<26",
+    "ruff>=0.14.0,<1",
+    "pylint>=3.3.9,<4",
+    "mypy>=1.18.2,<2",
+    "types-pyyaml>=6.0.12.20250915,<7",
+    "pydoc-markdown>=4.8.2,<5",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wkmigrate"]
 
 [tool.pydoc-markdown]
 loaders = [

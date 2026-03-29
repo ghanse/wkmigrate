@@ -32,24 +32,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          cache: 'pip'
-          cache-dependency-path: '**/pyproject.toml'
           python-version: ${{ matrix.pyVersion }}
 
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          version: "0.8.4"
+          enable-cache: true
+
       - name: Install dependencies
-        run: |
-          pip install poetry==2.2.1
-          poetry source remove pypi-proxy 2>/dev/null || true
-          poetry config repositories.pypi https://pypi.org/simple
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
-          poetry install
-          git checkout pyproject.toml
+        run: uv sync
 
       - name: Run integration tests
-        run: poetry run pytest -m integration --tb=short -v
+        run: make integration

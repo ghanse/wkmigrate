@@ -1,46 +1,40 @@
 .PHONY: dev test integration fmt docs docs-serve docs-clean docker
 
+clean:
+	rm -fr .venv clean .pytest_cache .ruff_cache .coverage coverage.xml
+	rm -fr **/*.pyc
+
 dev:
-	pip install poetry==2.2.1
-	poetry config virtualenvs.create true --local
-	poetry config virtualenvs.in-project true --local
-	poetry install
+	uv sync
 
 ci:
-	pip install poetry==2.2.1
-	poetry source remove pypi-proxy 2>/dev/null || true
-	poetry install --no-interaction
+	uv sync --frozen
 
 test:
-	poetry run pytest tests/unit
+	uv run pytest tests/unit
 
 integration:
-	poetry run pytest -m integration --tb=short -v
+	uv run pytest -m integration --tb=short -v
 
 fmt:
-	poetry run black .
-	poetry run ruff check . --fix
-	poetry run mypy .
-	poetry run pylint --output-format=colorized -j 0 src tests
+	uv run black .
+	uv run ruff check . --fix
+	uv run mypy .
+	uv run pylint --output-format=colorized -j 0 src tests
 
 docs:
-	# Regenerate API reference under docs/wkmigrate/docs using pydoc-markdown
-	poetry run pydoc-markdown
-	# Install yarn dependencies
+	uv run pydoc-markdown
 	yarn --cwd docs/wkmigrate install
-	# Build the static Docusaurus site
 	yarn --cwd docs/wkmigrate build
 
 docs-serve:
-	# Always rebuild API docs and the static site before serving
-	poetry run pydoc-markdown
+	uv run pydoc-markdown
 	yarn --cwd docs/wkmigrate build
 	yarn --cwd docs/wkmigrate serve
 
 docs-clean:
 	rm -rf docs/wkmigrate/build
 	rm -rf docs/wkmigrate/.docusaurus docs/wkmigrate/.cache
-	# Remove generated API docs but keep the hand-authored index.mdx
 	find docs/wkmigrate/docs/reference/api -mindepth 1 -not -name 'index.mdx' -exec rm -rf {} +
 
 docker:

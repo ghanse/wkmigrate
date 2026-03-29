@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@docusaurus/core": "^3.9.2",
-    "docusaurus": "^1.14.7"
+    "@docusaurus/core": "3.9.2",
+    "docusaurus": "1.14.7"
   }
 }
