@@ -829,6 +829,12 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 logger.info(  # pylint: disable=logging-too-many-args
                     "Created setup job %s for task '%s'", job_id, task.get('task_key')
                 )
+                try:
+                    client.jobs.run_now_and_wait(job_id=job_id)
+                    logger.info("Setup job %s completed successfully", job_id)
+                finally:
+                    client.jobs.delete(job_id=job_id)
+                    logger.info("Cleaned up setup job %s", job_id)
 
     @staticmethod
     def _materialize_secrets(

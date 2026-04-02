@@ -130,6 +130,12 @@ _SOURCE_SCHEMA_DEFAULTS: dict[str, str] = {
     "mysql": "",
 }
 
+_SOURCE_TYPE_DEFAULT_PORTS: dict[str, str] = {
+    "sqlserver": "1433",
+    "postgresql": "5432",
+    "mysql": "3306",
+}
+
 
 def _prepare_managed_ingestion(
     activity: CopyActivity,
@@ -165,6 +171,8 @@ def _prepare_managed_ingestion(
 
     # Validate required Lakeflow Connect fields
     missing: list[str] = []
+    if not connection_name:
+        missing.append("connection_name (service_name)")
     if not source_host:
         missing.append("source host")
     if not source_database:
@@ -263,6 +271,7 @@ def _build_lakeflow_connect_setup_notebook(
     sink_table_name = sink_definition.get("table_name", "")
     connection_name = source_definition.get("service_name", source_name)
     connection_type = _SOURCE_TYPE_TO_CONNECTION_TYPE.get(source_type, source_type.upper())
+    port = source_definition.get("port") or _SOURCE_TYPE_DEFAULT_PORTS.get(source_type, "1433")
 
     lines = [
         "# Databricks notebook source",
@@ -285,7 +294,7 @@ def _build_lakeflow_connect_setup_notebook(
         f"TYPE {connection_type}",
         "OPTIONS (",
         "  host '{host}',",
-        "  port '1433',",
+        f"  port '{port}',",
         "  user '{user_name}',",
         "  password '{password}'",
         ")",
