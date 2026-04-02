@@ -144,14 +144,11 @@ def get_database_options(
     service_name = dataset_definition["service_name"]
     jdbc_url = get_jdbc_url(dataset_definition)
     url_line = f'{dataset_name}_options["url"] = "{jdbc_url}"'
-    secrets_lines = [
-        f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
+    secrets_lines = [f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
                 scope="{credentials_scope}",
                 key="{service_name}_{secret}"
             )
-            """
-        for secret in DATASET_PROVIDER_SECRETS[database_type]
-    ]
+            """ for secret in DATASET_PROVIDER_SECRETS[database_type]]
     options_lines = [
         f"""{dataset_name}_options["{option}"] = '{dataset_definition.get(option)}'"""
         for option in DATASET_OPTIONS.get(database_type, [])

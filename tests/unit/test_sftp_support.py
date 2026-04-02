@@ -6,7 +6,6 @@ code generator helpers, and copy activity preparer for SFTP sources.
 
 from __future__ import annotations
 
-import pytest
 
 from wkmigrate.code_generator import (
     DEFAULT_CREDENTIALS_SCOPE,
@@ -29,7 +28,6 @@ from wkmigrate.parsers.dataset_parsers import (
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
 from wkmigrate.translators.dataset_translators import translate_dataset, translate_file_dataset
 from wkmigrate.translators.linked_service_translators import translate_sftp_spec
-
 
 # ---------------------------------------------------------------------------
 # SFTP linked service translator tests
