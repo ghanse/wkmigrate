@@ -314,6 +314,7 @@ def get_sftp_write_expression(dataset_name: str, sink_table: str, checkpoint_pat
     """
     return (
         f"{dataset_name}_df.writeStream \\\n"
+        f'    .outputMode("append") \\\n'
         f"    .trigger(availableNow=True) \\\n"
         f'    .option("checkpointLocation", "{checkpoint_path}") \\\n'
         f'    .toTable("{sink_table}")\n'

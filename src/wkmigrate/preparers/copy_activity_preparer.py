@@ -159,8 +159,6 @@ def _prepare_sftp_copy(
     base_task = get_base_task(activity)
 
     if not files_to_delta_sinks:
-        # Auto Loader requires readStream/writeStream.  Use trigger(availableNow=True)
-        # for batch-like semantics: process all available files then stop.
         notebook_path, notebook = _create_sftp_streaming_notebook(
             activity.task_key,
             source_definition,
@@ -242,7 +240,6 @@ def _create_sftp_streaming_notebook(
     table_name = sink_definition.get("table_name", sink_name)
     checkpoint_path = f"/Volumes/wkmigrate/sftp/_checkpoints/{activity_key}"
 
-    # Determine sink table reference
     if sink_type == "delta":
         sink_table = f"hive_metastore.{database_name}.{table_name}"
     else:
@@ -260,7 +257,7 @@ def _create_sftp_streaming_notebook(
     script_lines.append(get_read_expression(source_definition))
     script_lines.append("# Map the source columns to the target columns:")
     script_lines.append(_get_mapping(source_definition, sink_definition, column_mapping, True))
-    script_lines.append("# Write to the target using Structured Streaming with trigger(availableNow=True):")
+    script_lines.append("# Write to the target (streaming):")
     script_lines.append(get_sftp_write_expression(sink_name, sink_table, checkpoint_path))
 
     notebook_content = autopep8.fix_code("\n".join(script_lines))
@@ -300,12 +297,8 @@ def _build_sftp_setup_notebook(
     volume_path = get_sftp_file_uri(source_definition)
     notebook_path = f"/wkmigrate/sftp_setup/{connection_name}_setup"
 
-    # NOTE: This notebook mixes two kinds of f-string interpolation:
-    # - Build-time (Python f-strings here): {host}, {port}, {connection_name},
-    #   {credentials_scope}, {service_name} are resolved when generating the notebook.
-    # - Runtime (f-strings in the emitted notebook code): {connection_name}, {host},
-    #   {port}, {user_name}, {password} inside spark.sql(f"...") are resolved when
-    #   the notebook executes in Databricks, referencing local Python variables.
+    # Build-time f-strings resolve host/port/connection_name here;
+    # runtime f-strings in the emitted notebook resolve local variables.
     lines = [
         "# Databricks notebook source",
         "# SFTP Connection - One-Time Setup Notebook",
