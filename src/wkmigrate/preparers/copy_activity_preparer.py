@@ -163,19 +163,42 @@ def _prepare_sftp_copy(
     )
 
     setup_notebook = _build_sftp_setup_notebook(source_definition, credentials_scope)
+    notebooks = [setup_notebook, notebook]
 
     base_task = get_base_task(activity)
+
+    if not files_to_delta_sinks:
+        task = parse_mapping(
+            {
+                **base_task,
+                "notebook_task": {"notebook_path": notebook_path},
+            }
+        )
+        return PreparedActivity(
+            task=task,
+            notebooks=notebooks,
+            secrets=secrets_to_collect if secrets_to_collect else None,
+        )
+
+    # DLT pipeline execution
+    pipeline_name = f"{activity.task_key}_pipeline"
     task = parse_mapping(
         {
             **base_task,
-            "notebook_task": {"notebook_path": notebook_path},
+            "pipeline_task": {"pipeline_id": "__PIPELINE_ID__"},
         }
     )
-
     return PreparedActivity(
         task=task,
-        notebooks=[setup_notebook, notebook],
+        notebooks=notebooks,
         secrets=secrets_to_collect if secrets_to_collect else None,
+        pipelines=[
+            PipelineInstruction(
+                task_ref=task,
+                file_path=notebook.file_path,
+                name=pipeline_name,
+            )
+        ],
     )
 
 
