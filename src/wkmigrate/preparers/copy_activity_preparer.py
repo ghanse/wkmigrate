@@ -267,18 +267,17 @@ def _create_sftp_streaming_notebook(
     source_name = source_definition.get("dataset_name", "source")
     sink_name = sink_definition.get("dataset_name", "sink")
     sink_type = sink_definition.get("type", "delta")
-    database_name = sink_definition.get("database_name", "default")
-    table_name = sink_definition.get("table_name", sink_name)
     checkpoint_path = f"/Volumes/{default_catalog_name}/sftp/_checkpoints/{activity_key}"
 
     if sink_type == "delta":
-        sink_path = f"{default_catalog_name}.{database_name}.{table_name}"
-        sink_format = "delta"
-    else:
-        sink_container = sink_definition.get("container", "")
-        sink_folder = sink_definition.get("folder_path", "")
-        sink_path = f"/Volumes/{default_catalog_name}/sftp/{sink_container}/{sink_folder}"
-        sink_format = sink_type
+        raise ValueError(
+            "Delta sinks must use the DLT pipeline path, not the streaming notebook"
+        )
+
+    sink_container = sink_definition.get("container", "")
+    sink_folder = sink_definition.get("folder_path", "")
+    sink_path = f"/Volumes/{default_catalog_name}/sftp/{sink_container}/{sink_folder}"
+    sink_format = sink_type
 
     script_lines = [
         "# Databricks notebook source",
@@ -413,7 +412,7 @@ def _build_sftp_setup_notebook(
             "",
             f"# Step 2: Verify SFTP connection",
             f'spark.sql("""',
-            f"    CREATE SCHEMA IF NOT EXISTS {default_catalog_name}.sftp",
+            f"    CREATE SCHEMA IF NOT EXISTS `{default_catalog_name}`.sftp",
             '""")',
             "",
             f'print("SFTP connection \\"{connection_name}\\" configured.")',
@@ -433,7 +432,7 @@ def _build_sftp_setup_notebook(
                 "",
                 f"# Step 3: Create external volume for the sink bucket/container",
                 f'spark.sql("""',
-                f"    CREATE EXTERNAL VOLUME IF NOT EXISTS {default_catalog_name}.sftp.`{sink_service_name}_{sink_container}`",
+                f"    CREATE EXTERNAL VOLUME IF NOT EXISTS `{default_catalog_name}`.sftp.`{sink_service_name}_{sink_container}`",
                 f"    LOCATION '{volume_location}'",
                 '""")',
                 "",
