@@ -270,9 +270,7 @@ def _create_sftp_streaming_notebook(
     checkpoint_path = f"/Volumes/{default_catalog_name}/sftp/_checkpoints/{activity_key}"
 
     if sink_type == "delta":
-        raise ValueError(
-            "Delta sinks must use the DLT pipeline path, not the streaming notebook"
-        )
+        raise ValueError("Delta sinks must use the DLT pipeline path, not the streaming notebook")
 
     sink_container = sink_definition.get("container", "")
     sink_folder = sink_definition.get("folder_path", "")
