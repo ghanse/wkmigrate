@@ -236,7 +236,7 @@ def _build_lakeflow_connect_setup_notebook(
         "# Step 2: Managed ingestion pipeline configuration",
         f'source_schema = "{source_schema}"',
         f'source_table = "{source_table}"',
-        f'target_catalog = "wkmigrate"',
+        'target_catalog = "wkmigrate"',
         f'target_schema = "{sink_database_name}"',
         f'target_table = "{sink_table_name}"',
         "",

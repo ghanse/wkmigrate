@@ -57,8 +57,7 @@ def prepare_workflow(
         Prepared workflow containing the Databricks job payload and supporting artifacts for the pipeline.
     """
     activities = [
-        prepare_activity(task, files_to_delta_sinks, credentials_scope, use_lakeflow_connect)
-        for task in pipeline.tasks
+        prepare_activity(task, files_to_delta_sinks, credentials_scope, use_lakeflow_connect) for task in pipeline.tasks
     ]
     return PreparedWorkflow(pipeline=pipeline, activities=activities)
 
