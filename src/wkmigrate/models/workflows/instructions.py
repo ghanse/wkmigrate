@@ -50,6 +50,13 @@ class SecretInstruction:
     provided_value: str | None
 
 
+_SOURCE_TYPE_MAP: dict[str, str] = {
+    "sqlserver": "SQLSERVER",
+    "postgresql": "POSTGRESQL",
+    "mysql": "MYSQL",
+}
+
+
 @dataclass(slots=True)
 class ManagedIngestionInstruction:
     """
@@ -62,7 +69,7 @@ class ManagedIngestionInstruction:
     Attributes:
         task_ref: Reference to the Databricks task dictionary that will consume the pipeline.
         pipeline_name: Name to assign to the managed ingestion pipeline.
-        setup_notebook_path: Workspace path to the one-time setup notebook.
+        connection_name: Databricks connection name derived from the source linked service.
         source_type: Source database type (for example ``sqlserver``, ``postgresql``, ``mysql``).
         source_host: Hostname of the source database server.
         source_database: Database name on the source server.
@@ -75,7 +82,7 @@ class ManagedIngestionInstruction:
 
     task_ref: dict
     pipeline_name: str
-    setup_notebook_path: str
+    connection_name: str
     source_type: str
     source_host: str
     source_database: str
@@ -84,3 +91,21 @@ class ManagedIngestionInstruction:
     sink_catalog: str
     sink_schema: str
     sink_table: str
+
+    @property
+    def ingestion_source_type(self) -> str:
+        """Returns the SDK ``IngestionSourceType`` string for this source."""
+        return _SOURCE_TYPE_MAP.get(self.source_type, self.source_type.upper())
+
+    def to_configuration_dict(self) -> dict[str, str]:
+        """Returns the pipeline configuration metadata dict for diagnostics and tracing."""
+        return {
+            "wkmigrate.source.type": self.source_type,
+            "wkmigrate.source.host": self.source_host,
+            "wkmigrate.source.database": self.source_database,
+            "wkmigrate.source.schema": self.source_schema,
+            "wkmigrate.source.table": self.source_table,
+            "wkmigrate.sink.catalog": self.sink_catalog,
+            "wkmigrate.sink.schema": self.sink_schema,
+            "wkmigrate.sink.table": self.sink_table,
+        }

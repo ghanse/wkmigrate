@@ -148,6 +148,8 @@ def _prepare_managed_ingestion(
     source_database = source_definition.get("database", "")
     source_schema = source_definition.get("schema_name", "dbo")
     source_table = source_definition.get("table_name", "")
+    connection_name = source_definition.get("service_name", "")
+    sink_catalog = sink_definition.get("catalog", "wkmigrate")
     sink_database_name = sink_definition.get("database_name", "")
     sink_table_name = sink_definition.get("table_name", "")
 
@@ -166,13 +168,13 @@ def _prepare_managed_ingestion(
     ingestion_instruction = ManagedIngestionInstruction(
         task_ref=task,
         pipeline_name=pipeline_name,
-        setup_notebook_path=setup_notebook_path,
+        connection_name=connection_name,
         source_type=source_definition.get("type", "sqlserver"),
         source_host=source_host,
         source_database=source_database,
         source_schema=source_schema,
         source_table=source_table,
-        sink_catalog="wkmigrate",
+        sink_catalog=sink_catalog,
         sink_schema=sink_database_name,
         sink_table=sink_table_name,
     )

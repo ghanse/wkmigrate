@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from wkmigrate.code_generator import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
@@ -384,6 +386,7 @@ def test_copy_preparer_lakeflow_connect_sql_to_delta_produces_managed_ingestion(
     assert instruction.source_database == "mydb"
     assert instruction.source_schema == "dbo"
     assert instruction.source_table == "customers"
+    assert instruction.connection_name == "my_sql_server"
     assert instruction.sink_catalog == "wkmigrate"
     assert instruction.sink_schema == "default"
     assert instruction.sink_table == "customers"
@@ -433,6 +436,78 @@ def test_copy_preparer_lakeflow_connect_csv_source_not_eligible() -> None:
 
     assert result.managed_ingestion_pipelines is None
     assert result.notebooks is not None
+
+
+def test_managed_ingestion_instruction_ingestion_source_type() -> None:
+    """ingestion_source_type maps lowercase source_type to SDK enum values."""
+    activity = _make_sql_to_delta_copy_activity()
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+    instruction = result.managed_ingestion_pipelines[0]
+
+    assert instruction.ingestion_source_type == "SQLSERVER"
+
+
+def test_managed_ingestion_instruction_to_configuration_dict() -> None:
+    """to_configuration_dict returns expected wkmigrate.* metadata keys."""
+    activity = _make_sql_to_delta_copy_activity()
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+    instruction = result.managed_ingestion_pipelines[0]
+
+    config = instruction.to_configuration_dict()
+    assert config["wkmigrate.source.type"] == "sqlserver"
+    assert config["wkmigrate.source.host"] == "myserver.database.windows.net"
+    assert config["wkmigrate.sink.catalog"] == "wkmigrate"
+
+
+@pytest.mark.parametrize(
+    "source_type,source_host,service_name,expected_ingestion_source_type",
+    [
+        ("sqlserver", "sql.database.windows.net", "my_sqlserver_svc", "SQLSERVER"),
+        ("postgresql", "pg.database.azure.com", "my_pg_svc", "POSTGRESQL"),
+        ("mysql", "mysql.database.azure.com", "my_mysql_svc", "MYSQL"),
+    ],
+    ids=["sqlserver", "postgresql", "mysql"],
+)
+def test_copy_preparer_lakeflow_connect_parametrized_source_types(
+    source_type: str,
+    source_host: str,
+    service_name: str,
+    expected_ingestion_source_type: str,
+) -> None:
+    """Managed ingestion pipeline is created for all supported source types."""
+    source = {
+        "type": source_type,
+        "dataset_name": f"my_{source_type}_table",
+        "service_name": service_name,
+        "host": source_host,
+        "database": "testdb",
+        "schema_name": "public",
+        "table_name": "orders",
+        "user_name": "admin",
+        "authentication_type": "sql",
+        "dbtable": "public.orders",
+    }
+    activity = CopyActivity(
+        name=f"Copy{source_type.title()}ToDelta",
+        task_key=f"copy_{source_type}_to_delta",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": source_type},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(source_column_name="id", sink_column_name="id", sink_column_type="int"),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_type == source_type
+    assert instruction.source_host == source_host
+    assert instruction.connection_name == service_name
+    assert instruction.ingestion_source_type == expected_ingestion_source_type
 
 
 def test_workspace_store_use_lakeflow_connect_option_default_is_false(
@@ -486,3 +561,43 @@ def test_prepare_workflow_lakeflow_connect_threads_to_copy_activity() -> None:
     managed_pipelines = result.all_managed_ingestion_pipelines
     assert len(managed_pipelines) == 1
     assert managed_pipelines[0].pipeline_name == "copysqltodelta_lakeflow_connect"
+
+
+def test_for_each_preparer_threads_lakeflow_connect_to_inner_copy() -> None:
+    """prepare_for_each_activity passes use_lakeflow_connect to the inner copy activity."""
+    inner_copy = _make_sql_to_delta_copy_activity("InnerCopy")
+    activity = ForEachActivity(
+        name="ForEachWithCopy",
+        task_key="for_each_with_copy",
+        items_string="@pipeline().parameters.tables",
+        for_each_task=inner_copy,
+    )
+
+    result = prepare_for_each_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    assert result.managed_ingestion_pipelines[0].source_type == "sqlserver"
+
+
+def test_run_job_preparer_threads_lakeflow_connect_to_inner_workflow() -> None:
+    """prepare_run_job_activity passes use_lakeflow_connect into the nested workflow."""
+    inner_pipeline = Pipeline(
+        name="inner_pipeline",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    activity = RunJobActivity(
+        name="RunJobWithCopy",
+        task_key="run_job_with_copy",
+        pipeline=inner_pipeline,
+    )
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.inner_workflow is not None
+    managed = result.inner_workflow.all_managed_ingestion_pipelines
+    assert len(managed) == 1
+    assert managed[0].source_type == "sqlserver"

@@ -35,7 +35,14 @@ from databricks.sdk.service.jobs import (
     PipelineTask,
     Task,
 )
-from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
+from databricks.sdk.service.pipelines import (
+    IngestionConfig,
+    IngestionPipelineDefinition,
+    IngestionSourceType,
+    NotebookLibrary,
+    PipelineLibrary,
+    TableSpec,
+)
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 from typing_extensions import deprecated
 
@@ -716,16 +723,22 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 name=instruction.pipeline_name,
                 serverless=True,
                 target=instruction.sink_schema,
-                configuration={
-                    "wkmigrate.source.type": instruction.source_type,
-                    "wkmigrate.source.host": instruction.source_host,
-                    "wkmigrate.source.database": instruction.source_database,
-                    "wkmigrate.source.schema": instruction.source_schema,
-                    "wkmigrate.source.table": instruction.source_table,
-                    "wkmigrate.sink.catalog": instruction.sink_catalog,
-                    "wkmigrate.sink.schema": instruction.sink_schema,
-                    "wkmigrate.sink.table": instruction.sink_table,
-                },
+                ingestion_definition=IngestionPipelineDefinition(
+                    connection_name=instruction.connection_name,
+                    source_type=IngestionSourceType(instruction.ingestion_source_type),
+                    objects=[
+                        IngestionConfig(
+                            table=TableSpec(
+                                source_table=instruction.source_table,
+                                source_schema=instruction.source_schema,
+                                destination_catalog=instruction.sink_catalog,
+                                destination_schema=instruction.sink_schema,
+                                destination_table=instruction.sink_table,
+                            )
+                        )
+                    ],
+                ),
+                configuration=instruction.to_configuration_dict(),
             )
             pipeline_id = response.pipeline_id
             if pipeline_id is None:
@@ -1112,16 +1125,22 @@ class WorkspaceDefinitionStore(DefinitionStore):
                             "continuous": False,
                             "serverless": True,
                             "target": instruction.sink_schema,
-                            "configuration": {
-                                "wkmigrate.source.type": instruction.source_type,
-                                "wkmigrate.source.host": instruction.source_host,
-                                "wkmigrate.source.database": instruction.source_database,
-                                "wkmigrate.source.schema": instruction.source_schema,
-                                "wkmigrate.source.table": instruction.source_table,
-                                "wkmigrate.sink.catalog": instruction.sink_catalog,
-                                "wkmigrate.sink.schema": instruction.sink_schema,
-                                "wkmigrate.sink.table": instruction.sink_table,
+                            "ingestion_definition": {
+                                "connection_name": instruction.connection_name,
+                                "source_type": instruction.ingestion_source_type,
+                                "objects": [
+                                    {
+                                        "table": {
+                                            "source_table": instruction.source_table,
+                                            "source_schema": instruction.source_schema,
+                                            "destination_catalog": instruction.sink_catalog,
+                                            "destination_schema": instruction.sink_schema,
+                                            "destination_table": instruction.sink_table,
+                                        }
+                                    }
+                                ],
                             },
+                            "configuration": instruction.to_configuration_dict(),
                         }
                     }
                 }
