@@ -19,6 +19,7 @@ def prepare_for_each_activity(
     activity: ForEachActivity,
     default_files_to_delta_sinks: bool | None,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+    use_lakeflow_connect: bool = False,
 ) -> PreparedActivity:
     """
     Builds the task payload for a ForEach activity.
@@ -27,6 +28,8 @@ def prepare_for_each_activity(
         activity: Activity definition emitted by the translators
         default_files_to_delta_sinks: Optional override for DLT generation
         credentials_scope: Name of the Databricks secret scope used for storing credentials.
+        use_lakeflow_connect: When True, eligible SQL-to-Delta copy activities are replaced
+            with Lakeflow Connect managed ingestion pipelines.
 
     Returns:
         Prepared activity containing the ForEach task configuration.
@@ -36,6 +39,7 @@ def prepare_for_each_activity(
         activity.for_each_task,
         default_files_to_delta_sinks,
         credentials_scope,
+        use_lakeflow_connect,
     )
 
     for_each_task = parse_mapping(
@@ -50,6 +54,8 @@ def prepare_for_each_activity(
         task=parse_mapping({**get_base_task(activity), "for_each_task": for_each_task}),
         notebooks=inner_prepared.notebooks,
         pipelines=inner_prepared.pipelines,
+        managed_ingestion_pipelines=inner_prepared.managed_ingestion_pipelines,
         secrets=inner_prepared.secrets,
+        setup_task=inner_prepared.setup_task,
         inner_workflow=inner_prepared.inner_workflow,
     )

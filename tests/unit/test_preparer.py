@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from wkmigrate.code_generator import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
@@ -321,3 +323,643 @@ def _make_run_job_with_lookup_pipeline(name: str = "RunJobTest") -> RunJobActivi
         task_key=name.lower(),
         pipeline=_make_pipeline_with_lookup(),
     )
+
+
+# --- Lakeflow Connect managed ingestion tests ---
+
+_SQL_SOURCE = {
+    "type": "sqlserver",
+    "dataset_name": "my_sql_table",
+    "service_name": "my_sql_server",
+    "host": "myserver.database.windows.net",
+    "database": "mydb",
+    "schema_name": "dbo",
+    "table_name": "customers",
+    "user_name": "admin",
+    "authentication_type": "sql",
+    "dbtable": "dbo.customers",
+}
+
+_DELTA_SINK = {
+    "type": "delta",
+    "dataset_name": "my_delta_table",
+    "service_name": "my_databricks",
+    "database_name": "default",
+    "table_name": "customers",
+}
+
+
+def _make_sql_to_delta_copy_activity(name: str = "CopySqlToDelta") -> CopyActivity:
+    return CopyActivity(
+        name=name,
+        task_key=name.lower(),
+        source_dataset=_SQL_SOURCE,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(
+                source_column_name="id",
+                sink_column_name="id",
+                sink_column_type="int",
+            ),
+            ColumnMapping(
+                source_column_name="name",
+                sink_column_name="name",
+                sink_column_type="string",
+            ),
+        ],
+    )
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_produces_managed_ingestion() -> None:
+    """When use_lakeflow_connect=True with SQL source and Delta sink, a managed ingestion pipeline is created."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_type == "sqlserver"
+    assert instruction.source_host == "myserver.database.windows.net"
+    assert instruction.source_database == "mydb"
+    assert instruction.source_schema == "dbo"
+    assert instruction.source_table == "customers"
+    assert instruction.connection_name == "my_sql_server"
+    assert instruction.sink_catalog == "wkmigrate"
+    assert instruction.sink_schema == "default"
+    assert instruction.sink_table == "customers"
+    assert instruction.pipeline_name == "copysqltodelta_lakeflow_connect"
+    assert result.setup_task is not None
+    assert "connection_setup" in result.setup_task["task_key"]
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_has_setup_notebook() -> None:
+    """Managed ingestion produces a setup notebook artifact."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.notebooks is not None
+    assert len(result.notebooks) == 1
+    notebook = result.notebooks[0]
+    assert "lakeflow_connect" in notebook.file_path
+    assert "Lakeflow Connect" in notebook.content
+    assert "myserver.database.windows.net" in notebook.content
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_has_pipeline_task() -> None:
+    """Managed ingestion creates a pipeline_task in the prepared task."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert "pipeline_task" in result.task
+    assert result.pipelines is None  # No DLT pipeline, only managed ingestion
+
+
+def test_copy_preparer_lakeflow_connect_false_uses_standard_copy() -> None:
+    """When use_lakeflow_connect=False, SQL-to-Delta produces a standard copy notebook."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=False)
+
+    assert result.managed_ingestion_pipelines is None
+    assert result.notebooks is not None
+    assert "copy_data_notebooks" in result.notebooks[0].file_path
+
+
+def test_copy_preparer_lakeflow_connect_csv_source_not_eligible() -> None:
+    """When use_lakeflow_connect=True but source is CSV, standard copy is used."""
+    activity = _make_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is None
+    assert result.notebooks is not None
+
+
+def test_managed_ingestion_instruction_ingestion_source_type() -> None:
+    """ingestion_source_type maps lowercase source_type to SDK enum values."""
+    activity = _make_sql_to_delta_copy_activity()
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+    instruction = result.managed_ingestion_pipelines[0]
+
+    assert instruction.ingestion_source_type == "SQLSERVER"
+
+
+def test_managed_ingestion_instruction_to_configuration_dict() -> None:
+    """to_configuration_dict returns expected wkmigrate.* metadata keys."""
+    activity = _make_sql_to_delta_copy_activity()
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+    instruction = result.managed_ingestion_pipelines[0]
+
+    config = instruction.to_configuration_dict()
+    assert config["wkmigrate.source.type"] == "sqlserver"
+    assert config["wkmigrate.source.host"] == "myserver.database.windows.net"
+    assert config["wkmigrate.sink.catalog"] == "wkmigrate"
+
+
+@pytest.mark.parametrize(
+    "source_type,source_host,service_name,expected_ingestion_source_type",
+    [
+        ("sqlserver", "sql.database.windows.net", "my_sqlserver_svc", "SQLSERVER"),
+        ("postgresql", "pg.database.azure.com", "my_pg_svc", "POSTGRESQL"),
+        ("mysql", "mysql.database.azure.com", "my_mysql_svc", "MYSQL"),
+    ],
+    ids=["sqlserver", "postgresql", "mysql"],
+)
+def test_copy_preparer_lakeflow_connect_parametrized_source_types(
+    source_type: str,
+    source_host: str,
+    service_name: str,
+    expected_ingestion_source_type: str,
+) -> None:
+    """Managed ingestion pipeline is created for all supported source types."""
+    source = {
+        "type": source_type,
+        "dataset_name": f"my_{source_type}_table",
+        "service_name": service_name,
+        "host": source_host,
+        "database": "testdb",
+        "schema_name": "public",
+        "table_name": "orders",
+        "user_name": "admin",
+        "authentication_type": "sql",
+        "dbtable": "public.orders",
+    }
+    activity = CopyActivity(
+        name=f"Copy{source_type.title()}ToDelta",
+        task_key=f"copy_{source_type}_to_delta",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": source_type},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(source_column_name="id", sink_column_name="id", sink_column_type="int"),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_type == source_type
+    assert instruction.source_host == source_host
+    assert instruction.connection_name == service_name
+    assert instruction.ingestion_source_type == expected_ingestion_source_type
+
+
+def test_workspace_store_use_lakeflow_connect_option_default_is_false(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """By default, use_lakeflow_connect is False."""
+    assert workspace_definition_store._effective_use_lakeflow_connect() is False
+
+
+def test_workspace_store_use_lakeflow_connect_option_can_be_set(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """use_lakeflow_connect can be set via set_option."""
+    workspace_definition_store.set_option("use_lakeflow_connect", True)
+
+    assert workspace_definition_store._effective_use_lakeflow_connect() is True
+
+
+def test_workspace_store_prepare_workflow_lakeflow_connect_produces_managed_ingestion(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """When use_lakeflow_connect is set, _prepare_workflow produces managed ingestion artifacts."""
+    workspace_definition_store.set_option("use_lakeflow_connect", True)
+    pipeline = Pipeline(
+        name="test_sql_to_delta",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    prepared = workspace_definition_store._prepare_workflow(pipeline)
+
+    managed_pipelines = prepared.all_managed_ingestion_pipelines
+    assert len(managed_pipelines) == 1
+    assert managed_pipelines[0].source_type == "sqlserver"
+
+
+def test_prepare_workflow_lakeflow_connect_threads_to_copy_activity() -> None:
+    """prepare_workflow passes use_lakeflow_connect down to copy activity preparers."""
+    pipeline = Pipeline(
+        name="test_sql_to_delta",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline, use_lakeflow_connect=True)
+
+    managed_pipelines = result.all_managed_ingestion_pipelines
+    assert len(managed_pipelines) == 1
+    assert managed_pipelines[0].pipeline_name == "copysqltodelta_lakeflow_connect"
+
+
+def test_for_each_preparer_threads_lakeflow_connect_to_inner_copy() -> None:
+    """prepare_for_each_activity passes use_lakeflow_connect to the inner copy activity."""
+    inner_copy = _make_sql_to_delta_copy_activity("InnerCopy")
+    activity = ForEachActivity(
+        name="ForEachWithCopy",
+        task_key="for_each_with_copy",
+        items_string="@pipeline().parameters.tables",
+        for_each_task=inner_copy,
+    )
+
+    result = prepare_for_each_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    assert result.managed_ingestion_pipelines[0].source_type == "sqlserver"
+
+
+def test_run_job_preparer_threads_lakeflow_connect_to_inner_workflow() -> None:
+    """prepare_run_job_activity passes use_lakeflow_connect into the nested workflow."""
+    inner_pipeline = Pipeline(
+        name="inner_pipeline",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    activity = RunJobActivity(
+        name="RunJobWithCopy",
+        task_key="run_job_with_copy",
+        pipeline=inner_pipeline,
+    )
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.inner_workflow is not None
+    managed = result.inner_workflow.all_managed_ingestion_pipelines
+    assert len(managed) == 1
+    assert managed[0].source_type == "sqlserver"
+
+
+# --- Nested ForEach/RunJob propagation tests ---
+
+
+def test_for_each_lakeflow_connect_propagates_setup_task() -> None:
+    """ForEach with inner LC copy produces setup_task on the prepared activity."""
+    inner_copy = _make_sql_to_delta_copy_activity("InnerCopySetup")
+    activity = ForEachActivity(
+        name="ForEachSetup",
+        task_key="for_each_setup",
+        items_string="@pipeline().parameters.tables",
+        for_each_task=inner_copy,
+    )
+
+    result = prepare_for_each_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert result.setup_task is not None
+    assert "connection_setup" in result.setup_task["task_key"]
+
+
+def test_run_job_lakeflow_connect_propagates_setup_tasks_via_inner_workflow() -> None:
+    """RunJob with inner LC copy collects setup tasks via inner workflow."""
+    inner_pipeline = Pipeline(
+        name="inner_pipeline_setup",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    activity = RunJobActivity(
+        name="RunJobSetup",
+        task_key="run_job_setup",
+        pipeline=inner_pipeline,
+    )
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.inner_workflow is not None
+    setup_tasks = result.inner_workflow.all_setup_tasks
+    assert len(setup_tasks) == 1
+    assert "connection_setup" in setup_tasks[0]["task_key"]
+
+
+def test_prepare_workflow_all_setup_tasks_collects_across_activities() -> None:
+    """prepare_workflow collects all_setup_tasks from top-level activities."""
+    pipeline = Pipeline(
+        name="test_setup_tasks",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline, use_lakeflow_connect=True)
+
+    assert len(result.all_setup_tasks) == 1
+    assert "connection_setup" in result.all_setup_tasks[0]["task_key"]
+
+
+# --- Source-type-specific schema defaults ---
+
+
+def test_mysql_source_schema_defaults_to_empty() -> None:
+    """MySQL source schema should default to empty string, not 'dbo'."""
+    source = {
+        "type": "mysql",
+        "dataset_name": "my_mysql_table",
+        "service_name": "my_mysql_svc",
+        "host": "mysql.example.com",
+        "database": "testdb",
+        "table_name": "orders",
+    }
+    activity = CopyActivity(
+        name="CopyMysql",
+        task_key="copy_mysql",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "mysql"},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(source_column_name="id", sink_column_name="id", sink_column_type="int"),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_schema == ""
+
+
+def test_postgresql_source_schema_defaults_to_public() -> None:
+    """PostgreSQL source schema should default to 'public', not 'dbo'."""
+    source = {
+        "type": "postgresql",
+        "dataset_name": "my_pg_table",
+        "service_name": "my_pg_svc",
+        "host": "pg.example.com",
+        "database": "testdb",
+        "table_name": "orders",
+    }
+    activity = CopyActivity(
+        name="CopyPg",
+        task_key="copy_pg",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "postgresql"},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(source_column_name="id", sink_column_name="id", sink_column_type="int"),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_schema == "public"
+
+
+# --- Validation tests ---
+
+
+def test_lakeflow_connect_missing_required_fields_raises() -> None:
+    """Missing required fields on LC-eligible activities should raise ValueError."""
+    source = {
+        "type": "sqlserver",
+        "dataset_name": "my_sql_table",
+        "service_name": "my_sql_server",
+        # Missing host, database, table_name
+    }
+    sink = {
+        "type": "delta",
+        "dataset_name": "my_delta",
+        "service_name": "my_databricks",
+        # Missing database_name, table_name
+    }
+    activity = CopyActivity(
+        name="CopyBroken",
+        task_key="copy_broken",
+        source_dataset=source,
+        sink_dataset=sink,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    with pytest.raises(ValueError, match="missing required fields"):
+        prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+
+def test_lakeflow_connect_eligible_skips_column_mapping_validation() -> None:
+    """LC-eligible activities should not fail on missing column_mapping."""
+    activity = CopyActivity(
+        name="CopyNoMapping",
+        task_key="copy_no_mapping",
+        source_dataset=_SQL_SOURCE,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+
+
+# --- WDS catalog/schema option applies to managed ingestion ---
+
+
+def test_workspace_store_catalog_schema_applies_to_managed_ingestion(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """catalog/schema options should rewrite managed ingestion instruction sink_catalog/sink_schema."""
+    workspace_definition_store.set_option("use_lakeflow_connect", True)
+    workspace_definition_store.set_option("catalog", "production")
+    workspace_definition_store.set_option("schema", "analytics")
+    pipeline = Pipeline(
+        name="test_mi_options",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    prepared = workspace_definition_store._prepare_workflow(pipeline)
+
+    mi = prepared.all_managed_ingestion_pipelines[0]
+    assert mi.sink_catalog == "production"
+    assert mi.sink_schema == "analytics"
+
+
+# --- Setup notebook content ---
+
+
+def test_setup_notebook_contains_create_connection() -> None:
+    """Setup notebook should contain CREATE CONNECTION IF NOT EXISTS."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook = result.notebooks[0]
+    assert "CREATE CONNECTION IF NOT EXISTS" in notebook.content
+
+
+# --- _materialize_setup_tasks runs and cleans up jobs ---
+
+
+def test_materialize_setup_tasks_runs_and_deletes_job(
+    mock_workspace_client,
+) -> None:
+    """_materialize_setup_tasks should create, run, and delete each setup job."""
+    setup_tasks = [
+        {"task_key": "test_setup", "notebook_task": {"notebook_path": "/test/setup"}},
+    ]
+
+    WorkspaceDefinitionStore._materialize_setup_tasks(mock_workspace_client, setup_tasks)
+
+    run_history = getattr(mock_workspace_client.jobs, "_run_history", [])
+    deleted = getattr(mock_workspace_client.jobs, "_deleted", [])
+    assert len(run_history) == 1
+    assert len(deleted) == 1
+    assert run_history[0] == deleted[0]
+
+
+def test_materialize_setup_tasks_deletes_on_run_failure(
+    mock_workspace_client,
+) -> None:
+    """_materialize_setup_tasks should delete the job even if run_now_and_wait raises."""
+
+    def _failing_run(job_id: int) -> None:
+        raise RuntimeError("Job execution failed")
+
+    mock_workspace_client.jobs.run_now_and_wait = _failing_run
+
+    setup_tasks = [
+        {"task_key": "failing_setup", "notebook_task": {"notebook_path": "/test/fail"}},
+    ]
+
+    with pytest.raises(RuntimeError, match="Job execution failed"):
+        WorkspaceDefinitionStore._materialize_setup_tasks(mock_workspace_client, setup_tasks)
+
+    deleted = getattr(mock_workspace_client.jobs, "_deleted", [])
+    assert len(deleted) == 1
+
+
+# --- Source-type-specific default ports ---
+
+
+@pytest.mark.parametrize(
+    "source_type,expected_port",
+    [
+        ("sqlserver", "1433"),
+        ("postgresql", "5432"),
+        ("mysql", "3306"),
+    ],
+    ids=["sqlserver", "postgresql", "mysql"],
+)
+def test_setup_notebook_uses_correct_default_port(source_type: str, expected_port: str) -> None:
+    """Setup notebook should use the correct default port for each source type."""
+    source = {
+        "type": source_type,
+        "dataset_name": f"my_{source_type}_table",
+        "service_name": f"my_{source_type}_svc",
+        "host": f"{source_type}.example.com",
+        "database": "testdb",
+        "schema_name": "public",
+        "table_name": "orders",
+    }
+    activity = CopyActivity(
+        name=f"Copy{source_type.title()}",
+        task_key=f"copy_{source_type}",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": source_type},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook = result.notebooks[0]
+    assert f"port '{expected_port}'" in notebook.content
+
+
+def test_setup_notebook_uses_source_port_when_available() -> None:
+    """When the source definition has a port, it should override the default."""
+    source = {
+        **_SQL_SOURCE,
+        "port": "1444",
+    }
+    activity = CopyActivity(
+        name="CopyCustomPort",
+        task_key="copy_custom_port",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook = result.notebooks[0]
+    assert "port '1444'" in notebook.content
+
+
+# --- connection_name validation ---
+
+
+def test_setup_notebook_sanitizes_user_controlled_strings() -> None:
+    """User-controlled strings embedded in generated notebooks must be sanitized."""
+    source = {
+        **_SQL_SOURCE,
+        "host": 'evil")\nimport os; os.system("rm -rf /',
+        "service_name": 'conn"; DROP TABLE users; --',
+    }
+    activity = CopyActivity(
+        name="CopyInjection",
+        task_key="copy_injection",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook_content = result.notebooks[0].content
+    # Injected newlines must be stripped so code cannot escape the string literal
+    assert "\nimport os" not in notebook_content
+    # Unescaped double-quotes from user input must not appear (only escaped ones)
+    assert 'host = "evil")' not in notebook_content
+    assert 'connection_name = "conn"' not in notebook_content
+
+
+def test_lakeflow_connect_missing_connection_name_raises() -> None:
+    """Missing connection_name (service_name) should be included in the validation error."""
+    source = {
+        "type": "sqlserver",
+        "dataset_name": "my_sql_table",
+        # Missing service_name
+        "host": "myserver.database.windows.net",
+        "database": "mydb",
+        "table_name": "customers",
+    }
+    activity = CopyActivity(
+        name="CopyNoConnection",
+        task_key="copy_no_connection",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    with pytest.raises(ValueError, match="connection_name"):
+        prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)

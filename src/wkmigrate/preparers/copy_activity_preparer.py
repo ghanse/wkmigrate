@@ -25,38 +25,65 @@ from wkmigrate.code_generator import (
 )
 from wkmigrate.models.ir.pipeline import CopyActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
-from wkmigrate.models.workflows.instructions import PipelineInstruction
+from wkmigrate.models.workflows.instructions import ManagedIngestionInstruction, PipelineInstruction
 from wkmigrate.preparers.utils import get_base_task
 from wkmigrate.utils import parse_mapping
+
+LAKEFLOW_CONNECT_SUPPORTED_SOURCES = frozenset({"sqlserver", "postgresql", "mysql"})
+
+
+def _sanitize_notebook_str(value: str) -> str:
+    """Escape characters that could break or inject code in generated notebook string literals.
+
+    Strips backslashes, double-quotes, newlines, and carriage returns so the
+    value is safe to embed inside a Python ``"..."`` string in generated code.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "").replace("\r", "")
 
 
 def prepare_copy_activity(
     activity: CopyActivity,
     default_files_to_delta_sinks: bool | None,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+    use_lakeflow_connect: bool = False,
 ) -> PreparedActivity:
     """
     Builds tasks and artifacts for a Copy activity.
+
+    When ``use_lakeflow_connect`` is True and the source is a supported SQL database
+    writing to a Delta Lake sink, a Lakeflow Connect managed ingestion pipeline is
+    created instead of a notebook-based copy.
 
     Args:
         activity: Activity definition emitted by the translators.
         default_files_to_delta_sinks: Optional override for DLT generation.
         credentials_scope: Name of the Databricks secret scope used for storing credentials.
+        use_lakeflow_connect: When True, eligible SQL-to-Delta copy activities produce
+            managed ingestion pipeline artifacts.
 
     Returns:
         PreparedActivity containing task configuration and artifacts.
     """
     source_definition = merge_dataset_definition(activity.source_dataset, activity.source_properties)
     sink_definition = merge_dataset_definition(activity.sink_dataset, activity.sink_properties)
-    column_mapping = [asdict(mapping) for mapping in (activity.column_mapping or [])]
-    if not column_mapping:
-        raise ValueError("No column mapping provided for copy data task")
 
     data_source_secrets = collect_data_source_secrets(source_definition, credentials_scope)
     data_sink_secrets = collect_data_source_secrets(sink_definition, credentials_scope)
     secrets_to_collect = data_source_secrets + data_sink_secrets
 
-    files_to_delta_sinks = sink_definition.get("type") == "delta"
+    source_type = source_definition.get("type")
+    sink_type = sink_definition.get("type")
+
+    # Check Lakeflow Connect eligibility before column_mapping validation so that
+    # LC-eligible activities are not rejected for missing column mappings.
+    if use_lakeflow_connect and source_type in LAKEFLOW_CONNECT_SUPPORTED_SOURCES and sink_type == "delta":
+        return _prepare_managed_ingestion(activity, source_definition, sink_definition, secrets_to_collect)
+
+    column_mapping = [asdict(mapping) for mapping in (activity.column_mapping or [])]
+    if not column_mapping:
+        raise ValueError("No column mapping provided for copy data task")
+
+    files_to_delta_sinks = sink_type == "delta"
     if default_files_to_delta_sinks is not None:
         files_to_delta_sinks = default_files_to_delta_sinks
 
@@ -81,7 +108,7 @@ def prepare_copy_activity(
         return PreparedActivity(
             task=task,
             notebooks=[notebook],
-            secrets=secrets_to_collect if secrets_to_collect else None,
+            secrets=secrets_to_collect or None,
         )
 
     # DLT pipeline execution - pipeline_id will be resolved later
@@ -95,7 +122,7 @@ def prepare_copy_activity(
     return PreparedActivity(
         task=task,
         notebooks=[notebook],
-        secrets=secrets_to_collect if secrets_to_collect else None,
+        secrets=secrets_to_collect or None,
         pipelines=[
             PipelineInstruction(
                 task_ref=task,
@@ -104,6 +131,214 @@ def prepare_copy_activity(
             )
         ],
     )
+
+
+_SOURCE_SCHEMA_DEFAULTS: dict[str, str] = {
+    "sqlserver": "dbo",
+    "postgresql": "public",
+    "mysql": "",
+}
+
+_SOURCE_TYPE_DEFAULT_PORTS: dict[str, str] = {
+    "sqlserver": "1433",
+    "postgresql": "5432",
+    "mysql": "3306",
+}
+
+
+def _prepare_managed_ingestion(
+    activity: CopyActivity,
+    source_definition: dict,
+    sink_definition: dict,
+    secrets_to_collect: list,
+) -> PreparedActivity:
+    """
+    Builds a Lakeflow Connect managed ingestion pipeline for a SQL-to-Delta copy activity.
+
+    Args:
+        activity: Copy activity definition from the translator layer.
+        source_definition: Merged source dataset properties.
+        sink_definition: Merged sink dataset properties.
+        secrets_to_collect: Secret instructions for the source and sink.
+
+    Returns:
+        PreparedActivity with a pipeline task, setup task, and managed ingestion artifacts.
+
+    Raises:
+        ValueError: If required Lakeflow Connect fields are missing from the source or sink.
+    """
+    source_type = source_definition.get("type", "sqlserver")
+    source_host = source_definition.get("host", "")
+    source_database = source_definition.get("database", "")
+    default_schema = _SOURCE_SCHEMA_DEFAULTS.get(source_type, "")
+    source_schema = source_definition.get("schema_name", default_schema)
+    source_table = source_definition.get("table_name", "")
+    connection_name = source_definition.get("service_name", "")
+    sink_catalog = sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
+    sink_database_name = sink_definition.get("database_name", "")
+    sink_table_name = sink_definition.get("table_name", "")
+
+    # Validate required Lakeflow Connect fields
+    missing: list[str] = []
+    if not connection_name:
+        missing.append("connection_name (service_name)")
+    if not source_host:
+        missing.append("source host")
+    if not source_database:
+        missing.append("source database")
+    if not source_table:
+        missing.append("source table_name")
+    if not sink_database_name:
+        missing.append("sink database_name")
+    if not sink_table_name:
+        missing.append("sink table_name")
+    if missing:
+        raise ValueError(
+            f"Lakeflow Connect activity '{activity.name}' is missing required fields: {', '.join(missing)}"
+        )
+
+    pipeline_name = f"{activity.task_key}_lakeflow_connect"
+    setup_notebook_path = f"/wkmigrate/lakeflow_connect/{pipeline_name}_setup"
+
+    setup_notebook = _build_lakeflow_connect_setup_notebook(
+        source_definition, sink_definition, pipeline_name, setup_notebook_path
+    )
+
+    base_task = get_base_task(activity)
+    task = parse_mapping(
+        {
+            **base_task,
+            "pipeline_task": {"pipeline_id": "__MANAGED_INGESTION_PIPELINE_ID__"},
+        }
+    )
+
+    setup_task = {
+        "task_key": f"{activity.task_key}_connection_setup",
+        "notebook_task": {"notebook_path": setup_notebook_path},
+    }
+
+    ingestion_instruction = ManagedIngestionInstruction(
+        task_ref=task,
+        pipeline_name=pipeline_name,
+        connection_name=connection_name,
+        source_type=source_type,
+        source_host=source_host,
+        source_database=source_database,
+        source_schema=source_schema,
+        source_table=source_table,
+        sink_catalog=sink_catalog,
+        sink_schema=sink_database_name,
+        sink_table=sink_table_name,
+    )
+
+    return PreparedActivity(
+        task=task,
+        notebooks=[setup_notebook],
+        managed_ingestion_pipelines=[ingestion_instruction],
+        secrets=secrets_to_collect or None,
+        setup_task=setup_task,
+    )
+
+
+_SOURCE_TYPE_TO_CONNECTION_TYPE: dict[str, str] = {
+    "sqlserver": "SQLSERVER",
+    "postgresql": "POSTGRESQL",
+    "mysql": "MYSQL",
+}
+
+
+def _build_lakeflow_connect_setup_notebook(
+    source_definition: dict,
+    sink_definition: dict,
+    pipeline_name: str,
+    notebook_path: str,
+) -> NotebookArtifact:
+    """
+    Generates a one-time setup notebook for Lakeflow Connect configuration.
+
+    The notebook creates the UC connection using ``CREATE CONNECTION IF NOT EXISTS``
+    so it is safe to run repeatedly without duplicating resources.
+
+    Args:
+        source_definition: Merged source dataset properties.
+        sink_definition: Merged sink dataset properties.
+        pipeline_name: Logical name for the managed ingestion pipeline.
+        notebook_path: Workspace path where the notebook will be created.
+
+    Returns:
+        NotebookArtifact containing the setup notebook content.
+    """
+    source_name = source_definition.get("dataset_name", "source")
+    source_type = source_definition.get("type", "sqlserver")
+    source_host = _sanitize_notebook_str(source_definition.get("host", ""))
+    source_database = _sanitize_notebook_str(source_definition.get("database", ""))
+    default_schema = _SOURCE_SCHEMA_DEFAULTS.get(source_type, "")
+    source_schema = _sanitize_notebook_str(source_definition.get("schema_name", default_schema))
+    source_table = _sanitize_notebook_str(source_definition.get("table_name", ""))
+    sink_catalog = _sanitize_notebook_str(
+        sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
+    )
+    sink_database_name = _sanitize_notebook_str(sink_definition.get("database_name", ""))
+    sink_table_name = _sanitize_notebook_str(sink_definition.get("table_name", ""))
+    connection_name = _sanitize_notebook_str(source_definition.get("service_name", source_name))
+    connection_type = _SOURCE_TYPE_TO_CONNECTION_TYPE.get(source_type, source_type.upper())
+    port = _sanitize_notebook_str(
+        str(source_definition.get("port") or _SOURCE_TYPE_DEFAULT_PORTS.get(source_type, "1433"))
+    )
+
+    lines = [
+        "# Databricks notebook source",
+        "# Lakeflow Connect - One-Time Setup Notebook",
+        f"# Pipeline: {pipeline_name}",
+        f'# Source: {source_name} ({source_host}/{source_database})',
+        f'# Sink: {sink_catalog}.{sink_database_name}.{sink_table_name}',
+        "",
+        "# COMMAND ----------",
+        "",
+        "# Step 1: Create UC connection (idempotent)",
+        f'connection_name = "{connection_name}"',
+        f'host = "{source_host}"',
+        f'database = "{source_database}"',
+        'user_name = "<REPLACE_WITH_USERNAME>"',
+        'password = "<REPLACE_WITH_PASSWORD>"',
+        "",
+        'spark.sql(f"""',
+        "CREATE CONNECTION IF NOT EXISTS `{connection_name}`",
+        f"TYPE {connection_type}",
+        "OPTIONS (",
+        "  host '{host}',",
+        f"  port '{port}',",
+        "  user '{user_name}',",
+        "  password '{password}'",
+        ")",
+        '""")',
+        "",
+        "# COMMAND ----------",
+        "",
+        "# Step 2: Managed ingestion pipeline configuration",
+        f'source_schema = "{source_schema}"',
+        f'source_table = "{source_table}"',
+        f'target_catalog = "{sink_catalog}"',
+        f'target_schema = "{sink_database_name}"',
+        f'target_table = "{sink_table_name}"',
+        "",
+        "ingestion_config = {",
+        '    "source_host": host,',
+        '    "source_database": database,',
+        '    "source_schema": source_schema,',
+        '    "source_table": source_table,',
+        '    "target_catalog": target_catalog,',
+        '    "target_schema": target_schema,',
+        '    "target_table": target_table,',
+        "}",
+        "",
+        f'print("Lakeflow Connect pipeline \\"{pipeline_name}\\" configuration:")',
+        "for key, value in ingestion_config.items():",
+        '    print(f"  {key}: {value}")',
+    ]
+
+    content = autopep8.fix_code("\n".join(lines))
+    return NotebookArtifact(file_path=notebook_path, content=content)
 
 
 def _create_copy_data_notebook(
