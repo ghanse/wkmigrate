@@ -56,5 +56,6 @@ def prepare_for_each_activity(
         pipelines=inner_prepared.pipelines,
         managed_ingestion_pipelines=inner_prepared.managed_ingestion_pipelines,
         secrets=inner_prepared.secrets,
+        setup_task=inner_prepared.setup_task,
         inner_workflow=inner_prepared.inner_workflow,
     )

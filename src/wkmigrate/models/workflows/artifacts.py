@@ -70,6 +70,17 @@ class PreparedWorkflow:
         return result
 
     @property
+    def all_setup_tasks(self) -> list[dict[str, Any]]:
+        """All setup task dicts across this workflow and any nested inner workflows."""
+        result: list[dict[str, Any]] = []
+        for activity in self.activities:
+            if activity.setup_task is not None:
+                result.append(activity.setup_task)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_setup_tasks)
+        return result
+
+    @property
     def inner_workflows(self) -> list["PreparedWorkflow"]:
         """All inner workflows (recursively) produced by activities in this workflow."""
         result: list[PreparedWorkflow] = []
@@ -89,7 +100,10 @@ class PreparedActivity:
         task: Task configuration as a dictionary.
         notebooks: List of ``NotebookArtifact`` objects to upload.
         pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
+        managed_ingestion_pipelines: List of ``ManagedIngestionInstruction`` objects describing
+            Lakeflow Connect managed ingestion pipelines to create.
         secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
+        setup_task: Optional one-time setup task dict (e.g. for creating UC connections).
         inner_workflow: Additional workflow settings created for nested ForEach tasks.
     """
 
@@ -98,6 +112,7 @@ class PreparedActivity:
     pipelines: list[PipelineInstruction] | None = None
     managed_ingestion_pipelines: list[ManagedIngestionInstruction] | None = None
     secrets: list[SecretInstruction] | None = None
+    setup_task: dict[str, Any] | None = None
     inner_workflow: "PreparedWorkflow" | None = None
 
 

@@ -57,9 +57,6 @@ def prepare_copy_activity(
     """
     source_definition = merge_dataset_definition(activity.source_dataset, activity.source_properties)
     sink_definition = merge_dataset_definition(activity.sink_dataset, activity.sink_properties)
-    column_mapping = [asdict(mapping) for mapping in (activity.column_mapping or [])]
-    if not column_mapping:
-        raise ValueError("No column mapping provided for copy data task")
 
     data_source_secrets = collect_data_source_secrets(source_definition, credentials_scope)
     data_sink_secrets = collect_data_source_secrets(sink_definition, credentials_scope)
@@ -68,8 +65,14 @@ def prepare_copy_activity(
     source_type = source_definition.get("type")
     sink_type = sink_definition.get("type")
 
+    # Check Lakeflow Connect eligibility before column_mapping validation so that
+    # LC-eligible activities are not rejected for missing column mappings.
     if use_lakeflow_connect and source_type in LAKEFLOW_CONNECT_SUPPORTED_SOURCES and sink_type == "delta":
         return _prepare_managed_ingestion(activity, source_definition, sink_definition, secrets_to_collect)
+
+    column_mapping = [asdict(mapping) for mapping in (activity.column_mapping or [])]
+    if not column_mapping:
+        raise ValueError("No column mapping provided for copy data task")
 
     files_to_delta_sinks = sink_type == "delta"
     if default_files_to_delta_sinks is not None:
@@ -121,6 +124,13 @@ def prepare_copy_activity(
     )
 
 
+_SOURCE_SCHEMA_DEFAULTS: dict[str, str] = {
+    "sqlserver": "dbo",
+    "postgresql": "public",
+    "mysql": "",
+}
+
+
 def _prepare_managed_ingestion(
     activity: CopyActivity,
     source_definition: dict,
@@ -137,19 +147,41 @@ def _prepare_managed_ingestion(
         secrets_to_collect: Secret instructions for the source and sink.
 
     Returns:
-        PreparedActivity with a pipeline task and managed ingestion artifacts.
-    """
-    pipeline_name = f"{activity.task_key}_lakeflow_connect"
-    setup_notebook_path = f"/wkmigrate/lakeflow_connect/{pipeline_name}_setup"
+        PreparedActivity with a pipeline task, setup task, and managed ingestion artifacts.
 
+    Raises:
+        ValueError: If required Lakeflow Connect fields are missing from the source or sink.
+    """
+    source_type = source_definition.get("type", "sqlserver")
     source_host = source_definition.get("host", "")
     source_database = source_definition.get("database", "")
-    source_schema = source_definition.get("schema_name", "dbo")
+    default_schema = _SOURCE_SCHEMA_DEFAULTS.get(source_type, "")
+    source_schema = source_definition.get("schema_name", default_schema)
     source_table = source_definition.get("table_name", "")
     connection_name = source_definition.get("service_name", "")
-    sink_catalog = sink_definition.get("catalog", "wkmigrate")
+    sink_catalog = sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
     sink_database_name = sink_definition.get("database_name", "")
     sink_table_name = sink_definition.get("table_name", "")
+
+    # Validate required Lakeflow Connect fields
+    missing: list[str] = []
+    if not source_host:
+        missing.append("source host")
+    if not source_database:
+        missing.append("source database")
+    if not source_table:
+        missing.append("source table_name")
+    if not sink_database_name:
+        missing.append("sink database_name")
+    if not sink_table_name:
+        missing.append("sink table_name")
+    if missing:
+        raise ValueError(
+            f"Lakeflow Connect activity '{activity.name}' is missing required fields: {', '.join(missing)}"
+        )
+
+    pipeline_name = f"{activity.task_key}_lakeflow_connect"
+    setup_notebook_path = f"/wkmigrate/lakeflow_connect/{pipeline_name}_setup"
 
     setup_notebook = _build_lakeflow_connect_setup_notebook(
         source_definition, sink_definition, pipeline_name, setup_notebook_path
@@ -163,11 +195,16 @@ def _prepare_managed_ingestion(
         }
     )
 
+    setup_task = {
+        "task_key": f"{activity.task_key}_connection_setup",
+        "notebook_task": {"notebook_path": setup_notebook_path},
+    }
+
     ingestion_instruction = ManagedIngestionInstruction(
         task_ref=task,
         pipeline_name=pipeline_name,
         connection_name=connection_name,
-        source_type=source_definition.get("type", "sqlserver"),
+        source_type=source_type,
         source_host=source_host,
         source_database=source_database,
         source_schema=source_schema,
@@ -182,7 +219,15 @@ def _prepare_managed_ingestion(
         notebooks=[setup_notebook],
         managed_ingestion_pipelines=[ingestion_instruction],
         secrets=secrets_to_collect if secrets_to_collect else None,
+        setup_task=setup_task,
     )
+
+
+_SOURCE_TYPE_TO_CONNECTION_TYPE: dict[str, str] = {
+    "sqlserver": "SQLSERVER",
+    "postgresql": "POSTGRESQL",
+    "mysql": "MYSQL",
+}
 
 
 def _build_lakeflow_connect_setup_notebook(
@@ -194,8 +239,8 @@ def _build_lakeflow_connect_setup_notebook(
     """
     Generates a one-time setup notebook for Lakeflow Connect configuration.
 
-    The notebook documents the connection parameters and target mapping so
-    that an operator can review and finalize the managed ingestion pipeline.
+    The notebook creates the UC connection using ``CREATE CONNECTION IF NOT EXISTS``
+    so it is safe to run repeatedly without duplicating resources.
 
     Args:
         source_definition: Merged source dataset properties.
@@ -207,14 +252,17 @@ def _build_lakeflow_connect_setup_notebook(
         NotebookArtifact containing the setup notebook content.
     """
     source_name = source_definition.get("dataset_name", "source")
+    source_type = source_definition.get("type", "sqlserver")
     source_host = source_definition.get("host", "")
     source_database = source_definition.get("database", "")
-    source_schema = source_definition.get("schema_name", "dbo")
+    default_schema = _SOURCE_SCHEMA_DEFAULTS.get(source_type, "")
+    source_schema = source_definition.get("schema_name", default_schema)
     source_table = source_definition.get("table_name", "")
-    sink_catalog = sink_definition.get("catalog", "wkmigrate")
+    sink_catalog = sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
     sink_database_name = sink_definition.get("database_name", "")
     sink_table_name = sink_definition.get("table_name", "")
-    source_service_name = source_definition.get("service_name", source_name)
+    connection_name = source_definition.get("service_name", source_name)
+    connection_type = _SOURCE_TYPE_TO_CONNECTION_TYPE.get(source_type, source_type.upper())
 
     lines = [
         "# Databricks notebook source",
@@ -225,12 +273,23 @@ def _build_lakeflow_connect_setup_notebook(
         "",
         "# COMMAND ----------",
         "",
-        "# Step 1: Connection credentials",
-        f'# Linked service: {source_service_name}',
+        "# Step 1: Create UC connection (idempotent)",
+        f'connection_name = "{connection_name}"',
         f'host = "{source_host}"',
         f'database = "{source_database}"',
         'user_name = "<REPLACE_WITH_USERNAME>"',
         'password = "<REPLACE_WITH_PASSWORD>"',
+        "",
+        'spark.sql(f"""',
+        "CREATE CONNECTION IF NOT EXISTS `{connection_name}`",
+        f"TYPE {connection_type}",
+        "OPTIONS (",
+        "  host '{host}',",
+        "  port '1433',",
+        "  user '{user_name}',",
+        "  password '{password}'",
+        ")",
+        '""")',
         "",
         "# COMMAND ----------",
         "",
