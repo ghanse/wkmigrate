@@ -326,6 +326,19 @@ class _MockJobsAPI:
         """Return a stored job by ID."""
         return self._jobs[job_id]
 
+    def run_now_and_wait(self, job_id: int) -> None:
+        """Simulate running a job and waiting for it to complete."""
+        if job_id not in self._jobs:
+            raise KeyError(f"Job {job_id} not found")
+        self._run_history: list[int] = getattr(self, "_run_history", [])
+        self._run_history.append(job_id)
+
+    def delete(self, job_id: int) -> None:
+        """Delete a job by ID."""
+        self._deleted: list[int] = getattr(self, "_deleted", [])
+        self._deleted.append(job_id)
+        self._jobs.pop(job_id, None)
+
 
 class _MockWorkspaceAPI:
     """Subset of WorkspaceClient.workspace methods for testing."""

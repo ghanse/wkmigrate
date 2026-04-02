@@ -807,3 +807,133 @@ def test_setup_notebook_contains_create_connection() -> None:
 
     notebook = result.notebooks[0]
     assert "CREATE CONNECTION IF NOT EXISTS" in notebook.content
+
+
+# --- _materialize_setup_tasks runs and cleans up jobs ---
+
+
+def test_materialize_setup_tasks_runs_and_deletes_job(
+    mock_workspace_client,
+) -> None:
+    """_materialize_setup_tasks should create, run, and delete each setup job."""
+    setup_tasks = [
+        {"task_key": "test_setup", "notebook_task": {"notebook_path": "/test/setup"}},
+    ]
+
+    WorkspaceDefinitionStore._materialize_setup_tasks(mock_workspace_client, setup_tasks)
+
+    run_history = getattr(mock_workspace_client.jobs, "_run_history", [])
+    deleted = getattr(mock_workspace_client.jobs, "_deleted", [])
+    assert len(run_history) == 1
+    assert len(deleted) == 1
+    assert run_history[0] == deleted[0]
+
+
+def test_materialize_setup_tasks_deletes_on_run_failure(
+    mock_workspace_client,
+) -> None:
+    """_materialize_setup_tasks should delete the job even if run_now_and_wait raises."""
+    original_run = mock_workspace_client.jobs.run_now_and_wait
+
+    def _failing_run(job_id: int) -> None:
+        raise RuntimeError("Job execution failed")
+
+    mock_workspace_client.jobs.run_now_and_wait = _failing_run
+
+    setup_tasks = [
+        {"task_key": "failing_setup", "notebook_task": {"notebook_path": "/test/fail"}},
+    ]
+
+    with pytest.raises(RuntimeError, match="Job execution failed"):
+        WorkspaceDefinitionStore._materialize_setup_tasks(mock_workspace_client, setup_tasks)
+
+    deleted = getattr(mock_workspace_client.jobs, "_deleted", [])
+    assert len(deleted) == 1
+
+
+# --- Source-type-specific default ports ---
+
+
+@pytest.mark.parametrize(
+    "source_type,expected_port",
+    [
+        ("sqlserver", "1433"),
+        ("postgresql", "5432"),
+        ("mysql", "3306"),
+    ],
+    ids=["sqlserver", "postgresql", "mysql"],
+)
+def test_setup_notebook_uses_correct_default_port(source_type: str, expected_port: str) -> None:
+    """Setup notebook should use the correct default port for each source type."""
+    source = {
+        "type": source_type,
+        "dataset_name": f"my_{source_type}_table",
+        "service_name": f"my_{source_type}_svc",
+        "host": f"{source_type}.example.com",
+        "database": "testdb",
+        "schema_name": "public",
+        "table_name": "orders",
+    }
+    activity = CopyActivity(
+        name=f"Copy{source_type.title()}",
+        task_key=f"copy_{source_type}",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": source_type},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook = result.notebooks[0]
+    assert f"port '{expected_port}'" in notebook.content
+
+
+def test_setup_notebook_uses_source_port_when_available() -> None:
+    """When the source definition has a port, it should override the default."""
+    source = {
+        **_SQL_SOURCE,
+        "port": "1444",
+    }
+    activity = CopyActivity(
+        name="CopyCustomPort",
+        task_key="copy_custom_port",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook = result.notebooks[0]
+    assert "port '1444'" in notebook.content
+
+
+# --- connection_name validation ---
+
+
+def test_lakeflow_connect_missing_connection_name_raises() -> None:
+    """Missing connection_name (service_name) should be included in the validation error."""
+    source = {
+        "type": "sqlserver",
+        "dataset_name": "my_sql_table",
+        # Missing service_name
+        "host": "myserver.database.windows.net",
+        "database": "mydb",
+        "table_name": "customers",
+    }
+    activity = CopyActivity(
+        name="CopyNoConnection",
+        task_key="copy_no_connection",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    with pytest.raises(ValueError, match="connection_name"):
+        prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
