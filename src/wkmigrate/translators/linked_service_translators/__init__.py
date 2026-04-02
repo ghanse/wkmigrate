@@ -8,6 +8,9 @@ Each translator validates required fields, coerces connection settings, and emit
 from wkmigrate.translators.linked_service_translators.databricks_linked_service_translator import (
     translate_databricks_cluster_spec,
 )
+from wkmigrate.translators.linked_service_translators.sftp_linked_service_translator import (
+    translate_sftp_spec,
+)
 from wkmigrate.translators.linked_service_translators.sql_linked_service_translator import (
     translate_mysql_spec,
     translate_oracle_spec,
@@ -30,5 +33,6 @@ __all__ = [
     "translate_oracle_spec",
     "translate_postgresql_spec",
     "translate_s3_spec",
+    "translate_sftp_spec",
     "translate_sql_server_spec",
 ]

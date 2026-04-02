@@ -22,12 +22,14 @@ from wkmigrate.translators.linked_service_translators import (
     translate_azure_blob_spec,
     translate_gcs_spec,
     translate_s3_spec,
+    translate_sftp_spec,
 )
 
 _CLOUD_TRANSLATORS: dict[str, Callable] = {
     "s3": translate_s3_spec,
     "gcs": translate_gcs_spec,
     "azure_blob": translate_azure_blob_spec,
+    "sftp": translate_sftp_spec,
 }
 
 

@@ -22,6 +22,7 @@ from wkmigrate.code_generator import (
     get_file_uri,
     get_option_expressions,
     get_read_expression,
+    get_sftp_file_uri,
 )
 from wkmigrate.models.ir.pipeline import CopyActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
@@ -55,6 +56,11 @@ def prepare_copy_activity(
     data_source_secrets = collect_data_source_secrets(source_definition, credentials_scope)
     data_sink_secrets = collect_data_source_secrets(sink_definition, credentials_scope)
     secrets_to_collect = data_source_secrets + data_sink_secrets
+
+    source_provider_type = source_definition.get("provider_type")
+
+    if source_provider_type == "sftp":
+        return _prepare_sftp_copy(activity, source_definition, sink_definition, column_mapping, secrets_to_collect, credentials_scope)
 
     files_to_delta_sinks = sink_definition.get("type") == "delta"
     if default_files_to_delta_sinks is not None:
@@ -104,6 +110,133 @@ def prepare_copy_activity(
             )
         ],
     )
+
+
+def _prepare_sftp_copy(
+    activity: CopyActivity,
+    source_definition: dict,
+    sink_definition: dict,
+    column_mapping: list[dict],
+    secrets_to_collect: list,
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+) -> PreparedActivity:
+    """
+    Builds tasks and artifacts for a Copy activity that reads from an SFTP source.
+
+    SFTP sources use Auto Loader to stream files from a Unity Catalog volume
+    backed by an SFTP connection.  In addition to the main copy notebook, a
+    one-time setup notebook is generated to create the UC connection and
+    external volume.
+
+    Args:
+        activity: Copy activity definition from the translator layer.
+        source_definition: Merged source dataset properties.
+        sink_definition: Merged sink dataset properties.
+        column_mapping: Column-level mappings from source to sink.
+        secrets_to_collect: Secret instructions for the source and sink.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
+
+    Returns:
+        PreparedActivity with notebook tasks and setup notebook artifacts.
+    """
+    notebook_path, notebook = _create_copy_data_notebook(
+        source_definition,
+        sink_definition,
+        column_mapping,
+        files_to_delta_sinks=False,
+        credentials_scope=credentials_scope,
+    )
+
+    setup_notebook = _build_sftp_setup_notebook(source_definition, credentials_scope)
+
+    base_task = get_base_task(activity)
+    task = parse_mapping(
+        {
+            **base_task,
+            "notebook_task": {"notebook_path": notebook_path},
+        }
+    )
+
+    return PreparedActivity(
+        task=task,
+        notebooks=[setup_notebook, notebook],
+        secrets=secrets_to_collect if secrets_to_collect else None,
+    )
+
+
+def _build_sftp_setup_notebook(
+    source_definition: dict,
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+) -> NotebookArtifact:
+    """
+    Generates a one-time setup notebook for SFTP connection configuration.
+
+    The notebook creates a Unity Catalog connection to the SFTP server and
+    an external volume that exposes files from the remote path.  An operator
+    should review and execute this notebook once before running the translated
+    copy workflow.
+
+    Args:
+        source_definition: Merged source dataset properties.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
+
+    Returns:
+        NotebookArtifact containing the setup notebook content.
+    """
+    source_name = source_definition.get("dataset_name", "source")
+    service_name = source_definition.get("service_name", source_name)
+    host = source_definition.get("host", "<SFTP_HOST>")
+    port = source_definition.get("port", 22)
+    connection_name = f"{service_name}_sftp_connection"
+    volume_path = get_sftp_file_uri(source_definition)
+    notebook_path = f"/wkmigrate/sftp_setup/{connection_name}_setup"
+
+    lines = [
+        "# Databricks notebook source",
+        "# SFTP Connection - One-Time Setup Notebook",
+        f"# Source: {source_name} ({host}:{port})",
+        f"# Connection: {connection_name}",
+        "",
+        "# COMMAND ----------",
+        "",
+        "# Step 1: Create the Unity Catalog connection to the SFTP server",
+        f'connection_name = "{connection_name}"',
+        f'host = "{host}"',
+        f'port = {port}',
+        f'user_name = dbutils.secrets.get(scope="{credentials_scope}", key="{service_name}_user_name")',
+        f'password = dbutils.secrets.get(scope="{credentials_scope}", key="{service_name}_password")',
+        "",
+        "spark.sql(f\"\"\"",
+        "    CREATE CONNECTION IF NOT EXISTS `{connection_name}`",
+        "    TYPE sftp",
+        "    OPTIONS (",
+        "        host '{host}',",
+        "        port '{port}',",
+        "        username '{user_name}',",
+        "        password '{password}'",
+        "    )",
+        "\"\"\")",
+        "",
+        "# COMMAND ----------",
+        "",
+        "# Step 2: Create the external volume for SFTP file access",
+        'spark.sql("""',
+        "    CREATE SCHEMA IF NOT EXISTS wkmigrate.sftp",
+        '""")',
+        "",
+        "spark.sql(f\"\"\"",
+        f'    CREATE EXTERNAL VOLUME IF NOT EXISTS wkmigrate.sftp.`{service_name}`',
+        "    LOCATION 'sftp://{host}:{port}/'",
+        "    CONNECTION `{connection_name}`",
+        "\"\"\")",
+        "",
+        f'print("SFTP connection \\"{connection_name}\\" and volume configured.")',
+        f'print("Files will be available at: {volume_path}")',
+    ]
+
+    content = autopep8.fix_code("\n".join(lines))
+    return NotebookArtifact(file_path=notebook_path, content=content)
+
 
 
 def _create_copy_data_notebook(

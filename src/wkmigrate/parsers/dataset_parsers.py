@@ -35,6 +35,7 @@ CLOUD_LOCATION_TYPES: dict[str, str] = {
     "GoogleCloudStorageLocation": "gcs",
     "AzureBlobStorageLocation": "azure_blob",
     "AzureBlobFSLocation": "abfs",
+    "SftpLocation": "sftp",
 }
 DEFAULT_CREDENTIALS_SCOPE = "wkmigrate_credentials_scope"
 DATASET_PROVIDER_SECRETS: dict[str, list[str]] = {
@@ -46,6 +47,7 @@ DATASET_PROVIDER_SECRETS: dict[str, list[str]] = {
     "oracle": _JDBC_SECRETS,
     "postgresql": _JDBC_SECRETS,
     "s3": ["access_key_id", "secret_access_key"],
+    "sftp": ["user_name", "password"],
     "sqlserver": _JDBC_SECRETS,
 }
 DATASET_OPTIONS: dict[str, list[str]] = {
