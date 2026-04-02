@@ -32,6 +32,15 @@ from wkmigrate.utils import parse_mapping
 LAKEFLOW_CONNECT_SUPPORTED_SOURCES = frozenset({"sqlserver", "postgresql", "mysql"})
 
 
+def _sanitize_notebook_str(value: str) -> str:
+    """Escape characters that could break or inject code in generated notebook string literals.
+
+    Strips backslashes, double-quotes, newlines, and carriage returns so the
+    value is safe to embed inside a Python ``"..."`` string in generated code.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "").replace("\r", "")
+
+
 def prepare_copy_activity(
     activity: CopyActivity,
     default_files_to_delta_sinks: bool | None,
@@ -99,7 +108,7 @@ def prepare_copy_activity(
         return PreparedActivity(
             task=task,
             notebooks=[notebook],
-            secrets=secrets_to_collect if secrets_to_collect else None,
+            secrets=secrets_to_collect or None,
         )
 
     # DLT pipeline execution - pipeline_id will be resolved later
@@ -113,7 +122,7 @@ def prepare_copy_activity(
     return PreparedActivity(
         task=task,
         notebooks=[notebook],
-        secrets=secrets_to_collect if secrets_to_collect else None,
+        secrets=secrets_to_collect or None,
         pipelines=[
             PipelineInstruction(
                 task_ref=task,
@@ -226,7 +235,7 @@ def _prepare_managed_ingestion(
         task=task,
         notebooks=[setup_notebook],
         managed_ingestion_pipelines=[ingestion_instruction],
-        secrets=secrets_to_collect if secrets_to_collect else None,
+        secrets=secrets_to_collect or None,
         setup_task=setup_task,
     )
 
@@ -261,17 +270,21 @@ def _build_lakeflow_connect_setup_notebook(
     """
     source_name = source_definition.get("dataset_name", "source")
     source_type = source_definition.get("type", "sqlserver")
-    source_host = source_definition.get("host", "")
-    source_database = source_definition.get("database", "")
+    source_host = _sanitize_notebook_str(source_definition.get("host", ""))
+    source_database = _sanitize_notebook_str(source_definition.get("database", ""))
     default_schema = _SOURCE_SCHEMA_DEFAULTS.get(source_type, "")
-    source_schema = source_definition.get("schema_name", default_schema)
-    source_table = source_definition.get("table_name", "")
-    sink_catalog = sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
-    sink_database_name = sink_definition.get("database_name", "")
-    sink_table_name = sink_definition.get("table_name", "")
-    connection_name = source_definition.get("service_name", source_name)
+    source_schema = _sanitize_notebook_str(source_definition.get("schema_name", default_schema))
+    source_table = _sanitize_notebook_str(source_definition.get("table_name", ""))
+    sink_catalog = _sanitize_notebook_str(
+        sink_definition.get("catalog_name") or sink_definition.get("catalog", "wkmigrate")
+    )
+    sink_database_name = _sanitize_notebook_str(sink_definition.get("database_name", ""))
+    sink_table_name = _sanitize_notebook_str(sink_definition.get("table_name", ""))
+    connection_name = _sanitize_notebook_str(source_definition.get("service_name", source_name))
     connection_type = _SOURCE_TYPE_TO_CONNECTION_TYPE.get(source_type, source_type.upper())
-    port = source_definition.get("port") or _SOURCE_TYPE_DEFAULT_PORTS.get(source_type, "1433")
+    port = _sanitize_notebook_str(
+        str(source_definition.get("port") or _SOURCE_TYPE_DEFAULT_PORTS.get(source_type, "1433"))
+    )
 
     lines = [
         "# Databricks notebook source",

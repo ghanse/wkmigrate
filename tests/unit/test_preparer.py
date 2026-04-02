@@ -914,6 +914,33 @@ def test_setup_notebook_uses_source_port_when_available() -> None:
 # --- connection_name validation ---
 
 
+def test_setup_notebook_sanitizes_user_controlled_strings() -> None:
+    """User-controlled strings embedded in generated notebooks must be sanitized."""
+    source = {
+        **_SQL_SOURCE,
+        "host": 'evil")\nimport os; os.system("rm -rf /',
+        "service_name": 'conn"; DROP TABLE users; --',
+    }
+    activity = CopyActivity(
+        name="CopyInjection",
+        task_key="copy_injection",
+        source_dataset=source,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=None,
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    notebook_content = result.notebooks[0].content
+    # Injected newlines must be stripped so code cannot escape the string literal
+    assert "\nimport os" not in notebook_content
+    # Unescaped double-quotes from user input must not appear (only escaped ones)
+    assert 'host = "evil")' not in notebook_content
+    assert 'connection_name = "conn"' not in notebook_content
+
+
 def test_lakeflow_connect_missing_connection_name_raises() -> None:
     """Missing connection_name (service_name) should be included in the validation error."""
     source = {
