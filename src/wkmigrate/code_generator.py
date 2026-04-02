@@ -288,12 +288,36 @@ def get_sftp_read_expression(source_definition: dict) -> str:
     volume_path = get_sftp_file_uri(source_definition)
 
     return f"""{source_name}_df = (
-                        spark.read.format("cloudFiles")
+                        spark.readStream.format("cloudFiles")
                             .option("cloudFiles.format", "{source_type}")
                             .options(**{source_name}_options)
                             .load("{volume_path}")
                         )
                     """
+
+
+def get_sftp_write_expression(dataset_name: str, sink_table: str, checkpoint_path: str) -> str:
+    """
+    Generates a streaming write expression for Auto Loader SFTP ingestion.
+
+    Auto Loader requires ``readStream`` / ``writeStream``.  Using
+    ``trigger(availableNow=True)`` processes all available files and then
+    stops, giving batch-like semantics on top of streaming infrastructure.
+
+    Args:
+        dataset_name: Name of the DataFrame variable (without ``_df`` suffix).
+        sink_table: Fully-qualified target table name.
+        checkpoint_path: Path used by Structured Streaming for checkpointing.
+
+    Returns:
+        Python source fragment with the streaming write expression.
+    """
+    return (
+        f"{dataset_name}_df.writeStream \\\n"
+        f"    .trigger(availableNow=True) \\\n"
+        f'    .option("checkpointLocation", "{checkpoint_path}") \\\n'
+        f'    .toTable("{sink_table}")\n'
+    )
 
 
 def get_file_read_expression(source_definition: dict) -> str:
@@ -518,7 +542,7 @@ def _get_file_credential_lines(
     # Default: ABFS (ADLS Gen2)
     return [
         f"""spark.conf.set(
-                "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                "fs.azure.account.key.{dataset_definition.get("storage_account_name")}.dfs.core.windows.net",
                     dbutils.secrets.get(
                         scope="{credentials_scope}",
                         key="{service_name}_storage_account_key"

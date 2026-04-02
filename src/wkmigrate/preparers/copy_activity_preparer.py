@@ -24,6 +24,7 @@ from wkmigrate.code_generator import (
     get_option_expressions,
     get_read_expression,
     get_sftp_file_uri,
+    get_sftp_write_expression,
 )
 from wkmigrate.models.ir.pipeline import CopyActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
@@ -154,20 +155,20 @@ def _prepare_sftp_copy(
     if default_files_to_delta_sinks is not None:
         files_to_delta_sinks = default_files_to_delta_sinks
 
-    notebook_path, notebook = _create_copy_data_notebook(
-        source_definition,
-        sink_definition,
-        column_mapping,
-        files_to_delta_sinks=files_to_delta_sinks,
-        credentials_scope=credentials_scope,
-    )
-
     setup_notebook = _build_sftp_setup_notebook(source_definition, credentials_scope)
-    notebooks = [setup_notebook, notebook]
-
     base_task = get_base_task(activity)
 
     if not files_to_delta_sinks:
+        # Auto Loader requires readStream/writeStream.  Use trigger(availableNow=True)
+        # for batch-like semantics: process all available files then stop.
+        notebook_path, notebook = _create_sftp_streaming_notebook(
+            activity.task_key,
+            source_definition,
+            sink_definition,
+            column_mapping,
+            credentials_scope=credentials_scope,
+        )
+        notebooks = [setup_notebook, notebook]
         task = parse_mapping(
             {
                 **base_task,
@@ -180,7 +181,15 @@ def _prepare_sftp_copy(
             secrets=secrets_to_collect if secrets_to_collect else None,
         )
 
-    # DLT pipeline execution
+    # DLT pipeline execution — DLT handles streaming natively
+    notebook_path, notebook = _create_copy_data_notebook(
+        source_definition,
+        sink_definition,
+        column_mapping,
+        files_to_delta_sinks=True,
+        credentials_scope=credentials_scope,
+    )
+    notebooks = [setup_notebook, notebook]
     pipeline_name = f"{activity.task_key}_pipeline"
     task = parse_mapping(
         {
@@ -200,6 +209,64 @@ def _prepare_sftp_copy(
             )
         ],
     )
+
+
+def _create_sftp_streaming_notebook(
+    activity_key: str,
+    source_definition: dict,
+    sink_definition: dict,
+    column_mapping: list[dict],
+    credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+) -> tuple[str, NotebookArtifact]:
+    """
+    Generates a notebook that reads from SFTP via Auto Loader and writes with Structured Streaming.
+
+    Auto Loader (``cloudFiles``) is a streaming source only, so this notebook
+    uses ``readStream`` / ``writeStream`` with ``trigger(availableNow=True)``
+    to process all available files in a single micro-batch and then stop.
+
+    Args:
+        activity_key: Task key used for checkpoint path naming.
+        source_definition: Merged source dataset definition dictionary.
+        sink_definition: Merged sink dataset definition dictionary.
+        column_mapping: Column-level mappings from source to sink.
+        credentials_scope: Name of the Databricks secret scope used for storing credentials.
+
+    Returns:
+        Tuple of ``(notebook_path, NotebookArtifact)``.
+    """
+    source_name = source_definition.get("dataset_name", "source")
+    sink_name = sink_definition.get("dataset_name", "sink")
+    sink_type = sink_definition.get("type", "delta")
+    database_name = sink_definition.get("database_name", "default")
+    table_name = sink_definition.get("table_name", sink_name)
+    checkpoint_path = f"/Volumes/wkmigrate/sftp/_checkpoints/{activity_key}"
+
+    # Determine sink table reference
+    if sink_type == "delta":
+        sink_table = f"hive_metastore.{database_name}.{table_name}"
+    else:
+        sink_table = f"wkmigrate.sftp.{sink_name}"
+
+    script_lines = [
+        "# Databricks notebook source",
+        "import pyspark.sql.types as T",
+        "import pyspark.sql.functions as F",
+        "",
+        "# Set the source options:",
+    ]
+    script_lines.extend(get_option_expressions(source_definition, credentials_scope))
+    script_lines.append("# Read from the SFTP source via Auto Loader (streaming):")
+    script_lines.append(get_read_expression(source_definition))
+    script_lines.append("# Map the source columns to the target columns:")
+    script_lines.append(_get_mapping(source_definition, sink_definition, column_mapping, True))
+    script_lines.append("# Write to the target using Structured Streaming with trigger(availableNow=True):")
+    script_lines.append(get_sftp_write_expression(sink_name, sink_table, checkpoint_path))
+
+    notebook_content = autopep8.fix_code("\n".join(script_lines))
+    notebook_path = f"/wkmigrate/copy_data_notebooks/copy_{source_name}_to_{sink_name}"
+    notebook_artifact = NotebookArtifact(file_path=notebook_path, content=notebook_content)
+    return notebook_path, notebook_artifact
 
 
 def _build_sftp_setup_notebook(
@@ -233,6 +300,12 @@ def _build_sftp_setup_notebook(
     volume_path = get_sftp_file_uri(source_definition)
     notebook_path = f"/wkmigrate/sftp_setup/{connection_name}_setup"
 
+    # NOTE: This notebook mixes two kinds of f-string interpolation:
+    # - Build-time (Python f-strings here): {host}, {port}, {connection_name},
+    #   {credentials_scope}, {service_name} are resolved when generating the notebook.
+    # - Runtime (f-strings in the emitted notebook code): {connection_name}, {host},
+    #   {port}, {user_name}, {password} inside spark.sql(f"...") are resolved when
+    #   the notebook executes in Databricks, referencing local Python variables.
     lines = [
         "# Databricks notebook source",
         "# SFTP Connection - One-Time Setup Notebook",
@@ -244,11 +317,11 @@ def _build_sftp_setup_notebook(
         "# Step 1: Create the Unity Catalog connection to the SFTP server",
         f'connection_name = "{connection_name}"',
         f'host = "{host}"',
-        f'port = {port}',
+        f"port = {port}",
         f'user_name = dbutils.secrets.get(scope="{credentials_scope}", key="{service_name}_user_name")',
         f'password = dbutils.secrets.get(scope="{credentials_scope}", key="{service_name}_password")',
         "",
-        "spark.sql(f\"\"\"",
+        'spark.sql(f"""',
         "    CREATE CONNECTION IF NOT EXISTS `{connection_name}`",
         "    TYPE sftp",
         "    OPTIONS (",
@@ -257,7 +330,7 @@ def _build_sftp_setup_notebook(
         "        username '{user_name}',",
         "        password '{password}'",
         "    )",
-        "\"\"\")",
+        '""")',
         "",
         "# COMMAND ----------",
         "",
@@ -266,11 +339,11 @@ def _build_sftp_setup_notebook(
         "    CREATE SCHEMA IF NOT EXISTS wkmigrate.sftp",
         '""")',
         "",
-        "spark.sql(f\"\"\"",
-        f'    CREATE EXTERNAL VOLUME IF NOT EXISTS wkmigrate.sftp.`{service_name}`',
+        'spark.sql(f"""',
+        f"    CREATE EXTERNAL VOLUME IF NOT EXISTS wkmigrate.sftp.`{service_name}`",
         "    LOCATION 'sftp://{host}:{port}/'",
         "    CONNECTION `{connection_name}`",
-        "\"\"\")",
+        '""")',
         "",
         f'print("SFTP connection \\"{connection_name}\\" and volume configured.")',
         f'print("Files will be available at: {volume_path}")',
