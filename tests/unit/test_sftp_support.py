@@ -15,6 +15,7 @@ from wkmigrate.code_generator import (
     get_sftp_file_uri,
     get_sftp_options,
     get_sftp_read_expression,
+    get_sftp_write_expression,
 )
 from wkmigrate.models.ir.datasets import FileDataset
 from wkmigrate.models.ir.linked_services import SftpLinkedService
@@ -298,8 +299,8 @@ def test_get_sftp_options() -> None:
 
     joined = "\n".join(lines)
     assert "sftp_csv_options = {}" in joined
-    assert 'cloudFiles.connectionName' in joined
-    assert 'my_sftp_sftp_connection' in joined
+    assert "cloudFiles.connectionName" in joined
+    assert "my_sftp_sftp_connection" in joined
 
 
 def test_get_option_expressions_sftp_dispatches() -> None:
@@ -335,6 +336,36 @@ def test_get_sftp_read_expression() -> None:
     assert "sftp_csv_df" in expr
 
 
+def test_get_sftp_read_expression_uses_readstream() -> None:
+    """get_sftp_read_expression uses spark.readStream (not spark.read)."""
+    definition = {
+        "dataset_name": "sftp_csv",
+        "type": "csv",
+        "service_name": "my_sftp",
+        "folder_path": "data/incoming",
+        "provider_type": "sftp",
+    }
+    expr = get_sftp_read_expression(definition)
+
+    assert "readStream" in expr
+    assert "spark.read.format" not in expr
+
+
+def test_get_sftp_write_expression() -> None:
+    """get_sftp_write_expression generates a streaming write with trigger(availableNow=True)."""
+    expr = get_sftp_write_expression(
+        dataset_name="my_sink",
+        sink_table="catalog.schema.target_table",
+        checkpoint_path="/Volumes/wkmigrate/sftp/_checkpoints/my_task",
+    )
+
+    assert "my_sink_df.writeStream" in expr
+    assert "availableNow=True" in expr
+    assert "checkpointLocation" in expr
+    assert "/Volumes/wkmigrate/sftp/_checkpoints/my_task" in expr
+    assert 'toTable("catalog.schema.target_table")' in expr
+
+
 def test_get_read_expression_sftp_dispatches() -> None:
     """get_read_expression dispatches to SFTP read when provider_type is sftp."""
     definition = {
@@ -348,6 +379,7 @@ def test_get_read_expression_sftp_dispatches() -> None:
 
     assert "cloudFiles" in expr
     assert "sftp_csv_df" in expr
+    assert "readStream" in expr
 
 
 # ---------------------------------------------------------------------------
@@ -470,15 +502,17 @@ def test_sftp_copy_preparer_custom_credentials_scope() -> None:
     assert DEFAULT_CREDENTIALS_SCOPE not in setup_content
 
 
-def test_sftp_copy_preparer_uses_batch_read() -> None:
-    """SFTP copy notebook uses spark.read (batch), not spark.readStream."""
+def test_sftp_copy_preparer_uses_streaming() -> None:
+    """SFTP copy notebook uses readStream + writeStream with trigger(availableNow=True)."""
     activity = _make_sftp_copy_activity()
 
     result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
 
     copy_notebook = result.notebooks[1]
-    assert "spark.read.format" in copy_notebook.content
-    assert "readStream" not in copy_notebook.content
+    assert "readStream" in copy_notebook.content
+    assert "writeStream" in copy_notebook.content
+    assert "availableNow=True" in copy_notebook.content
+    assert "checkpointLocation" in copy_notebook.content
 
 
 def test_sftp_copy_preparer_respects_files_to_delta_sinks() -> None:
