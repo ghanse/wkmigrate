@@ -48,3 +48,39 @@ class SecretInstruction:
     service_name: str | None
     service_type: str | None
     provided_value: str | None
+
+
+@dataclass(slots=True)
+class ManagedIngestionInstruction:
+    """
+    Represents a Lakeflow Connect managed ingestion pipeline to be created.
+
+    When a Copy activity reads from a supported SQL database and writes to a
+    Delta Lake table, the activity can be replaced by a Lakeflow Connect
+    managed ingestion pipeline instead of a notebook-based copy.
+
+    Attributes:
+        task_ref: Reference to the Databricks task dictionary that will consume the pipeline.
+        pipeline_name: Name to assign to the managed ingestion pipeline.
+        setup_notebook_path: Workspace path to the one-time setup notebook.
+        source_type: Source database type (for example ``sqlserver``, ``postgresql``, ``mysql``).
+        source_host: Hostname of the source database server.
+        source_database: Database name on the source server.
+        source_schema: Schema name within the source database.
+        source_table: Table name within the source schema.
+        sink_catalog: Unity Catalog name for the target Delta table.
+        sink_schema: Schema (database) name for the target Delta table.
+        sink_table: Table name for the target Delta table.
+    """
+
+    task_ref: dict
+    pipeline_name: str
+    setup_notebook_path: str
+    source_type: str
+    source_host: str
+    source_database: str
+    source_schema: str
+    source_table: str
+    sink_catalog: str
+    sink_schema: str
+    sink_table: str

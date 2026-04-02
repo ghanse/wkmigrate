@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
+from wkmigrate.models.workflows.instructions import ManagedIngestionInstruction, PipelineInstruction, SecretInstruction
 
 
 @dataclass(slots=True)
@@ -59,6 +59,17 @@ class PreparedWorkflow:
         return result
 
     @property
+    def all_managed_ingestion_pipelines(self) -> list[ManagedIngestionInstruction]:
+        """All managed ingestion pipeline instructions across this workflow and any nested inner workflows."""
+        result: list[ManagedIngestionInstruction] = []
+        for activity in self.activities:
+            if activity.managed_ingestion_pipelines:
+                result.extend(activity.managed_ingestion_pipelines)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_managed_ingestion_pipelines)
+        return result
+
+    @property
     def inner_workflows(self) -> list["PreparedWorkflow"]:
         """All inner workflows (recursively) produced by activities in this workflow."""
         result: list[PreparedWorkflow] = []
@@ -85,6 +96,7 @@ class PreparedActivity:
     task: dict[str, Any]
     notebooks: list[NotebookArtifact] | None = None
     pipelines: list[PipelineInstruction] | None = None
+    managed_ingestion_pipelines: list[ManagedIngestionInstruction] | None = None
     secrets: list[SecretInstruction] | None = None
     inner_workflow: "PreparedWorkflow" | None = None
 

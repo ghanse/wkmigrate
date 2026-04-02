@@ -44,7 +44,7 @@ from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
-from wkmigrate.models.workflows.instructions import PipelineInstruction, SecretInstruction
+from wkmigrate.models.workflows.instructions import ManagedIngestionInstruction, PipelineInstruction, SecretInstruction
 from wkmigrate.preparers.preparer import prepare_workflow
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             "schema",
             "workspace_url",
             "credentials_scope",
+            "use_lakeflow_connect",
         }
     )
     _valid_compute_types = frozenset({"serverless", "classic"})
@@ -188,6 +189,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._upload_notebooks(client, prepared.all_notebooks)
         self._materialize_secrets(client, prepared.all_secrets)
         self._materialize_pipelines(client, prepared.all_pipelines)
+        self._materialize_managed_ingestion_pipelines(client, prepared.all_managed_ingestion_pipelines)
         self._ensure_notebook_dependencies(client, prepared.tasks)
         inner_job_ids = self._create_inner_jobs(client, prepared.inner_workflows)
         if inner_job_ids:
@@ -324,6 +326,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """Returns the credentials_scope option, or the default scope if not set."""
         return self.options.get('credentials_scope', DEFAULT_CREDENTIALS_SCOPE)
 
+    def _effective_use_lakeflow_connect(self) -> bool:
+        """Returns the use_lakeflow_connect option, defaulting to False."""
+        return self.options.get('use_lakeflow_connect', False)
+
     def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
         Validates that all provided keys are recognised option keys.
@@ -370,6 +376,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             pipeline=pipeline_definition,
             files_to_delta_sinks=self._effective_files_to_delta_sinks(),
             credentials_scope=self._effective_credentials_scope(),
+            use_lakeflow_connect=self._effective_use_lakeflow_connect(),
         )
         return self._apply_options(prepared, defer_root_path=defer_root_path)
 
@@ -682,6 +689,54 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 instruction.task_ref["pipeline_task"] = {"pipeline_id": pipeline_id}
 
     @staticmethod
+    def _materialize_managed_ingestion_pipelines(
+        client: WorkspaceClient,
+        instructions: Iterable[ManagedIngestionInstruction],
+    ) -> None:
+        """
+        Creates Lakeflow Connect managed ingestion pipelines in the workspace.
+
+        Each instruction produces a serverless pipeline configured with the
+        source and sink metadata extracted during translation.
+
+        Args:
+            client: Authenticated workspace client.
+            instructions: Managed ingestion pipeline creation instructions.
+
+        Raises:
+            ValueError: If the pipeline cannot be created.
+        """
+        for instruction in instructions:
+            response = client.pipelines.create(
+                allow_duplicate_names=True,
+                catalog=instruction.sink_catalog,
+                channel="CURRENT",
+                continuous=False,
+                development=False,
+                name=instruction.pipeline_name,
+                serverless=True,
+                target=instruction.sink_schema,
+                configuration={
+                    "wkmigrate.source.type": instruction.source_type,
+                    "wkmigrate.source.host": instruction.source_host,
+                    "wkmigrate.source.database": instruction.source_database,
+                    "wkmigrate.source.schema": instruction.source_schema,
+                    "wkmigrate.source.table": instruction.source_table,
+                    "wkmigrate.sink.catalog": instruction.sink_catalog,
+                    "wkmigrate.sink.schema": instruction.sink_schema,
+                    "wkmigrate.sink.table": instruction.sink_table,
+                },
+            )
+            pipeline_id = response.pipeline_id
+            if pipeline_id is None:
+                raise ValueError("Created managed ingestion pipeline ID cannot be None")
+            pipeline_task = instruction.task_ref.get("pipeline_task")
+            if isinstance(pipeline_task, PipelineTask):
+                instruction.task_ref["pipeline_task"] = PipelineTask(pipeline_id=pipeline_id)
+            else:
+                instruction.task_ref["pipeline_task"] = {"pipeline_id": pipeline_id}
+
+    @staticmethod
     def _materialize_secrets(
         client: WorkspaceClient,
         secrets_to_create: Iterable[SecretInstruction],
@@ -844,9 +899,17 @@ class WorkspaceDefinitionStore(DefinitionStore):
 
         self._write_notebooks(prepared.all_notebooks, notebooks_dir)
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
+        self._write_managed_ingestion_pipeline_resources(prepared.all_managed_ingestion_pipelines, pipelines_dir)
         self._write_secrets(prepared.all_secrets, bundle_dir)
         self._write_unsupported(prepared.pipeline.not_translatable or [], bundle_dir)
-        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, prepared.inner_workflows)
+        self._write_bundle_manifest(
+            bundle_name,
+            job_file,
+            prepared.all_pipelines,
+            bundle_dir,
+            prepared.inner_workflows,
+            prepared.all_managed_ingestion_pipelines,
+        )
 
     def _write_notebooks(self, notebooks: Iterable[NotebookArtifact], output_dir: str) -> None:
         """
@@ -1022,6 +1085,51 @@ class WorkspaceDefinitionStore(DefinitionStore):
             with open(pipeline_file, "w", encoding="utf-8") as pipeline_handle:
                 yaml.safe_dump(pipeline_payload, pipeline_handle, sort_keys=False)
 
+    def _write_managed_ingestion_pipeline_resources(
+        self,
+        instructions: Iterable[ManagedIngestionInstruction],
+        pipelines_dir: str,
+    ) -> None:
+        """
+        Writes managed ingestion pipeline resource definitions to the asset bundle.
+
+        Args:
+            instructions: Managed ingestion pipeline instructions to materialize.
+            pipelines_dir: Destination directory for pipeline YAML files.
+        """
+        os.makedirs(pipelines_dir, exist_ok=True)
+        for instruction in instructions:
+            pipeline_payload = {
+                "resources": {
+                    "pipelines": {
+                        instruction.pipeline_name: {
+                            "name": instruction.pipeline_name,
+                            "pipeline_type": "managed_ingestion",
+                            "allow_duplicate_names": True,
+                            "catalog": instruction.sink_catalog,
+                            "channel": "CURRENT",
+                            "development": False,
+                            "continuous": False,
+                            "serverless": True,
+                            "target": instruction.sink_schema,
+                            "configuration": {
+                                "wkmigrate.source.type": instruction.source_type,
+                                "wkmigrate.source.host": instruction.source_host,
+                                "wkmigrate.source.database": instruction.source_database,
+                                "wkmigrate.source.schema": instruction.source_schema,
+                                "wkmigrate.source.table": instruction.source_table,
+                                "wkmigrate.sink.catalog": instruction.sink_catalog,
+                                "wkmigrate.sink.schema": instruction.sink_schema,
+                                "wkmigrate.sink.table": instruction.sink_table,
+                            },
+                        }
+                    }
+                }
+            }
+            pipeline_file = os.path.join(pipelines_dir, f"{instruction.pipeline_name}.yml")
+            with open(pipeline_file, "w", encoding="utf-8") as pipeline_handle:
+                yaml.safe_dump(pipeline_payload, pipeline_handle, sort_keys=False)
+
     def _write_bundle_manifest(
         self,
         bundle_name: str,
@@ -1029,6 +1137,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         pipelines: Iterable[PipelineInstruction],
         bundle_dir: str,
         inner_workflows: Iterable[PreparedWorkflow] | None = None,
+        managed_ingestion_pipelines: Iterable[ManagedIngestionInstruction] | None = None,
     ) -> None:
         """
         Writes a minimal Databricks asset bundle manifest (databricks.yml).
@@ -1039,14 +1148,19 @@ class WorkspaceDefinitionStore(DefinitionStore):
             pipelines: Pipeline instructions to include.
             bundle_dir: Destination directory for the manifest.
             inner_workflows: Inner workflows whose jobs are included in the bundle.
+            managed_ingestion_pipelines: Managed ingestion pipeline instructions to include.
         """
         pipeline_resources = [os.path.join("resources", "pipelines", f"{pipeline.name}.yml") for pipeline in pipelines]
+        managed_resources = [
+            os.path.join("resources", "pipelines", f"{mi.pipeline_name}.yml")
+            for mi in (managed_ingestion_pipelines or [])
+        ]
         job_resources = [os.path.relpath(job_file, bundle_dir)]
         for inner_wf in inner_workflows or []:
             inner_name = inner_wf.pipeline.name
             if inner_name:
                 job_resources.append(os.path.join("resources", "jobs", f"{inner_name}.yml"))
-        bundle_resources = job_resources + pipeline_resources
+        bundle_resources = job_resources + pipeline_resources + managed_resources
         manifest = {
             "bundle": {"name": bundle_name},
             "targets": {
