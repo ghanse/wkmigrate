@@ -166,3 +166,4 @@ cython_debug/
 /poetry.toml
 /poetry.lock
 /yarn.lock
+uv.lock

@@ -196,8 +196,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._upload_notebooks(client, prepared.all_notebooks)
         self._materialize_secrets(client, prepared.all_secrets)
         self._materialize_pipelines(client, prepared.all_pipelines)
-        self._materialize_managed_ingestion_pipelines(client, prepared.all_managed_ingestion_pipelines)
         self._materialize_setup_tasks(client, prepared.all_setup_tasks)
+        self._materialize_managed_ingestion_pipelines(client, prepared.all_managed_ingestion_pipelines)
         self._ensure_notebook_dependencies(client, prepared.tasks)
         inner_job_ids = self._create_inner_jobs(client, prepared.inner_workflows)
         if inner_job_ids:
