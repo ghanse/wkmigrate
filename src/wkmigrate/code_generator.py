@@ -125,9 +125,7 @@ def get_sftp_options(
         for option in DATASET_OPTIONS.get(file_type, [])
         if dataset_definition.get(option)
     ]
-    config_lines.append(
-        f'{dataset_name}_options["connection_name"] = "{service_name}_sftp_connection"'
-    )
+    config_lines.append(f'{dataset_name}_options["connection_name"] = "{service_name}_sftp_connection"')
     return [f"{dataset_name}_options = {{}}", *config_lines]
 
 

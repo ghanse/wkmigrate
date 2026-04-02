@@ -60,7 +60,9 @@ def prepare_copy_activity(
     source_provider_type = source_definition.get("provider_type")
 
     if source_provider_type == "sftp":
-        return _prepare_sftp_copy(activity, source_definition, sink_definition, column_mapping, secrets_to_collect, credentials_scope)
+        return _prepare_sftp_copy(
+            activity, source_definition, sink_definition, column_mapping, secrets_to_collect, credentials_scope
+        )
 
     files_to_delta_sinks = sink_definition.get("type") == "delta"
     if default_files_to_delta_sinks is not None:
@@ -236,7 +238,6 @@ def _build_sftp_setup_notebook(
 
     content = autopep8.fix_code("\n".join(lines))
     return NotebookArtifact(file_path=notebook_path, content=content)
-
 
 
 def _create_copy_data_notebook(
