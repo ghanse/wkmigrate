@@ -9,6 +9,7 @@ definition, notebook artifacts, and secrets to be created in the target workspac
 from __future__ import annotations
 
 from dataclasses import asdict
+from urllib.parse import urlparse
 
 import autopep8  # type: ignore
 
@@ -61,7 +62,13 @@ def prepare_copy_activity(
 
     if source_provider_type == "sftp":
         return _prepare_sftp_copy(
-            activity, source_definition, sink_definition, column_mapping, secrets_to_collect, credentials_scope
+            activity,
+            source_definition,
+            sink_definition,
+            column_mapping,
+            secrets_to_collect,
+            credentials_scope,
+            default_files_to_delta_sinks,
         )
 
     files_to_delta_sinks = sink_definition.get("type") == "delta"
@@ -121,11 +128,12 @@ def _prepare_sftp_copy(
     column_mapping: list[dict],
     secrets_to_collect: list,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+    default_files_to_delta_sinks: bool | None = None,
 ) -> PreparedActivity:
     """
     Builds tasks and artifacts for a Copy activity that reads from an SFTP source.
 
-    SFTP sources use Auto Loader to stream files from a Unity Catalog volume
+    SFTP sources use Auto Loader to read files from a Unity Catalog volume
     backed by an SFTP connection.  In addition to the main copy notebook, a
     one-time setup notebook is generated to create the UC connection and
     external volume.
@@ -137,15 +145,20 @@ def _prepare_sftp_copy(
         column_mapping: Column-level mappings from source to sink.
         secrets_to_collect: Secret instructions for the source and sink.
         credentials_scope: Name of the Databricks secret scope used for storing credentials.
+        default_files_to_delta_sinks: Optional override for DLT generation.
 
     Returns:
         PreparedActivity with notebook tasks and setup notebook artifacts.
     """
+    files_to_delta_sinks = sink_definition.get("type") == "delta"
+    if default_files_to_delta_sinks is not None:
+        files_to_delta_sinks = default_files_to_delta_sinks
+
     notebook_path, notebook = _create_copy_data_notebook(
         source_definition,
         sink_definition,
         column_mapping,
-        files_to_delta_sinks=False,
+        files_to_delta_sinks=files_to_delta_sinks,
         credentials_scope=credentials_scope,
     )
 
@@ -187,8 +200,12 @@ def _build_sftp_setup_notebook(
     """
     source_name = source_definition.get("dataset_name", "source")
     service_name = source_definition.get("service_name", source_name)
-    host = source_definition.get("host", "<SFTP_HOST>")
-    port = source_definition.get("port", 22)
+
+    # Parse host/port from the url field (e.g. "sftp://host:port")
+    url = source_definition.get("url", "")
+    parsed = urlparse(url)
+    host = parsed.hostname or source_definition.get("host", "<SFTP_HOST>")
+    port = parsed.port or source_definition.get("port", 22)
     connection_name = f"{service_name}_sftp_connection"
     volume_path = get_sftp_file_uri(source_definition)
     notebook_path = f"/wkmigrate/sftp_setup/{connection_name}_setup"

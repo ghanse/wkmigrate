@@ -29,7 +29,6 @@ _CLOUD_TRANSLATORS: dict[str, Callable] = {
     "s3": translate_s3_spec,
     "gcs": translate_gcs_spec,
     "azure_blob": translate_azure_blob_spec,
-    "sftp": translate_sftp_spec,
 }
 
 

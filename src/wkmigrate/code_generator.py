@@ -63,7 +63,7 @@ def get_option_expressions(dataset_definition: dict, credentials_scope: str = DE
     dataset_type = dataset_definition.get("type")
     provider_type = dataset_definition.get("provider_type")
     if provider_type == "sftp":
-        return get_sftp_options(dataset_definition, dataset_type or "csv", credentials_scope=credentials_scope)
+        return get_sftp_options(dataset_definition, dataset_type or "csv")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     if dataset_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
@@ -100,9 +100,7 @@ def get_file_options(
     return [f"{dataset_name}_options = {{}}", *config_lines]
 
 
-def get_sftp_options(
-    dataset_definition: dict, file_type: str, credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE
-) -> list[str]:
+def get_sftp_options(dataset_definition: dict, file_type: str) -> list[str]:
     """
     Generates code to create a Spark data source options dictionary for an SFTP file dataset.
 
@@ -113,7 +111,6 @@ def get_sftp_options(
     Args:
         dataset_definition: Dataset definition dictionary.
         file_type: File type (for example ``"csv"`` or ``"parquet"``).
-        credentials_scope: Name of the Databricks secret scope used for storing credentials.
 
     Returns:
         List of Python source lines that create the options dictionary.
@@ -125,7 +122,7 @@ def get_sftp_options(
         for option in DATASET_OPTIONS.get(file_type, [])
         if dataset_definition.get(option)
     ]
-    config_lines.append(f'{dataset_name}_options["connection_name"] = "{service_name}_sftp_connection"')
+    config_lines.append(f'{dataset_name}_options["cloudFiles.connectionName"] = "{service_name}_sftp_connection"')
     return [f"{dataset_name}_options = {{}}", *config_lines]
 
 
@@ -252,7 +249,7 @@ def get_file_uri(definition: dict) -> str:
     return f"abfss://{container}@{storage_account_name}.dfs.core.windows.net/{folder_path}"
 
 
-def get_sftp_file_uri(definition: dict) -> str:
+def get_sftp_file_uri(definition: dict, catalog: str = "wkmigrate", schema: str = "sftp") -> str:
     """
     Builds the volume path for an SFTP dataset definition.
 
@@ -262,13 +259,15 @@ def get_sftp_file_uri(definition: dict) -> str:
 
     Args:
         definition: Dataset definition dictionary containing service_name and folder_path.
+        catalog: Unity Catalog catalog name (default ``"wkmigrate"``).
+        schema: Unity Catalog schema name (default ``"sftp"``).
 
     Returns:
         Volume path string for the SFTP dataset.
     """
     service_name = definition.get("service_name", "")
     folder_path = definition.get("folder_path", "")
-    return f"/Volumes/wkmigrate/sftp/{service_name}/{folder_path}"
+    return f"/Volumes/{catalog}/{schema}/{service_name}/{folder_path}"
 
 
 def get_sftp_read_expression(source_definition: dict) -> str:
@@ -289,7 +288,7 @@ def get_sftp_read_expression(source_definition: dict) -> str:
     volume_path = get_sftp_file_uri(source_definition)
 
     return f"""{source_name}_df = (
-                        spark.readStream.format("cloudFiles")
+                        spark.read.format("cloudFiles")
                             .option("cloudFiles.format", "{source_type}")
                             .options(**{source_name}_options)
                             .load("{volume_path}")

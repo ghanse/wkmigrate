@@ -298,7 +298,7 @@ def test_get_sftp_options() -> None:
 
     joined = "\n".join(lines)
     assert "sftp_csv_options = {}" in joined
-    assert 'connection_name' in joined
+    assert 'cloudFiles.connectionName' in joined
     assert 'my_sftp_sftp_connection' in joined
 
 
@@ -314,7 +314,7 @@ def test_get_option_expressions_sftp_dispatches() -> None:
 
     joined = "\n".join(lines)
     assert "sftp_csv_options = {}" in joined
-    assert "connection_name" in joined
+    assert "cloudFiles.connectionName" in joined
 
 
 def test_get_sftp_read_expression() -> None:
@@ -359,8 +359,7 @@ _SFTP_SOURCE = {
     "type": "csv",
     "dataset_name": "sftp_csv_source",
     "service_name": "sftp-server-1",
-    "host": "sftp.example.com",
-    "port": 22,
+    "url": "sftp://sftp.example.com:22",
     "folder_path": "uploads/data.csv",
     "provider_type": "sftp",
     "header": "true",
@@ -469,3 +468,118 @@ def test_sftp_copy_preparer_custom_credentials_scope() -> None:
     setup_content = result.notebooks[0].content
     assert 'scope="sftp_vault"' in setup_content
     assert DEFAULT_CREDENTIALS_SCOPE not in setup_content
+
+
+def test_sftp_copy_preparer_uses_batch_read() -> None:
+    """SFTP copy notebook uses spark.read (batch), not spark.readStream."""
+    activity = _make_sftp_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    copy_notebook = result.notebooks[1]
+    assert "spark.read.format" in copy_notebook.content
+    assert "readStream" not in copy_notebook.content
+
+
+def test_sftp_copy_preparer_respects_files_to_delta_sinks() -> None:
+    """SFTP copy preparer threads default_files_to_delta_sinks through."""
+    activity = _make_sftp_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=True)
+
+    # When files_to_delta_sinks=True, should produce a pipeline task
+    assert "pipeline_task" in result.task
+    assert result.pipelines is not None
+
+
+def test_sftp_copy_preparer_setup_notebook_parses_host_from_url() -> None:
+    """Setup notebook parses host/port from the url field, not raw host/port keys."""
+    # Build a CopyActivity using a FileDataset-like source with url but no host/port keys
+    source = {
+        "type": "csv",
+        "dataset_name": "sftp_url_test",
+        "service_name": "sftp-server-url",
+        "url": "sftp://myhost.example.com:2222",
+        "folder_path": "data/files.csv",
+        "provider_type": "sftp",
+    }
+    activity = CopyActivity(
+        name="CopySftpUrlTest",
+        task_key="copysftp_url_test",
+        source_dataset=source,
+        sink_dataset=_CSV_SINK,
+        source_properties={"type": "csv"},
+        sink_properties={"type": "csv"},
+        column_mapping=[
+            ColumnMapping(
+                source_column_name="col_a",
+                sink_column_name="col_a",
+                sink_column_type="string",
+            ),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    setup_content = result.notebooks[0].content
+    assert "myhost.example.com" in setup_content
+    assert "2222" in setup_content
+
+
+def test_sftp_copy_end_to_end_from_file_dataset_ir() -> None:
+    """Integration: FileDataset IR -> prepare_copy_activity -> setup notebook has real host/port."""
+    from wkmigrate.parsers.dataset_parsers import merge_dataset_definition
+
+    # Simulate a FileDataset produced by _translate_sftp_file_dataset
+    sftp_dataset = FileDataset(
+        dataset_name="sftp_e2e_csv",
+        dataset_type="DelimitedText",
+        container=None,
+        folder_path="incoming/data.csv",
+        storage_account_name=None,
+        service_name="prod-sftp",
+        url="sftp://prod.sftp.example.com:2222",
+        format_options={"header": "true", "sep": ","},
+        provider_type="sftp",
+    )
+    source_properties = {"type": "csv"}
+    source_definition = merge_dataset_definition(sftp_dataset, source_properties)
+
+    # Verify url is in the merged definition and host/port are NOT
+    assert "url" in source_definition
+    assert source_definition["url"] == "sftp://prod.sftp.example.com:2222"
+    assert "host" not in source_definition
+    assert "port" not in source_definition
+
+    # Build a CopyActivity with the dataset
+    sink = {
+        "type": "csv",
+        "dataset_name": "sink_e2e",
+        "service_name": "blob_store",
+        "storage_account_name": "myacct",
+        "container": "out",
+        "folder_path": "target",
+    }
+    activity = CopyActivity(
+        name="E2eSftpCopy",
+        task_key="e2e_sftp_copy",
+        source_dataset=sftp_dataset,
+        sink_dataset=sink,
+        source_properties=source_properties,
+        sink_properties={"type": "csv"},
+        column_mapping=[
+            ColumnMapping(
+                source_column_name="id",
+                sink_column_name="id",
+                sink_column_type="int",
+            ),
+        ],
+    )
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    # Setup notebook must contain the real host and port parsed from url
+    setup_content = result.notebooks[0].content
+    assert "prod.sftp.example.com" in setup_content
+    assert "2222" in setup_content
+    assert "CREATE CONNECTION" in setup_content
