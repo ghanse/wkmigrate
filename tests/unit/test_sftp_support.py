@@ -6,6 +6,7 @@ code generator helpers, and copy activity preparer for SFTP sources.
 
 from __future__ import annotations
 
+import warnings
 
 from wkmigrate.code_generator import (
     DEFAULT_CREDENTIALS_SCOPE,
@@ -25,7 +26,10 @@ from wkmigrate.parsers.dataset_parsers import (
     DATASET_PROVIDER_SECRETS,
     collect_data_source_secrets,
 )
-from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
+from wkmigrate.preparers.copy_activity_preparer import (
+    _build_sftp_setup_notebook,
+    prepare_copy_activity,
+)
 from wkmigrate.translators.dataset_translators import translate_dataset, translate_file_dataset
 from wkmigrate.translators.linked_service_translators import translate_sftp_spec
 
@@ -625,3 +629,87 @@ def test_sftp_copy_end_to_end_from_file_dataset_ir() -> None:
     assert "prod.sftp.example.com" in setup_content
     assert "2222" in setup_content
     assert "CREATE CONNECTION" in setup_content
+
+
+def test_sftp_setup_notebook_warns_on_unsupported_auth() -> None:
+    """Non-Basic auth emits a warning and generates placeholder credentials."""
+    source_definition = {
+        "type": "csv",
+        "dataset_name": "sftp_ssh_key",
+        "service_name": "sftp-key-server",
+        "url": "sftp://sftp.example.com:22",
+        "folder_path": "uploads/data.csv",
+        "provider_type": "sftp",
+        "authentication_type": "SshPublicKey",
+    }
+    sink_definition = {
+        "type": "csv",
+        "dataset_name": "my_sink",
+        "service_name": "my_blob",
+        "container": "output",
+        "folder_path": "data",
+    }
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        notebook = _build_sftp_setup_notebook(
+            source_definition,
+            sink_definition,
+            credentials_scope="wkmigrate",
+            default_catalog_name="wkmigrate",
+        )
+
+    # A warning must have been emitted about the unsupported auth type
+    assert len(caught) == 1
+    assert "SshPublicKey" in str(caught[0].message)
+    assert "not translatable" in str(caught[0].message)
+
+    # The generated notebook must contain placeholder markers and key_fingerprint
+    assert "key_fingerprint" in notebook.content
+    assert "<SshPublicKey_USER>" in notebook.content
+    assert "<SshPublicKey_PASSWORD>" in notebook.content
+    assert "<SshPublicKey_KEY_FINGERPRINT>" in notebook.content
+
+
+def test_sftp_copy_delta_sink_always_uses_dlt_pipeline() -> None:
+    """Delta sinks must always route to DLT pipeline, even when default_files_to_delta_sinks=False."""
+    delta_sink = {
+        "type": "delta",
+        "dataset_name": "my_delta_table",
+        "service_name": "my_lakehouse",
+        "database_name": "analytics",
+        "table_name": "events",
+    }
+    activity = CopyActivity(
+        name="CopySftpToDelta",
+        task_key="copysftptodelta",
+        source_dataset=_SFTP_SOURCE,
+        sink_dataset=delta_sink,
+        source_properties={"type": "csv"},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(
+                source_column_name="col_a",
+                sink_column_name="col_a",
+                sink_column_type="string",
+            ),
+        ],
+    )
+
+    # Even with default_files_to_delta_sinks=False, Delta sink must use DLT pipeline
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=False)
+
+    assert "pipeline_task" in result.task
+    assert result.pipelines is not None
+    assert len(result.pipelines) == 1
+
+
+def test_sftp_setup_notebook_escapes_host_in_sql() -> None:
+    """Setup notebook escapes single quotes in host to prevent SQL injection."""
+    activity = _make_sftp_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    setup_content = result.notebooks[0].content
+    # host must also be escaped, not just user_name and password
+    assert setup_content.count("replace(\"'\", \"''\")") == 3

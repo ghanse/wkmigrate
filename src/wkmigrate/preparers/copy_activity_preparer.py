@@ -158,9 +158,17 @@ def _prepare_sftp_copy(
     Returns:
         PreparedActivity with notebook tasks and setup notebook artifacts.
     """
-    files_to_delta_sinks = sink_definition.get("type") == "delta"
-    if default_files_to_delta_sinks is not None:
+    sink_is_delta = sink_definition.get("type") == "delta"
+
+    # Delta sinks must always use the DLT pipeline path because the streaming
+    # notebook writes via `.option("path", ...)` which requires a filesystem
+    # path -- a three-part table name is invalid there.
+    if sink_is_delta:
+        files_to_delta_sinks = True
+    elif default_files_to_delta_sinks is not None:
         files_to_delta_sinks = default_files_to_delta_sinks
+    else:
+        files_to_delta_sinks = False
 
     setup_notebook = _build_sftp_setup_notebook(
         source_definition,
@@ -351,6 +359,7 @@ def _build_sftp_setup_notebook(
                 f'password = dbutils.secrets.get(scope="{credentials_scope}", key="{service_name}_password")',
                 "",
                 "# Escape single quotes in credentials to prevent SQL injection",
+                "host = host.replace(\"'\", \"''\")",
                 "user_name = user_name.replace(\"'\", \"''\")",
                 "password = password.replace(\"'\", \"''\")",
                 "",
@@ -379,6 +388,9 @@ def _build_sftp_setup_notebook(
                 f'user_name = "<{auth_type}_USER>"',
                 f'password = "<{auth_type}_PASSWORD>"',
                 f'key_fingerprint = "<{auth_type}_KEY_FINGERPRINT>"',
+                "",
+                "# Escape single quotes to prevent SQL injection",
+                "host = host.replace(\"'\", \"''\")",
                 "",
                 'spark.sql(f"""',
                 "    CREATE CONNECTION IF NOT EXISTS `{connection_name}`",
