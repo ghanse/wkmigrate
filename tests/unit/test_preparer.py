@@ -833,7 +833,6 @@ def test_materialize_setup_tasks_deletes_on_run_failure(
     mock_workspace_client,
 ) -> None:
     """_materialize_setup_tasks should delete the job even if run_now_and_wait raises."""
-    original_run = mock_workspace_client.jobs.run_now_and_wait
 
     def _failing_run(job_id: int) -> None:
         raise RuntimeError("Job execution failed")

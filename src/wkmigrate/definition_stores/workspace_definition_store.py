@@ -831,10 +831,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
                 )
                 try:
                     client.jobs.run_now_and_wait(job_id=job_id)
-                    logger.info("Setup job %s completed successfully", job_id)
+                    logger.info("Setup job %s completed successfully", job_id)  # pylint: disable=logging-too-many-args
                 finally:
                     client.jobs.delete(job_id=job_id)
-                    logger.info("Cleaned up setup job %s", job_id)
+                    logger.info("Cleaned up setup job %s", job_id)  # pylint: disable=logging-too-many-args
 
     @staticmethod
     def _materialize_secrets(
