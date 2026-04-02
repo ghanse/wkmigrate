@@ -144,11 +144,14 @@ def get_database_options(
     service_name = dataset_definition["service_name"]
     jdbc_url = get_jdbc_url(dataset_definition)
     url_line = f'{dataset_name}_options["url"] = "{jdbc_url}"'
-    secrets_lines = [f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
+    secrets_lines = [
+        f"""{dataset_name}_options["{secret}"] = dbutils.secrets.get(
                 scope="{credentials_scope}",
                 key="{service_name}_{secret}"
             )
-            """ for secret in DATASET_PROVIDER_SECRETS[database_type]]
+            """
+        for secret in DATASET_PROVIDER_SECRETS[database_type]
+    ]
     options_lines = [
         f"""{dataset_name}_options["{option}"] = '{dataset_definition.get(option)}'"""
         for option in DATASET_OPTIONS.get(database_type, [])
@@ -246,25 +249,29 @@ def get_file_uri(definition: dict) -> str:
     return f"abfss://{container}@{storage_account_name}.dfs.core.windows.net/{folder_path}"
 
 
-def get_sftp_file_uri(definition: dict, catalog: str = "wkmigrate", schema: str = "sftp") -> str:
+def sftp_file_uri(definition: dict) -> str:
     """
-    Builds the volume path for an SFTP dataset definition.
+    Builds the direct SFTP URI for an SFTP dataset definition.
 
-    Files ingested from SFTP via a Unity Catalog connection are accessed through
-    Databricks Volumes.  The path follows the pattern
-    ``/Volumes/<catalog>/<schema>/<volume>/<folder_path>``.
+    The URI uses the ``sftp://`` scheme and references the host, port, and
+    folder path directly.  Unity Catalog volumes cannot be created from an
+    SFTP connection, so the URI must point to the SFTP server directly.
 
     Args:
-        definition: Dataset definition dictionary containing service_name and folder_path.
-        catalog: Unity Catalog catalog name (default ``"wkmigrate"``).
-        schema: Unity Catalog schema name (default ``"sftp"``).
+        definition: Dataset definition dictionary containing url (or host/port)
+            and folder_path.
 
     Returns:
-        Volume path string for the SFTP dataset.
+        SFTP URI string (e.g. ``sftp://host:port/path``).
     """
-    service_name = definition.get("service_name", "")
+    from urllib.parse import urlparse
+
+    url = definition.get("url", "")
+    parsed = urlparse(url)
+    host = parsed.hostname or definition.get("host", "<SFTP_HOST>")
+    port = parsed.port or definition.get("port", 22)
     folder_path = definition.get("folder_path", "")
-    return f"/Volumes/{catalog}/{schema}/{service_name}/{folder_path}"
+    return f"sftp://{host}:{port}/{folder_path}"
 
 
 def get_sftp_read_expression(source_definition: dict) -> str:
@@ -282,18 +289,23 @@ def get_sftp_read_expression(source_definition: dict) -> str:
     """
     source_name = source_definition["dataset_name"]
     source_type = source_definition.get("type", "csv")
-    volume_path = get_sftp_file_uri(source_definition)
+    file_uri = sftp_file_uri(source_definition)
 
     return f"""{source_name}_df = (
                         spark.readStream.format("cloudFiles")
                             .option("cloudFiles.format", "{source_type}")
                             .options(**{source_name}_options)
-                            .load("{volume_path}")
+                            .load("{file_uri}")
                         )
                     """
 
 
-def get_sftp_write_expression(dataset_name: str, sink_table: str, checkpoint_path: str) -> str:
+def get_sftp_write_expression(
+    dataset_name: str,
+    sink_format: str,
+    sink_path: str,
+    checkpoint_path: str,
+) -> str:
     """
     Generates a streaming write expression for Auto Loader SFTP ingestion.
 
@@ -301,9 +313,14 @@ def get_sftp_write_expression(dataset_name: str, sink_table: str, checkpoint_pat
     ``trigger(availableNow=True)`` processes all available files and then
     stops, giving batch-like semantics on top of streaming infrastructure.
 
+    Writes use ``format`` / ``option("path", ...)`` / ``start()`` /
+    ``awaitTermination()`` rather than ``toTable`` because the sink may not
+    be a Delta table.
+
     Args:
         dataset_name: Name of the DataFrame variable (without ``_df`` suffix).
-        sink_table: Fully-qualified target table name.
+        sink_format: Spark write format (e.g. ``"delta"``, ``"csv"``, ``"parquet"``).
+        sink_path: Output path for the written data.
         checkpoint_path: Path used by Structured Streaming for checkpointing.
 
     Returns:
@@ -311,10 +328,13 @@ def get_sftp_write_expression(dataset_name: str, sink_table: str, checkpoint_pat
     """
     return (
         f"{dataset_name}_df.writeStream \\\n"
+        f'    .format("{sink_format}") \\\n'
         f'    .outputMode("append") \\\n'
         f"    .trigger(availableNow=True) \\\n"
         f'    .option("checkpointLocation", "{checkpoint_path}") \\\n'
-        f'    .toTable("{sink_table}")\n'
+        f'    .option("path", "{sink_path}") \\\n'
+        f"    .start() \\\n"
+        f"    .awaitTermination()\n"
     )
 
 

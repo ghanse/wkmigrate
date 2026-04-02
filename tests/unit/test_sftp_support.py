@@ -11,7 +11,7 @@ from wkmigrate.code_generator import (
     DEFAULT_CREDENTIALS_SCOPE,
     get_option_expressions,
     get_read_expression,
-    get_sftp_file_uri,
+    sftp_file_uri,
     get_sftp_options,
     get_sftp_read_expression,
     get_sftp_write_expression,
@@ -28,10 +28,6 @@ from wkmigrate.parsers.dataset_parsers import (
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
 from wkmigrate.translators.dataset_translators import translate_dataset, translate_file_dataset
 from wkmigrate.translators.linked_service_translators import translate_sftp_spec
-
-# ---------------------------------------------------------------------------
-# SFTP linked service translator tests
-# ---------------------------------------------------------------------------
 
 
 def test_translate_sftp_spec_full_configuration() -> None:
@@ -112,11 +108,6 @@ def test_translate_sftp_spec_generates_uuid_when_no_name() -> None:
     assert isinstance(result, SftpLinkedService)
     assert result.service_name is not None
     assert len(result.service_name) > 0
-
-
-# ---------------------------------------------------------------------------
-# SFTP dataset translator tests
-# ---------------------------------------------------------------------------
 
 
 def _build_sftp_dataset(
@@ -227,11 +218,6 @@ def test_translate_dataset_dispatches_sftp() -> None:
     assert result.provider_type == "sftp"
 
 
-# ---------------------------------------------------------------------------
-# SFTP secrets registry tests
-# ---------------------------------------------------------------------------
-
-
 def test_sftp_provider_secrets_registered() -> None:
     """SFTP provider secrets include user_name and password."""
     assert "sftp" in DATASET_PROVIDER_SECRETS
@@ -269,20 +255,16 @@ def test_collect_sftp_secrets_custom_scope() -> None:
         assert secret.scope == "custom_vault"
 
 
-# ---------------------------------------------------------------------------
-# SFTP code generator tests
-# ---------------------------------------------------------------------------
-
-
-def test_get_sftp_file_uri() -> None:
-    """get_sftp_file_uri builds a volume path."""
+def test_sftp_file_uri() -> None:
+    """sftp_file_uri builds a direct SFTP URI."""
     definition = {
         "service_name": "my_sftp",
         "folder_path": "data/incoming",
+        "url": "sftp://myhost.example.com:22",
     }
-    uri = get_sftp_file_uri(definition)
+    uri = sftp_file_uri(definition)
 
-    assert uri == "/Volumes/wkmigrate/sftp/my_sftp/data/incoming"
+    assert uri == "sftp://myhost.example.com:22/data/incoming"
 
 
 def test_get_sftp_options() -> None:
@@ -324,13 +306,14 @@ def test_get_sftp_read_expression() -> None:
         "service_name": "my_sftp",
         "folder_path": "data/incoming",
         "provider_type": "sftp",
+        "url": "sftp://myhost.example.com:22",
     }
     expr = get_sftp_read_expression(definition)
 
     assert "cloudFiles" in expr
     assert "cloudFiles.format" in expr
     assert "csv" in expr
-    assert "/Volumes/wkmigrate/sftp/my_sftp/data/incoming" in expr
+    assert "sftp://myhost.example.com:22/data/incoming" in expr
     assert "sftp_csv_df" in expr
 
 
@@ -350,18 +333,23 @@ def test_get_sftp_read_expression_uses_readstream() -> None:
 
 
 def test_get_sftp_write_expression() -> None:
-    """get_sftp_write_expression generates a streaming write with trigger(availableNow=True)."""
+    """get_sftp_write_expression generates a streaming write with format/path/start/awaitTermination."""
     expr = get_sftp_write_expression(
         dataset_name="my_sink",
-        sink_table="catalog.schema.target_table",
+        sink_format="delta",
+        sink_path="/Volumes/wkmigrate/sftp/output/data",
         checkpoint_path="/Volumes/wkmigrate/sftp/_checkpoints/my_task",
     )
 
     assert "my_sink_df.writeStream" in expr
+    assert 'format("delta")' in expr
     assert "availableNow=True" in expr
     assert "checkpointLocation" in expr
     assert "/Volumes/wkmigrate/sftp/_checkpoints/my_task" in expr
-    assert 'toTable("catalog.schema.target_table")' in expr
+    assert '"path"' in expr
+    assert ".start()" in expr
+    assert ".awaitTermination()" in expr
+    assert "toTable" not in expr
 
 
 def test_get_read_expression_sftp_dispatches() -> None:
@@ -372,17 +360,13 @@ def test_get_read_expression_sftp_dispatches() -> None:
         "service_name": "my_sftp",
         "folder_path": "uploads",
         "provider_type": "sftp",
+        "url": "sftp://my_sftp:22",
     }
     expr = get_read_expression(definition)
 
     assert "cloudFiles" in expr
     assert "sftp_csv_df" in expr
     assert "readStream" in expr
-
-
-# ---------------------------------------------------------------------------
-# SFTP copy activity preparer tests
-# ---------------------------------------------------------------------------
 
 
 _SFTP_SOURCE = {
@@ -394,6 +378,7 @@ _SFTP_SOURCE = {
     "provider_type": "sftp",
     "header": "true",
     "sep": ",",
+    "authentication_type": "Basic",
 }
 
 _CSV_SINK = {
@@ -437,20 +422,31 @@ def test_sftp_copy_preparer_produces_setup_notebook() -> None:
     assert "sftp_setup" in setup_notebook.file_path
     assert "CREATE CONNECTION" in setup_notebook.content
     assert "sftp.example.com" in setup_notebook.content
+    assert "user '{user_name}'" in setup_notebook.content
 
     copy_notebook = result.notebooks[1]
     assert "copy_data_notebooks" in copy_notebook.file_path
 
 
-def test_sftp_copy_preparer_setup_notebook_has_volume_creation() -> None:
-    """SFTP setup notebook creates an external volume."""
+def test_sftp_copy_preparer_setup_notebook_has_sink_volume_creation() -> None:
+    """SFTP setup notebook creates an external volume for the sink (non-Delta)."""
     activity = _make_sftp_copy_activity()
 
     result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
 
     setup_content = result.notebooks[0].content
     assert "CREATE EXTERNAL VOLUME" in setup_content
-    assert "sftp-server-1" in setup_content
+    assert "curated" in setup_content
+
+
+def test_sftp_copy_preparer_has_setup_task() -> None:
+    """SFTP copy produces a setup_task for the one-time setup job."""
+    activity = _make_sftp_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.setup_task is not None
+    assert "notebook_task" in result.setup_task
 
 
 def test_sftp_copy_preparer_has_notebook_task() -> None:
@@ -500,8 +496,18 @@ def test_sftp_copy_preparer_custom_credentials_scope() -> None:
     assert DEFAULT_CREDENTIALS_SCOPE not in setup_content
 
 
+def test_sftp_copy_preparer_setup_notebook_escapes_sql_strings() -> None:
+    """SFTP setup notebook escapes single quotes in credentials to prevent SQL injection."""
+    activity = _make_sftp_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
+
+    setup_content = result.notebooks[0].content
+    assert "replace(\"'\", \"''\")" in setup_content
+
+
 def test_sftp_copy_preparer_uses_streaming() -> None:
-    """SFTP copy notebook uses readStream + writeStream with trigger(availableNow=True)."""
+    """SFTP copy notebook uses readStream + writeStream with format/path/start/awaitTermination."""
     activity = _make_sftp_copy_activity()
 
     result = prepare_copy_activity(activity, default_files_to_delta_sinks=None)
@@ -511,6 +517,9 @@ def test_sftp_copy_preparer_uses_streaming() -> None:
     assert "writeStream" in copy_notebook.content
     assert "availableNow=True" in copy_notebook.content
     assert "checkpointLocation" in copy_notebook.content
+    assert ".start()" in copy_notebook.content
+    assert ".awaitTermination()" in copy_notebook.content
+    assert "toTable" not in copy_notebook.content
 
 
 def test_sftp_copy_preparer_respects_files_to_delta_sinks() -> None:
@@ -534,6 +543,7 @@ def test_sftp_copy_preparer_setup_notebook_parses_host_from_url() -> None:
         "url": "sftp://myhost.example.com:2222",
         "folder_path": "data/files.csv",
         "provider_type": "sftp",
+        "authentication_type": "Basic",
     }
     activity = CopyActivity(
         name="CopySftpUrlTest",

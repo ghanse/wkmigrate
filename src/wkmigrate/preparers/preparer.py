@@ -41,6 +41,7 @@ def prepare_workflow(
     pipeline: Pipeline,
     files_to_delta_sinks: bool | None = None,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+    default_catalog_name: str = "wkmigrate",
 ) -> PreparedWorkflow:
     """
     Prepares a pipeline internal representation for creation as a Databricks Lakeflow job.
@@ -49,11 +50,14 @@ def prepare_workflow(
         pipeline: Pipeline internal representation to prepare.
         files_to_delta_sinks: Overrides the inferred Files-to-Delta behavior when set.
         credentials_scope: Name of the Databricks secret scope used for storing credentials.
+        default_catalog_name: Default Unity Catalog catalog name for generated artifacts.
 
     Returns:
         Prepared workflow containing the Databricks job payload and supporting artifacts for the pipeline.
     """
-    activities = [prepare_activity(task, files_to_delta_sinks, credentials_scope) for task in pipeline.tasks]
+    activities = [
+        prepare_activity(task, files_to_delta_sinks, credentials_scope, default_catalog_name) for task in pipeline.tasks
+    ]
     return PreparedWorkflow(pipeline=pipeline, activities=activities)
 
 
@@ -61,6 +65,7 @@ def prepare_activity(
     activity: Activity,
     default_files_to_delta_sinks: bool | None,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
+    default_catalog_name: str = "wkmigrate",
 ) -> PreparedActivity:
     """
     Prepares an activity internal representation for creation as a Databricks Lakeflow job task.
@@ -69,6 +74,7 @@ def prepare_activity(
         activity: Activity internal representation to prepare.
         default_files_to_delta_sinks: Whether to use the default files-to-delta sinks behavior.
         credentials_scope: Name of the Databricks secret scope used for storing credentials.
+        default_catalog_name: Default Unity Catalog catalog name for generated artifacts.
 
     Returns:
         Prepared activity containing the task configuration and any associated artifacts.
@@ -86,7 +92,7 @@ def prepare_activity(
     if isinstance(activity, RunJobActivity):
         return prepare_run_job_activity(activity, default_files_to_delta_sinks, credentials_scope)
     if isinstance(activity, CopyActivity):
-        return prepare_copy_activity(activity, default_files_to_delta_sinks, credentials_scope)
+        return prepare_copy_activity(activity, default_files_to_delta_sinks, credentials_scope, default_catalog_name)
     if isinstance(activity, LookupActivity):
         return prepare_lookup_activity(activity, credentials_scope)
     if isinstance(activity, WebActivity):

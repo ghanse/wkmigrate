@@ -90,6 +90,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             "schema",
             "workspace_url",
             "credentials_scope",
+            "default_catalog_name",
         }
     )
     _valid_compute_types = frozenset({"serverless", "classic"})
@@ -188,6 +189,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._upload_notebooks(client, prepared.all_notebooks)
         self._materialize_secrets(client, prepared.all_secrets)
         self._materialize_pipelines(client, prepared.all_pipelines)
+        self._materialize_setup_tasks(client, prepared)
         self._ensure_notebook_dependencies(client, prepared.tasks)
         inner_job_ids = self._create_inner_jobs(client, prepared.inner_workflows)
         if inner_job_ids:
@@ -324,6 +326,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """Returns the credentials_scope option, or the default scope if not set."""
         return self.options.get('credentials_scope', DEFAULT_CREDENTIALS_SCOPE)
 
+    def _effective_default_catalog_name(self) -> str:
+        """Returns the default_catalog_name option, or ``'wkmigrate'`` if not set."""
+        return self.options.get('default_catalog_name', 'wkmigrate')
+
     def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
         Validates that all provided keys are recognised option keys.
@@ -370,6 +376,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             pipeline=pipeline_definition,
             files_to_delta_sinks=self._effective_files_to_delta_sinks(),
             credentials_scope=self._effective_credentials_scope(),
+            default_catalog_name=self._effective_default_catalog_name(),
         )
         return self._apply_options(prepared, defer_root_path=defer_root_path)
 
@@ -702,6 +709,33 @@ class WorkspaceDefinitionStore(DefinitionStore):
             value = secret.provided_value or "PLACEHOLDER_SECRET_VALUE"
             client.secrets.put_secret(scope=secret.scope, key=secret.key, string_value=value)
 
+    @staticmethod
+    def _materialize_setup_tasks(
+        client: WorkspaceClient,
+        prepared: PreparedWorkflow,
+    ) -> None:
+        """
+        Creates one-time setup jobs for activities that require them.
+
+        Each setup task is created as a separate single-task job so operators
+        can run them once before the main workflow.
+
+        Args:
+            client: Authenticated workspace client.
+            prepared: Prepared workflow containing activities with setup tasks.
+        """
+        setup_tasks = prepared.all_setup_tasks
+        if not setup_tasks:
+            return
+        for setup_task in setup_tasks:
+            job_name = setup_task.get("task_key", "setup_task")
+            response = client.jobs.create(
+                name=f"{job_name}_setup",
+                tasks=[Task.from_dict(setup_task)],
+            )
+            if response.job_id:
+                logger.info("Created setup job '%s_setup' (id=%s)", job_name, response.job_id)
+
     def _ensure_notebook_dependencies(
         self,
         client: WorkspaceClient,
@@ -841,6 +875,17 @@ class WorkspaceDefinitionStore(DefinitionStore):
             inner_resource = {"resources": {"jobs": {inner_name: self._serialize_for_json(inner_settings)}}}
             with open(inner_job_file, "w", encoding="utf-8") as inner_handle:
                 yaml.safe_dump(inner_resource, inner_handle, sort_keys=False)
+
+        for idx, setup_task in enumerate(prepared.all_setup_tasks):
+            setup_name = setup_task.get("task_key", f"setup_task_{idx}")
+            setup_job_file = os.path.join(jobs_dir, f"{setup_name}_setup.yml")
+            setup_settings = {
+                "name": f"{setup_name}_setup",
+                "tasks": [setup_task],
+            }
+            setup_resource = {"resources": {"jobs": {f"{setup_name}_setup": self._serialize_for_json(setup_settings)}}}
+            with open(setup_job_file, "w", encoding="utf-8") as setup_handle:
+                yaml.safe_dump(setup_resource, setup_handle, sort_keys=False)
 
         self._write_notebooks(prepared.all_notebooks, notebooks_dir)
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
