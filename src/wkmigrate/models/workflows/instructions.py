@@ -57,7 +57,7 @@ _SOURCE_TYPE_MAP: dict[str, str] = {
 }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class ManagedIngestionInstruction:
     """
     Represents a Lakeflow Connect managed ingestion pipeline to be created.

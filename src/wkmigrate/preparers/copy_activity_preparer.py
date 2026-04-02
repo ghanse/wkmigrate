@@ -29,7 +29,6 @@ from wkmigrate.models.workflows.instructions import ManagedIngestionInstruction,
 from wkmigrate.preparers.utils import get_base_task
 from wkmigrate.utils import parse_mapping
 
-# Source dataset types eligible for Lakeflow Connect managed ingestion.
 LAKEFLOW_CONNECT_SUPPORTED_SOURCES = frozenset({"sqlserver", "postgresql", "mysql"})
 
 
@@ -69,7 +68,6 @@ def prepare_copy_activity(
     source_type = source_definition.get("type")
     sink_type = sink_definition.get("type")
 
-    # Check if this copy task qualifies for Lakeflow Connect managed ingestion:
     if use_lakeflow_connect and source_type in LAKEFLOW_CONNECT_SUPPORTED_SOURCES and sink_type == "delta":
         return _prepare_managed_ingestion(activity, source_definition, sink_definition, secrets_to_collect)
 
@@ -213,6 +211,7 @@ def _build_lakeflow_connect_setup_notebook(
     source_database = source_definition.get("database", "")
     source_schema = source_definition.get("schema_name", "dbo")
     source_table = source_definition.get("table_name", "")
+    sink_catalog = sink_definition.get("catalog", "wkmigrate")
     sink_database_name = sink_definition.get("database_name", "")
     sink_table_name = sink_definition.get("table_name", "")
     source_service_name = source_definition.get("service_name", source_name)
@@ -222,7 +221,7 @@ def _build_lakeflow_connect_setup_notebook(
         "# Lakeflow Connect - One-Time Setup Notebook",
         f"# Pipeline: {pipeline_name}",
         f'# Source: {source_name} ({source_host}/{source_database})',
-        f'# Sink: wkmigrate.{sink_database_name}.{sink_table_name}',
+        f'# Sink: {sink_catalog}.{sink_database_name}.{sink_table_name}',
         "",
         "# COMMAND ----------",
         "",
@@ -238,7 +237,7 @@ def _build_lakeflow_connect_setup_notebook(
         "# Step 2: Managed ingestion pipeline configuration",
         f'source_schema = "{source_schema}"',
         f'source_table = "{source_table}"',
-        'target_catalog = "wkmigrate"',
+        f'target_catalog = "{sink_catalog}"',
         f'target_schema = "{sink_database_name}"',
         f'target_table = "{sink_table_name}"',
         "",
