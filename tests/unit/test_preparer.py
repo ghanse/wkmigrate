@@ -321,3 +321,168 @@ def _make_run_job_with_lookup_pipeline(name: str = "RunJobTest") -> RunJobActivi
         task_key=name.lower(),
         pipeline=_make_pipeline_with_lookup(),
     )
+
+
+# --- Lakeflow Connect managed ingestion tests ---
+
+_SQL_SOURCE = {
+    "type": "sqlserver",
+    "dataset_name": "my_sql_table",
+    "service_name": "my_sql_server",
+    "host": "myserver.database.windows.net",
+    "database": "mydb",
+    "schema_name": "dbo",
+    "table_name": "customers",
+    "user_name": "admin",
+    "authentication_type": "sql",
+    "dbtable": "dbo.customers",
+}
+
+_DELTA_SINK = {
+    "type": "delta",
+    "dataset_name": "my_delta_table",
+    "service_name": "my_databricks",
+    "database_name": "default",
+    "table_name": "customers",
+}
+
+
+def _make_sql_to_delta_copy_activity(name: str = "CopySqlToDelta") -> CopyActivity:
+    return CopyActivity(
+        name=name,
+        task_key=name.lower(),
+        source_dataset=_SQL_SOURCE,
+        sink_dataset=_DELTA_SINK,
+        source_properties={"type": "sqlserver"},
+        sink_properties={"type": "delta"},
+        column_mapping=[
+            ColumnMapping(
+                source_column_name="id",
+                sink_column_name="id",
+                sink_column_type="int",
+            ),
+            ColumnMapping(
+                source_column_name="name",
+                sink_column_name="name",
+                sink_column_type="string",
+            ),
+        ],
+    )
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_produces_managed_ingestion() -> None:
+    """When use_lakeflow_connect=True with SQL source and Delta sink, a managed ingestion pipeline is created."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is not None
+    assert len(result.managed_ingestion_pipelines) == 1
+    instruction = result.managed_ingestion_pipelines[0]
+    assert instruction.source_type == "sqlserver"
+    assert instruction.source_host == "myserver.database.windows.net"
+    assert instruction.source_database == "mydb"
+    assert instruction.source_schema == "dbo"
+    assert instruction.source_table == "customers"
+    assert instruction.sink_catalog == "wkmigrate"
+    assert instruction.sink_schema == "default"
+    assert instruction.sink_table == "customers"
+    assert instruction.pipeline_name == "copysqltodelta_lakeflow_connect"
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_has_setup_notebook() -> None:
+    """Managed ingestion produces a setup notebook artifact."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.notebooks is not None
+    assert len(result.notebooks) == 1
+    notebook = result.notebooks[0]
+    assert "lakeflow_connect" in notebook.file_path
+    assert "Lakeflow Connect" in notebook.content
+    assert "myserver.database.windows.net" in notebook.content
+
+
+def test_copy_preparer_lakeflow_connect_sql_to_delta_has_pipeline_task() -> None:
+    """Managed ingestion creates a pipeline_task in the prepared task."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert "pipeline_task" in result.task
+    assert result.pipelines is None  # No DLT pipeline, only managed ingestion
+
+
+def test_copy_preparer_lakeflow_connect_false_uses_standard_copy() -> None:
+    """When use_lakeflow_connect=False, SQL-to-Delta produces a standard copy notebook."""
+    activity = _make_sql_to_delta_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=False)
+
+    assert result.managed_ingestion_pipelines is None
+    assert result.notebooks is not None
+    assert "copy_data_notebooks" in result.notebooks[0].file_path
+
+
+def test_copy_preparer_lakeflow_connect_csv_source_not_eligible() -> None:
+    """When use_lakeflow_connect=True but source is CSV, standard copy is used."""
+    activity = _make_copy_activity()
+
+    result = prepare_copy_activity(activity, default_files_to_delta_sinks=None, use_lakeflow_connect=True)
+
+    assert result.managed_ingestion_pipelines is None
+    assert result.notebooks is not None
+
+
+def test_workspace_store_use_lakeflow_connect_option_default_is_false(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """By default, use_lakeflow_connect is False."""
+    assert workspace_definition_store._effective_use_lakeflow_connect() is False
+
+
+def test_workspace_store_use_lakeflow_connect_option_can_be_set(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """use_lakeflow_connect can be set via set_option."""
+    workspace_definition_store.set_option("use_lakeflow_connect", True)
+
+    assert workspace_definition_store._effective_use_lakeflow_connect() is True
+
+
+def test_workspace_store_prepare_workflow_lakeflow_connect_produces_managed_ingestion(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """When use_lakeflow_connect is set, _prepare_workflow produces managed ingestion artifacts."""
+    workspace_definition_store.set_option("use_lakeflow_connect", True)
+    pipeline = Pipeline(
+        name="test_sql_to_delta",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    prepared = workspace_definition_store._prepare_workflow(pipeline)
+
+    managed_pipelines = prepared.all_managed_ingestion_pipelines
+    assert len(managed_pipelines) == 1
+    assert managed_pipelines[0].source_type == "sqlserver"
+
+
+def test_prepare_workflow_lakeflow_connect_threads_to_copy_activity() -> None:
+    """prepare_workflow passes use_lakeflow_connect down to copy activity preparers."""
+    pipeline = Pipeline(
+        name="test_sql_to_delta",
+        tasks=[_make_sql_to_delta_copy_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline, use_lakeflow_connect=True)
+
+    managed_pipelines = result.all_managed_ingestion_pipelines
+    assert len(managed_pipelines) == 1
+    assert managed_pipelines[0].pipeline_name == "copysqltodelta_lakeflow_connect"
