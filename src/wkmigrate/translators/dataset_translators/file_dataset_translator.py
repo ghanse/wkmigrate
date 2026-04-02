@@ -70,6 +70,8 @@ def translate_file_dataset(
 
     if provider_type == "abfs":
         return _translate_abfs_file_dataset(dataset_type, dataset, provider_type)
+    if provider_type == "sftp":
+        return _translate_sftp_file_dataset(dataset_type, dataset, provider_type)
     return _translate_cloud_file_dataset(dataset_type, dataset, provider_type)
 
 
@@ -116,6 +118,55 @@ def _translate_abfs_file_dataset(
         storage_account_name=linked_service.storage_account_name,
         service_name=linked_service.service_name,
         url=linked_service.url,
+        format_options=format_options,
+        provider_type=provider_type,
+    )
+
+
+def _translate_sftp_file_dataset(
+    dataset_type: str, dataset: dict, provider_type: str
+) -> FileDataset | UnsupportedValue:
+    """Translate an SFTP-backed file dataset.
+
+    SFTP datasets do not use a container or bucket.  The file path is
+    derived from the location's ``folder_path`` and ``file_name`` fields.
+    The linked service provides connection metadata (host, port,
+    authentication).
+
+    Args:
+        dataset_type: ADF dataset type (e.g. ``"DelimitedText"``, ``"Parquet"``).
+        dataset: Raw dataset definition from Azure Data Factory.
+        provider_type: Cloud provider identifier (always ``"sftp"`` for this translator).
+
+    Returns:
+        File dataset as a ``FileDataset`` object, or ``UnsupportedValue`` when parsing fails.
+    """
+    properties = dataset.get("properties", {})
+
+    folder_path = parse_cloud_file_path(properties)
+    if isinstance(folder_path, UnsupportedValue):
+        return UnsupportedValue(value=dataset, message=folder_path.message)
+
+    linked_service_definition = get_linked_service_definition(dataset)
+    if isinstance(linked_service_definition, UnsupportedValue):
+        return UnsupportedValue(value=dataset, message=linked_service_definition.message)
+
+    linked_service = translate_sftp_spec(linked_service_definition)
+    if isinstance(linked_service, UnsupportedValue):
+        return UnsupportedValue(value=dataset, message=linked_service.message)
+
+    format_options = parse_format_options(dataset_type, dataset)
+    if isinstance(format_options, UnsupportedValue):
+        return UnsupportedValue(value=dataset, message=format_options.message)
+
+    return FileDataset(
+        dataset_name=dataset.get("name", "DATASET_NAME_NOT_PROVIDED"),
+        dataset_type=dataset_type,
+        container=None,
+        folder_path=folder_path,
+        storage_account_name=None,
+        service_name=linked_service.service_name,
+        url=f"sftp://{linked_service.host}:{linked_service.port}",
         format_options=format_options,
         provider_type=provider_type,
     )
