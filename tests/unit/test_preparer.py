@@ -485,3 +485,122 @@ def test_prepare_workflow_dispatches_delete_activity() -> None:
     assert len(result.activities) == 1
     assert result.activities[0].notebooks is not None
     assert "dbutils.fs.rm" in result.activities[0].notebooks[0].content
+
+
+# --- setup_tasks tests ---
+
+
+def test_delete_preparer_produces_setup_task_with_folder_path() -> None:
+    """When folder_path is set, a setup task creating a UC external volume is returned."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.setup_tasks is not None
+    assert len(result.setup_tasks) == 1
+    setup = result.setup_tasks[0]
+    assert "setup_volume_" in setup.task["task_key"]
+    assert setup.notebooks is not None
+    assert "CREATE EXTERNAL VOLUME IF NOT EXISTS" in setup.notebooks[0].content
+
+
+def test_delete_preparer_no_setup_task_without_folder_path() -> None:
+    """When folder_path is None, no setup tasks are emitted."""
+    activity = DeleteActivity(
+        name="NoPathDelete",
+        task_key="no_path_delete",
+        dataset_name="StagingDataset",
+        recursive=True,
+    )
+
+    result = prepare_delete_activity(activity)
+
+    assert result.setup_tasks is None
+
+
+def test_delete_preparer_setup_task_uses_custom_catalog_schema() -> None:
+    """Setup task respects provided catalog and schema."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity, catalog="prod_catalog", schema="prod_schema")
+
+    assert result.setup_tasks is not None
+    notebook_content = result.setup_tasks[0].notebooks[0].content
+    assert "prod_catalog" in notebook_content
+    assert "prod_schema" in notebook_content
+
+
+def test_delete_preparer_setup_task_defaults_catalog_schema() -> None:
+    """Setup task falls back to default catalog/schema when not provided."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.setup_tasks is not None
+    notebook_content = result.setup_tasks[0].notebooks[0].content
+    assert "'main'" in notebook_content
+    assert "'default'" in notebook_content
+
+
+def test_delete_preparer_setup_notebook_path() -> None:
+    """Setup notebook uses a distinct path under /wkmigrate/setup_notebooks/."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.setup_tasks is not None
+    assert result.setup_tasks[0].notebooks[0].file_path == "/wkmigrate/setup_notebooks/create_volume_deletetest"
+
+
+def test_prepare_workflow_collects_setup_tasks() -> None:
+    """prepare_workflow aggregates setup_tasks from individual activities."""
+    pipeline = Pipeline(
+        name="test_delete_pipeline",
+        tasks=[_make_delete_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline)
+
+    assert result.setup_tasks is not None
+    assert len(result.setup_tasks) == 1
+    assert "CREATE EXTERNAL VOLUME IF NOT EXISTS" in result.setup_tasks[0].notebooks[0].content
+
+
+def test_prepare_workflow_no_setup_tasks_without_delete() -> None:
+    """prepare_workflow returns None for setup_tasks when no activities produce them."""
+    pipeline = _make_pipeline_with_lookup()
+
+    result = prepare_workflow(pipeline)
+
+    assert result.setup_tasks is None
+
+
+def test_all_setup_tasks_property_includes_activity_level() -> None:
+    """PreparedWorkflow.all_setup_tasks includes setup tasks from individual activities."""
+    activity = _make_delete_activity()
+
+    pipeline = Pipeline(
+        name="test_pipeline",
+        tasks=[activity],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    workflow = prepare_workflow(pipeline)
+
+    assert len(workflow.all_setup_tasks) >= 1
+    assert any("CREATE EXTERNAL VOLUME" in st.notebooks[0].content for st in workflow.all_setup_tasks if st.notebooks)
+
+
+def test_setup_task_notebook_is_idempotent_sql() -> None:
+    """The setup notebook uses IF NOT EXISTS so it is safe to rerun."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.setup_tasks is not None
+    content = result.setup_tasks[0].notebooks[0].content
+    assert "IF NOT EXISTS" in content

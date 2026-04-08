@@ -192,6 +192,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         inner_job_ids = self._create_inner_jobs(client, prepared.inner_workflows)
         if inner_job_ids:
             self._assign_inner_job_ids(prepared.tasks, inner_job_ids)
+        self._create_setup_jobs(client, prepared)
         job_payload = self._build_job_payload_for_api(prepared)
         response = client.jobs.create(**job_payload)
         job_id = response.job_id
@@ -753,7 +754,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         except Exception:
             warnings.warn(f"Notebook {notebook_path} not found in target workspace", stacklevel=3)
 
-    def _write_asset_bundle(
+    def _write_asset_bundle(  # pylint: disable=too-many-locals
         self,
         prepared: PreparedWorkflow,
         bundle_dir: str,
@@ -846,7 +847,15 @@ class WorkspaceDefinitionStore(DefinitionStore):
         self._write_pipeline_resources(prepared.all_pipelines, pipelines_dir)
         self._write_secrets(prepared.all_secrets, bundle_dir)
         self._write_unsupported(prepared.pipeline.not_translatable or [], bundle_dir)
-        self._write_bundle_manifest(bundle_name, job_file, prepared.all_pipelines, bundle_dir, prepared.inner_workflows)
+        setup_job_files = self._write_setup_job_bundles(prepared, jobs_dir, notebooks_dir)
+        self._write_bundle_manifest(
+            bundle_name,
+            job_file,
+            prepared.all_pipelines,
+            bundle_dir,
+            prepared.inner_workflows,
+            setup_job_files=setup_job_files,
+        )
 
     def _write_notebooks(self, notebooks: Iterable[NotebookArtifact], output_dir: str) -> None:
         """
@@ -1029,6 +1038,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         pipelines: Iterable[PipelineInstruction],
         bundle_dir: str,
         inner_workflows: Iterable[PreparedWorkflow] | None = None,
+        setup_job_files: list[str] | None = None,
     ) -> None:
         """
         Writes a minimal Databricks asset bundle manifest (databricks.yml).
@@ -1039,6 +1049,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
             pipelines: Pipeline instructions to include.
             bundle_dir: Destination directory for the manifest.
             inner_workflows: Inner workflows whose jobs are included in the bundle.
+            setup_job_files: Relative paths to setup job YAML files to include in the bundle.
         """
         pipeline_resources = [os.path.join("resources", "pipelines", f"{pipeline.name}.yml") for pipeline in pipelines]
         job_resources = [os.path.relpath(job_file, bundle_dir)]
@@ -1046,6 +1057,8 @@ class WorkspaceDefinitionStore(DefinitionStore):
             inner_name = inner_wf.pipeline.name
             if inner_name:
                 job_resources.append(os.path.join("resources", "jobs", f"{inner_name}.yml"))
+        if setup_job_files:
+            job_resources.extend(setup_job_files)
         bundle_resources = job_resources + pipeline_resources
         manifest = {
             "bundle": {"name": bundle_name},
@@ -1333,6 +1346,76 @@ class WorkspaceDefinitionStore(DefinitionStore):
                     self._assign_inner_job_refs([nested_task])
                 elif isinstance(nested_task, list):
                     self._assign_inner_job_refs(nested_task)
+
+    def _create_setup_jobs(self, client: WorkspaceClient, prepared: PreparedWorkflow) -> None:
+        """Creates unscheduled one-time setup jobs for any setup tasks in the workflow.
+
+        Each setup task is materialized as a standalone, unscheduled job.
+        The user runs these ad-hoc before the first execution of the main workflow.
+
+        Args:
+            client: Authenticated workspace client.
+            prepared: Prepared workflow whose ``all_setup_tasks`` will be created.
+        """
+        setup_tasks = prepared.all_setup_tasks
+        if not setup_tasks:
+            return
+        for setup_activity in setup_tasks:
+            if setup_activity.notebooks:
+                self._upload_notebooks(client, setup_activity.notebooks)
+            setup_payload: dict[str, Any] = {
+                'name': f"[setup] {prepared.pipeline.name} - {setup_activity.task['task_key']}",
+                'tags': {'wkmigrate_setup': 'true'},
+                'tasks': [Task.from_dict(self._serialize_for_json(setup_activity.task))],
+            }
+            response = client.jobs.create(**setup_payload)
+            if response.job_id is None:
+                raise ValueError('Failed to create setup job')
+            logger.info(  # pylint: disable=logging-too-many-args
+                'Created setup job %s (id=%s) for pipeline %s',
+                setup_payload['name'],
+                response.job_id,
+                prepared.pipeline.name,
+            )
+
+    def _write_setup_job_bundles(
+        self,
+        prepared: PreparedWorkflow,
+        jobs_dir: str,
+        notebooks_dir: str,
+    ) -> list[str]:
+        """Writes asset bundle YAML for unscheduled setup jobs.
+
+        Each setup task is written as a separate job resource file with no schedule.
+
+        Args:
+            prepared: Prepared workflow whose ``all_setup_tasks`` will be written.
+            jobs_dir: Directory for job YAML resource files.
+            notebooks_dir: Directory for notebook source files.
+
+        Returns:
+            List of setup job resource file paths, relative to the bundle root.
+        """
+        setup_tasks = prepared.all_setup_tasks
+        if not setup_tasks:
+            return []
+        setup_job_files: list[str] = []
+        for setup_activity in setup_tasks:
+            if setup_activity.notebooks:
+                self._write_notebooks(setup_activity.notebooks, notebooks_dir)
+            task_key = setup_activity.task['task_key']
+            setup_name = f"setup_{task_key}"
+            setup_settings = {
+                'name': f"[setup] {prepared.pipeline.name} - {task_key}",
+                'tags': {'wkmigrate_setup': 'true'},
+                'tasks': [setup_activity.task],
+            }
+            setup_file = os.path.join(jobs_dir, f"{setup_name}.yml")
+            setup_resource = {'resources': {'jobs': {setup_name: self._serialize_for_json(setup_settings)}}}
+            with open(setup_file, 'w', encoding='utf-8') as setup_handle:
+                yaml.safe_dump(setup_resource, setup_handle, sort_keys=False)
+            setup_job_files.append(os.path.join('resources', 'jobs', f"{setup_name}.yml"))
+        return setup_job_files
 
     @staticmethod
     def _format_unsupported_entries(warning_entries: Iterable[dict]) -> list[dict]:
