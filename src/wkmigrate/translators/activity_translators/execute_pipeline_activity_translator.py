@@ -51,6 +51,17 @@ def translate_execute_pipeline_activity(
     parameters = parse_mapping(activity.get("parameters")) or None
     wait_on_completion = activity.get("wait_on_completion", True)
 
+    if not wait_on_completion:
+        warnings.warn(
+            NotTranslatableWarning(
+                "wait_on_completion",
+                f"Execute Pipeline activity '{pipeline_name}' has wait_on_completion=false. "
+                "Databricks Run Job tasks always wait for completion; "
+                "the fire-and-forget semantic cannot be replicated.",
+            ),
+            stacklevel=2,
+        )
+
     # Translate the embedded child pipeline definition when available.
     child_pipeline_ir = None
     pipeline_definition = activity.get("pipeline_definition")

@@ -431,14 +431,22 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
     assert result.notebook_path == fixture["expected"]["notebook_path"]
 
 
-def test_execute_pipeline_dispatches_correctly(unsupported_activity_fixtures: list[dict]) -> None:
+def test_execute_pipeline_dispatches_correctly() -> None:
     """Test that ExecutePipeline activity is dispatched to the execute pipeline translator."""
-    fixture = get_fixture(unsupported_activity_fixtures, "execute_pipeline")
-    result = translate_activity(fixture["input"])
+    activity_input = {
+        "name": "call_child_pipeline",
+        "type": "ExecutePipeline",
+        "description": "Execute child pipeline",
+        "depends_on": [],
+        "policy": {"timeout": "0.01:00:00"},
+        "pipeline": {"reference_name": "child_pipeline", "type": "PipelineReference"},
+        "wait_on_completion": True,
+    }
+    result = translate_activity(activity_input)
 
     assert isinstance(result, ExecutePipelineActivity)
     assert result.pipeline_name == "child_pipeline"
-    assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
+    assert result.timeout_seconds == 3600
 
 
 def test_wait_creates_placeholder_with_dependency(unsupported_activity_fixtures: list[dict]) -> None:

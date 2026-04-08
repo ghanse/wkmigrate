@@ -12,6 +12,7 @@ All public methods are pure: they return new dicts rather than mutating inputs.
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -58,8 +59,12 @@ class PipelineAdapter:
             New dict containing the original pipeline fields plus enriched
             activities and the (optionally normalized) trigger.
         """
+        resolving: set[str] = set()
+        pipeline_name = pipeline.get("name")
+        if pipeline_name:
+            resolving.add(pipeline_name)
         activities = pipeline.get("activities") or []
-        enriched_activities = [self._enrich_activity(a) for a in activities]
+        enriched_activities = [self._enrich_activity(a, resolving) for a in activities]
         enriched_trigger = self.normalize_casing(trigger) if trigger else None
         return {**pipeline, "activities": enriched_activities, "trigger": enriched_trigger}
 
@@ -85,19 +90,20 @@ class PipelineAdapter:
             self._normalized_cache[cache_key] = out
         return out
 
-    def _enrich_activity(self, activity: dict) -> dict:
+    def _enrich_activity(self, activity: dict, resolving: set[str] | None = None) -> dict:
         """
         Returns an activity dict enriched with datasets, linked services, and child pipelines.
 
         Args:
             activity: Input activity as a dictionary.
+            resolving: Set of pipeline names currently being resolved (recursion guard).
 
         Returns:
             Activity with dataset, linked service, and child pipeline metadata.
         """
         result = self._enrich_datasets(activity)
         result = self._enrich_linked_service(result)
-        result = self._enrich_execute_pipeline(result)
+        result = self._enrich_execute_pipeline(result, resolving)
         return result
 
     def _enrich_datasets(self, activity: dict) -> dict:
@@ -138,7 +144,7 @@ class PipelineAdapter:
             return activity
         return {**activity, **additions}
 
-    def _enrich_execute_pipeline(self, activity: dict) -> dict:
+    def _enrich_execute_pipeline(self, activity: dict, resolving: set[str] | None = None) -> dict:
         """
         Returns an activity dictionary enriched with the child pipeline definition for Execute Pipeline activities.
 
@@ -146,8 +152,12 @@ class PipelineAdapter:
         ``ExecutePipeline``, the referenced child pipeline is fetched, normalized,
         enriched (recursively), and embedded under the ``pipeline_definition`` key.
 
+        A *resolving* set tracks pipeline names currently being enriched to
+        prevent infinite recursion on circular pipeline references.
+
         Args:
             activity: Input activity as a dictionary.
+            resolving: Set of pipeline names currently being resolved (recursion guard).
 
         Returns:
             Activity with child pipeline metadata when applicable, otherwise unchanged.
@@ -167,12 +177,23 @@ class PipelineAdapter:
         if not pipeline_name:
             return activity
 
+        if resolving is None:
+            resolving = set()
+
+        if pipeline_name in resolving:
+            warnings.warn(
+                f"Circular pipeline reference detected: '{pipeline_name}' is already being resolved. "
+                "Skipping enrichment to avoid infinite recursion.",
+                stacklevel=2,
+            )
+            return activity
+
         try:
             raw_pipeline = self.get_pipeline(pipeline_name)
             normalized = self.normalize_casing(raw_pipeline, ("pipeline", pipeline_name))
             if normalized is not None:
                 raw_pipeline = normalized
-            enriched = self._adapt_child_pipeline(raw_pipeline)
+            enriched = self._adapt_child_pipeline(raw_pipeline, resolving)
             return {**activity, "pipeline_definition": enriched}
         except (ValueError, KeyError):
             logger.warning(
@@ -180,7 +201,7 @@ class PipelineAdapter:
             )
             return activity
 
-    def _adapt_child_pipeline(self, pipeline: dict) -> dict:
+    def _adapt_child_pipeline(self, pipeline: dict, resolving: set[str] | None = None) -> dict:
         """
         Enriches a child pipeline dict with datasets and linked services.
 
@@ -191,13 +212,22 @@ class PipelineAdapter:
 
         Args:
             pipeline: Raw child pipeline definition.
+            resolving: Set of pipeline names currently being resolved (recursion guard).
 
         Returns:
             Enriched pipeline dict ready for translation.
         """
+        if resolving is None:
+            resolving = set()
+
         pipeline = normalize_arm_pipeline(pipeline)
+
+        pipeline_name = pipeline.get("name")
+        if pipeline_name:
+            resolving = resolving | {pipeline_name}
+
         activities = pipeline.get("activities") or []
-        enriched_activities = [self._enrich_activity(a) for a in activities]
+        enriched_activities = [self._enrich_activity(a, resolving) for a in activities]
         return {**pipeline, "activities": enriched_activities, "trigger": None}
 
     def _enrich_linked_service(self, activity: dict) -> dict:

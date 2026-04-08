@@ -360,7 +360,10 @@ def test_execute_pipeline_preparer_with_child_produces_inner_workflow() -> None:
 
     assert result.inner_workflow is not None
     assert len(result.inner_workflow.activities) == 1
-    assert "__INNER_JOB__:child_pipeline" in str(result.task.get("run_job_task"))
+    run_job_task = result.task.get("run_job_task")
+    assert isinstance(run_job_task, dict)
+    assert "__INNER_JOB__:child_pipeline" in str(run_job_task.get("job_id"))
+    assert run_job_task.get("job_parameters") == {"env": "prod"}
 
 
 def test_execute_pipeline_preparer_without_child_produces_placeholder() -> None:

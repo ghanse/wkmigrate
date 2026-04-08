@@ -1301,10 +1301,14 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         for task in tasks:
             run_job_task = task.get("run_job_task")
-            if run_job_task and isinstance(run_job_task, str) and run_job_task.startswith("__INNER_JOB__:"):
-                job_name = run_job_task.split(":", 1)[1]
-                if job_name in job_id_map:
-                    task["run_job_task"] = {"job_id": job_id_map[job_name]}
+            if isinstance(run_job_task, dict):
+                job_id_value = run_job_task.get("job_id")
+                if (
+                    isinstance(job_id_value, str)
+                    and job_id_value.startswith("__INNER_JOB__:")
+                    and (job_name := job_id_value.split(":", 1)[1]) in job_id_map
+                ):
+                    run_job_task["job_id"] = job_id_map[job_name]
             for_each_task = task.get("for_each_task")
             if for_each_task:
                 nested_task = for_each_task.get("task")
@@ -1319,10 +1323,11 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """
         for task in tasks:
             run_job_task = task.get("run_job_task")
-            if run_job_task:
-                if isinstance(run_job_task, str) and run_job_task.startswith("__INNER_JOB__:"):
-                    job_name = run_job_task.split(":", 1)[1]
-                    task["run_job_task"] = {"job_id": f"${{resources.jobs.{job_name}.id}}"}
+            if isinstance(run_job_task, dict):
+                job_id_value = run_job_task.get("job_id")
+                if isinstance(job_id_value, str) and job_id_value.startswith("__INNER_JOB__:"):
+                    job_name = job_id_value.split(":", 1)[1]
+                    run_job_task["job_id"] = f"${{resources.jobs.{job_name}.id}}"
             job_id = task.get("job_id")
             if job_id and isinstance(job_id, str):
                 task["job_id"] = f"${{resources.jobs.{job_id}.id}}"

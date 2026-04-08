@@ -45,7 +45,10 @@ def prepare_execute_pipeline_activity(
         preparer = import_module("wkmigrate.preparers.preparer")
         inner_workflow = preparer.prepare_workflow(activity.pipeline, default_files_to_delta_sinks, credentials_scope)
 
-        task = parse_mapping({**base_task, "run_job_task": f"__INNER_JOB__:{activity.pipeline_name}"})
+        run_job_task_dict: dict = {"job_id": f"__INNER_JOB__:{activity.pipeline_name}"}
+        if activity.parameters:
+            run_job_task_dict["job_parameters"] = activity.parameters
+        task = parse_mapping({**base_task, "run_job_task": run_job_task_dict})
         return PreparedActivity(task=task, inner_workflow=inner_workflow)
 
     # Child pipeline was not resolved -- emit a placeholder reference.

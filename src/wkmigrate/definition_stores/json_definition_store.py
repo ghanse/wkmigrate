@@ -181,18 +181,20 @@ class JsonDefinitionStore(DefinitionStore):
         return None
 
     def _get_raw_pipeline(self, pipeline_name: str) -> dict:
-        """Return a normalized pipeline dict suitable for adapter enrichment.
+        """Return a pipeline dict suitable for adapter enrichment.
 
-        Unlike ``get_pipeline`` this applies ARM normalization so the adapter
-        receives a flat dict with ``activities``, ``parameters``, etc.
+        ARM normalization is intentionally *not* applied here because
+        ``_adapt_child_pipeline`` in the adapter already calls
+        ``normalize_arm_pipeline``.  Applying it twice is harmless but
+        wasteful and confusing.
 
         Args:
             pipeline_name: Name of the pipeline to look up.
 
         Returns:
-            Normalized pipeline dict.
+            Raw pipeline dict.
         """
-        return normalize_arm_pipeline(dict(self.get_pipeline(pipeline_name)))
+        return dict(self.get_pipeline(pipeline_name))
 
     def get_dataset(self, dataset_name: str) -> dict:
         """Return the dataset dict for the given name."""
