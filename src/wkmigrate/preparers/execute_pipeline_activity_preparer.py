@@ -1,11 +1,10 @@
-"""
-This module defines a preparer for Execute Pipeline activities.
+"""Preparer for Execute Pipeline activities.
 
-The preparer builds a Databricks Run Job task that invokes the translated
-child pipeline as a nested workflow, passing pipeline parameters as job
-parameters.  When the child pipeline IR is available the preparer delegates
-to ``prepare_workflow`` to produce an inner workflow; otherwise it emits a
-placeholder job reference keyed by pipeline name.
+Builds a Databricks Run Job task that invokes the translated child pipeline
+as a nested workflow, passing pipeline parameters as job parameters.  When
+the child pipeline IR is available the preparer delegates to
+``prepare_workflow``; otherwise it emits a placeholder job reference keyed
+by pipeline name.
 """
 
 from __future__ import annotations
@@ -24,8 +23,7 @@ def prepare_execute_pipeline_activity(
     default_files_to_delta_sinks: bool | None,
     credentials_scope: str = DEFAULT_CREDENTIALS_SCOPE,
 ) -> PreparedActivity:
-    """
-    Builds the task payload for an Execute Pipeline activity.
+    """Builds the task payload for an Execute Pipeline activity.
 
     When the child pipeline was resolved and translated, a full inner workflow
     is prepared.  Otherwise a placeholder ``run_job_task`` referencing the

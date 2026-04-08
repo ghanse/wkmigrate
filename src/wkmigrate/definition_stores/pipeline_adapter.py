@@ -91,8 +91,7 @@ class PipelineAdapter:
         return out
 
     def _enrich_activity(self, activity: dict, resolving: set[str] | None = None) -> dict:
-        """
-        Returns an activity dict enriched with datasets, linked services, and child pipelines.
+        """Returns an activity dict enriched with datasets, linked services, and child pipelines.
 
         Args:
             activity: Input activity as a dictionary.
@@ -145,15 +144,12 @@ class PipelineAdapter:
         return {**activity, **additions}
 
     def _enrich_execute_pipeline(self, activity: dict, resolving: set[str] | None = None) -> dict:
-        """
-        Returns an activity dictionary enriched with the child pipeline definition for Execute Pipeline activities.
+        """Returns an activity dict enriched with the child pipeline definition.
 
-        When a ``get_pipeline`` callable is available and the activity type is
-        ``ExecutePipeline``, the referenced child pipeline is fetched, normalized,
-        enriched (recursively), and embedded under the ``pipeline_definition`` key.
-
-        A *resolving* set tracks pipeline names currently being enriched to
-        prevent infinite recursion on circular pipeline references.
+        For ``ExecutePipeline`` activities the referenced child pipeline is
+        fetched, normalized, enriched (recursively), and embedded under the
+        ``pipeline_definition`` key.  A *resolving* set guards against
+        infinite recursion on circular pipeline references.
 
         Args:
             activity: Input activity as a dictionary.
@@ -190,9 +186,7 @@ class PipelineAdapter:
 
         try:
             raw_pipeline = self.get_pipeline(pipeline_name)
-            normalized = self.normalize_casing(raw_pipeline, ("pipeline", pipeline_name))
-            if normalized is not None:
-                raw_pipeline = normalized
+            raw_pipeline = self.normalize_casing(raw_pipeline, ("pipeline", pipeline_name)) or raw_pipeline
             enriched = self._adapt_child_pipeline(raw_pipeline, resolving)
             return {**activity, "pipeline_definition": enriched}
         except (ValueError, KeyError):
@@ -202,13 +196,12 @@ class PipelineAdapter:
             return activity
 
     def _adapt_child_pipeline(self, pipeline: dict, resolving: set[str] | None = None) -> dict:
-        """
-        Enriches a child pipeline dict with datasets and linked services.
+        """Enriches a child pipeline dict with datasets and linked services.
 
         Unlike ``adapt`` this skips trigger resolution since child pipelines
-        invoked by Execute Pipeline do not carry their own triggers.
-        ``normalize_arm_pipeline`` is applied first to flatten any ``properties``
-        wrapper and merge ``typeProperties`` into activity dicts.
+        invoked via Execute Pipeline do not carry their own triggers.
+        ``normalize_arm_pipeline`` is applied first to flatten any
+        ``properties`` wrapper and merge ``typeProperties`` into activity dicts.
 
         Args:
             pipeline: Raw child pipeline definition.

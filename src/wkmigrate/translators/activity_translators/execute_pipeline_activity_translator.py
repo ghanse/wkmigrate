@@ -1,13 +1,12 @@
-"""This module defines a translator for Execute Pipeline activities.
+"""This module defines a translator for translating Execute Pipeline activities.
 
-Translators in this module normalize Execute Pipeline activity payloads into internal
-representations. The translator resolves the child pipeline definition (embedded by the
-adapter during enrichment), translates it into a ``Pipeline`` IR, and wraps the result
+The translator resolves the child pipeline definition (embedded by the adapter
+during enrichment), translates it into a ``Pipeline`` IR, and wraps the result
 in an ``ExecutePipelineActivity``.
 
-When the child pipeline definition is not available (e.g. the source definition store
-could not resolve it), the translator still produces a valid ``ExecutePipelineActivity``
-with ``pipeline`` set to ``None`` so the preparer can emit a placeholder reference.
+When the child pipeline definition is not available (e.g. the source definition
+store could not resolve it), ``pipeline`` is set to ``None`` so the preparer can
+emit a placeholder reference.
 """
 
 from __future__ import annotations
@@ -24,13 +23,12 @@ from wkmigrate.utils import parse_mapping
 def translate_execute_pipeline_activity(
     activity: dict, base_kwargs: dict
 ) -> ExecutePipelineActivity | UnsupportedValue:
-    """
-    Translates an ADF Execute Pipeline activity into an ``ExecutePipelineActivity`` object.
+    """Translates an ADF Execute Pipeline activity into an ``ExecutePipelineActivity``.
 
-    The child pipeline referenced by ``pipeline.reference_name`` is expected to have been
-    resolved and embedded under ``pipeline_definition`` by the pipeline adapter during the
-    enrichment phase.  When present the definition is translated into a ``Pipeline`` IR and
-    attached to the resulting activity.
+    The child pipeline referenced by ``pipeline.reference_name`` is expected to
+    have been resolved and embedded under ``pipeline_definition`` by the adapter
+    during enrichment.  When present the definition is translated into a
+    ``Pipeline`` IR and attached to the resulting activity.
 
     Args:
         activity: Execute Pipeline activity definition as a ``dict``.
@@ -62,7 +60,6 @@ def translate_execute_pipeline_activity(
             stacklevel=2,
         )
 
-    # Translate the embedded child pipeline definition when available.
     child_pipeline_ir = None
     pipeline_definition = activity.get("pipeline_definition")
     if pipeline_definition is not None:

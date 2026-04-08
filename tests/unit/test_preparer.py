@@ -352,8 +352,8 @@ def _make_execute_pipeline_without_child(name: str = "ExecPipelineNoChild") -> E
     )
 
 
-def test_execute_pipeline_preparer_with_child_produces_inner_workflow() -> None:
-    """prepare_execute_pipeline_activity creates an inner workflow when the child pipeline is available."""
+def test_execute_pipeline_with_child_produces_inner_workflow() -> None:
+    """Resolved child pipeline produces an inner workflow with __INNER_JOB__ placeholder."""
     activity = _make_execute_pipeline_with_child()
 
     result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
@@ -362,12 +362,12 @@ def test_execute_pipeline_preparer_with_child_produces_inner_workflow() -> None:
     assert len(result.inner_workflow.activities) == 1
     run_job_task = result.task.get("run_job_task")
     assert isinstance(run_job_task, dict)
-    assert "__INNER_JOB__:child_pipeline" in str(run_job_task.get("job_id"))
+    assert run_job_task.get("job_id") == "__INNER_JOB__:child_pipeline"
     assert run_job_task.get("job_parameters") == {"env": "prod"}
 
 
-def test_execute_pipeline_preparer_without_child_produces_placeholder() -> None:
-    """prepare_execute_pipeline_activity emits a placeholder when the child pipeline is not resolved."""
+def test_execute_pipeline_without_child_produces_placeholder() -> None:
+    """Unresolved child pipeline emits a placeholder job_id template."""
     activity = _make_execute_pipeline_without_child()
 
     result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
@@ -378,8 +378,8 @@ def test_execute_pipeline_preparer_without_child_produces_placeholder() -> None:
     assert "job_id_for_unresolved_pipeline" in str(run_job_task.get("job_id"))
 
 
-def test_execute_pipeline_preparer_default_scope_in_inner_notebook() -> None:
-    """prepare_execute_pipeline_activity passes DEFAULT_CREDENTIALS_SCOPE into the nested workflow."""
+def test_execute_pipeline_default_scope_in_inner_notebook() -> None:
+    """Inner workflow notebooks use DEFAULT_CREDENTIALS_SCOPE by default."""
     activity = _make_execute_pipeline_with_child()
 
     result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
@@ -389,8 +389,8 @@ def test_execute_pipeline_preparer_default_scope_in_inner_notebook() -> None:
     assert f'scope="{DEFAULT_CREDENTIALS_SCOPE}"' in notebook_content
 
 
-def test_execute_pipeline_preparer_custom_scope_in_inner_notebook() -> None:
-    """prepare_execute_pipeline_activity forwards credentials_scope into nested prepared notebooks."""
+def test_execute_pipeline_custom_scope_in_inner_notebook() -> None:
+    """Custom credentials_scope is forwarded into nested prepared notebooks."""
     activity = _make_execute_pipeline_with_child()
 
     result = prepare_execute_pipeline_activity(
@@ -405,8 +405,8 @@ def test_execute_pipeline_preparer_custom_scope_in_inner_notebook() -> None:
     assert DEFAULT_CREDENTIALS_SCOPE not in notebook_content
 
 
-def test_run_job_preparer_emits_dict_run_job_task() -> None:
-    """prepare_run_job_activity emits run_job_task as a dict with job_id placeholder."""
+def test_run_job_activity_emits_dict_run_job_task() -> None:
+    """RunJobActivity run_job_task is a dict with __INNER_JOB__ job_id placeholder."""
     activity = _make_run_job_with_lookup_pipeline()
 
     result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
@@ -446,10 +446,10 @@ def test_assign_inner_job_ids_resolves_run_job_activity_placeholder(
     assert tasks[0]["run_job_task"]["job_id"] == 42
 
 
-def test_assign_inner_job_ids_resolves_execute_pipeline_placeholder(
+def test_assign_inner_job_ids_preserves_job_parameters(
     workspace_definition_store: WorkspaceDefinitionStore,
 ) -> None:
-    """_assign_inner_job_ids resolves __INNER_JOB__: placeholders in ExecutePipelineActivity dict format."""
+    """_assign_inner_job_ids resolves __INNER_JOB__: placeholder while preserving job_parameters."""
     tasks = [
         {
             "task_key": "exec_pipeline",

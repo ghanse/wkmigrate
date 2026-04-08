@@ -431,8 +431,8 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
     assert result.notebook_path == fixture["expected"]["notebook_path"]
 
 
-def test_execute_pipeline_dispatches_correctly() -> None:
-    """Test that ExecutePipeline activity is dispatched to the execute pipeline translator."""
+def test_execute_pipeline_dispatches_to_translator() -> None:
+    """ExecutePipeline type routes through translate_execute_pipeline_activity."""
     activity_input = {
         "name": "call_child_pipeline",
         "type": "ExecutePipeline",
