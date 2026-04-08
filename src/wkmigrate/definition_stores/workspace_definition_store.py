@@ -1296,8 +1296,16 @@ class WorkspaceDefinitionStore(DefinitionStore):
         return job_ids
 
     def _assign_inner_job_ids(self, tasks: Iterable[dict], job_id_map: dict[str, int]) -> None:
-        """
-        Replaces placeholder run_job_task job IDs with created inner job IDs.
+        """Replaces ``__INNER_JOB__:`` placeholder job IDs with real job IDs.
+
+        Recursively walks tasks (including ``for_each_task`` nesting) and
+        substitutes any ``run_job_task.job_id`` that starts with the
+        ``__INNER_JOB__:`` sentinel with the corresponding numeric job ID
+        from *job_id_map*.
+
+        Args:
+            tasks: Iterable of serialized task dicts to mutate in place.
+            job_id_map: Mapping of inner job names to their created job IDs.
         """
         for task in tasks:
             run_job_task = task.get("run_job_task")
@@ -1318,8 +1326,15 @@ class WorkspaceDefinitionStore(DefinitionStore):
                     self._assign_inner_job_ids(nested_task, job_id_map)
 
     def _assign_inner_job_refs(self, tasks: Iterable[dict]) -> None:
-        """
-        Replaces placeholder run_job_task job IDs with bundle resource references.
+        """Replaces ``__INNER_JOB__:`` placeholder job IDs with bundle resource references.
+
+        Recursively walks tasks (including ``for_each_task`` nesting) and
+        substitutes any ``run_job_task.job_id`` that starts with the
+        ``__INNER_JOB__:`` sentinel with a ``${resources.jobs.<name>.id}``
+        interpolation string suitable for Databricks Asset Bundles.
+
+        Args:
+            tasks: Iterable of serialized task dicts to mutate in place.
         """
         for task in tasks:
             run_job_task = task.get("run_job_task")

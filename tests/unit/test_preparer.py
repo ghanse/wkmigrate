@@ -16,7 +16,6 @@ from wkmigrate.models.ir.pipeline import (
     WebActivity,
 )
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
-from wkmigrate.preparers.execute_pipeline_activity_preparer import prepare_execute_pipeline_activity
 from wkmigrate.preparers.for_each_activity_preparer import prepare_for_each_activity
 from wkmigrate.preparers.lookup_activity_preparer import prepare_lookup_activity
 from wkmigrate.preparers.preparer import prepare_workflow
@@ -356,7 +355,7 @@ def test_execute_pipeline_with_child_produces_inner_workflow() -> None:
     """Resolved child pipeline produces an inner workflow with __INNER_JOB__ placeholder."""
     activity = _make_execute_pipeline_with_child()
 
-    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
 
     assert result.inner_workflow is not None
     assert len(result.inner_workflow.activities) == 1
@@ -370,7 +369,7 @@ def test_execute_pipeline_without_child_produces_placeholder() -> None:
     """Unresolved child pipeline emits a placeholder job_id template."""
     activity = _make_execute_pipeline_without_child()
 
-    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
 
     assert result.inner_workflow is None
     run_job_task = result.task.get("run_job_task")
@@ -382,7 +381,7 @@ def test_execute_pipeline_default_scope_in_inner_notebook() -> None:
     """Inner workflow notebooks use DEFAULT_CREDENTIALS_SCOPE by default."""
     activity = _make_execute_pipeline_with_child()
 
-    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
 
     assert result.inner_workflow is not None
     notebook_content = result.inner_workflow.activities[0].notebooks[0].content
@@ -393,7 +392,7 @@ def test_execute_pipeline_custom_scope_in_inner_notebook() -> None:
     """Custom credentials_scope is forwarded into nested prepared notebooks."""
     activity = _make_execute_pipeline_with_child()
 
-    result = prepare_execute_pipeline_activity(
+    result = prepare_run_job_activity(
         activity,
         default_files_to_delta_sinks=None,
         credentials_scope="exec_vault",
