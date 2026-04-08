@@ -14,6 +14,7 @@ from wkmigrate.models.ir.pipeline import (
     Activity,
     CopyActivity,
     DatabricksNotebookActivity,
+    DeleteActivity,
     ForEachActivity,
     IfConditionActivity,
     LookupActivity,
@@ -26,6 +27,7 @@ from wkmigrate.models.ir.pipeline import (
 )
 from wkmigrate.models.workflows.artifacts import PreparedActivity, PreparedWorkflow
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
+from wkmigrate.preparers.delete_activity_preparer import prepare_delete_activity
 from wkmigrate.preparers.for_each_activity_preparer import prepare_for_each_activity
 from wkmigrate.preparers.if_condition_activity_preparer import prepare_if_condition_activity
 from wkmigrate.preparers.lookup_activity_preparer import prepare_lookup_activity
@@ -87,6 +89,8 @@ def prepare_activity(
         return prepare_run_job_activity(activity, default_files_to_delta_sinks, credentials_scope)
     if isinstance(activity, CopyActivity):
         return prepare_copy_activity(activity, default_files_to_delta_sinks, credentials_scope)
+    if isinstance(activity, DeleteActivity):
+        return prepare_delete_activity(activity)
     if isinstance(activity, LookupActivity):
         return prepare_lookup_activity(activity, credentials_scope)
     if isinstance(activity, WebActivity):

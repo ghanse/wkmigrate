@@ -124,6 +124,12 @@ def linked_service_fixtures() -> list[dict]:
 
 
 @pytest.fixture
+def delete_activity_fixtures() -> list[dict]:
+    """Load Delete activity test fixtures."""
+    return load_fixtures("delete_activities.json")
+
+
+@pytest.fixture
 def web_activity_fixtures() -> list[dict]:
     """Load Web activity test fixtures."""
     return load_fixtures("web_activities.json")

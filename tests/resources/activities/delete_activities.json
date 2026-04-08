@@ -1,0 +1,162 @@
+[
+  {
+    "id": "basic_delete",
+    "description": "Delete activity - simple recursive delete",
+    "input": {
+      "name": "delete_staging_files",
+      "type": "Delete",
+      "description": "Remove staging files after processing",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00",
+        "retry": 2,
+        "retry_interval_in_seconds": 30
+      },
+      "dataset": {
+        "reference_name": "StagingDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": true
+    },
+    "expected": {
+      "name": "delete_staging_files",
+      "task_key": "delete_staging_files",
+      "dataset_name": "StagingDataset",
+      "recursive": true,
+      "timeout_seconds": 3600,
+      "max_retries": 2,
+      "min_retry_interval_millis": 30000
+    }
+  },
+  {
+    "id": "delete_no_recurse",
+    "description": "Delete activity - non-recursive delete",
+    "input": {
+      "name": "delete_single_file",
+      "type": "Delete",
+      "description": "Remove a single file without recursion",
+      "depends_on": [],
+      "dataset": {
+        "reference_name": "OutputDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": false,
+      "folder_path": "data/output/temp"
+    },
+    "expected": {
+      "name": "delete_single_file",
+      "task_key": "delete_single_file",
+      "dataset_name": "OutputDataset",
+      "recursive": false,
+      "folder_path": "data/output/temp"
+    }
+  },
+  {
+    "id": "delete_with_wildcard",
+    "description": "Delete activity - with wildcard file name",
+    "input": {
+      "name": "delete_csv_files",
+      "type": "Delete",
+      "description": "Remove CSV files matching a wildcard pattern",
+      "depends_on": [],
+      "dataset": {
+        "reference_name": "RawDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": true,
+      "store_settings": {
+        "type": "AzureBlobFSReadSettings",
+        "wildcard_file_name": "*.csv",
+        "wildcard_folder_path": "data/raw/*"
+      }
+    },
+    "expected": {
+      "name": "delete_csv_files",
+      "task_key": "delete_csv_files",
+      "dataset_name": "RawDataset",
+      "recursive": true,
+      "wildcard_file_name": "*.csv",
+      "wildcard_folder_path": "data/raw/*"
+    }
+  },
+  {
+    "id": "delete_with_logging",
+    "description": "Delete activity - with enableLogging (triggers warning)",
+    "input": {
+      "name": "delete_with_audit",
+      "type": "Delete",
+      "description": "Delete files with audit logging enabled",
+      "depends_on": [],
+      "dataset": {
+        "reference_name": "ArchiveDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": true,
+      "enable_logging": true,
+      "log_storage_settings": {
+        "linked_service_name": {
+          "reference_name": "AuditStorageLink",
+          "type": "LinkedServiceReference"
+        },
+        "path": "audit-logs/delete"
+      }
+    },
+    "expected": {
+      "name": "delete_with_audit",
+      "task_key": "delete_with_audit",
+      "dataset_name": "ArchiveDataset",
+      "recursive": true
+    }
+  },
+  {
+    "id": "delete_with_dependency",
+    "description": "Delete activity - with upstream dependency",
+    "input": {
+      "name": "cleanup_after_copy",
+      "type": "Delete",
+      "description": "Clean up source files after successful copy",
+      "depends_on": [
+        {
+          "activity": "copy_to_target",
+          "dependency_conditions": ["Succeeded"]
+        }
+      ],
+      "dataset": {
+        "reference_name": "SourceDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": true
+    },
+    "expected": {
+      "name": "cleanup_after_copy",
+      "task_key": "cleanup_after_copy",
+      "dataset_name": "SourceDataset",
+      "recursive": true
+    }
+  },
+  {
+    "id": "missing_dataset",
+    "description": "Delete activity - missing dataset returns UnsupportedValue",
+    "input": {
+      "name": "bad_delete",
+      "type": "Delete",
+      "recursive": true
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing value 'dataset' for Delete activity"
+  },
+  {
+    "id": "missing_dataset_reference_name",
+    "description": "Delete activity - missing dataset reference name returns UnsupportedValue",
+    "input": {
+      "name": "bad_delete_ref",
+      "type": "Delete",
+      "dataset": {
+        "type": "DatasetReference"
+      },
+      "recursive": true
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing value 'dataset.referenceName' for Delete activity"
+  }
+]

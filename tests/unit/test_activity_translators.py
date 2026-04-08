@@ -16,6 +16,7 @@ from wkmigrate.models.ir.pipeline import (
     CopyActivity,
     Authentication,
     DatabricksNotebookActivity,
+    DeleteActivity,
     ForEachActivity,
     IfConditionActivity,
     LookupActivity,
@@ -51,6 +52,7 @@ from wkmigrate.translators.activity_translators.spark_jar_activity_translator im
 from wkmigrate.translators.activity_translators.lookup_activity_translator import (
     translate_lookup_activity,
 )
+from wkmigrate.translators.activity_translators.delete_activity_translator import translate_delete_activity
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
 from wkmigrate.translators.activity_translators.set_variable_activity_translator import (
     translate_set_variable_activity,
@@ -1479,3 +1481,94 @@ def test_copy_invalid_translator_returns_unsupported(copy_activity_fixtures: lis
 
     assert isinstance(result, UnsupportedValue)
     assert "translator" in result.message.lower()
+
+
+# --- Delete activity tests ---
+
+
+def test_basic_delete_activity(delete_activity_fixtures: list[dict]) -> None:
+    """Test translation of a basic recursive Delete activity."""
+    fixture = get_fixture(delete_activity_fixtures, "basic_delete")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.name == fixture["expected"]["name"]
+    assert result.task_key == fixture["expected"]["task_key"]
+    assert result.dataset_name == fixture["expected"]["dataset_name"]
+    assert result.recursive is True
+    assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
+    assert result.max_retries == fixture["expected"]["max_retries"]
+    assert result.min_retry_interval_millis == fixture["expected"]["min_retry_interval_millis"]
+
+
+def test_delete_no_recurse(delete_activity_fixtures: list[dict]) -> None:
+    """Test translation of a Delete activity with recursive=false."""
+    fixture = get_fixture(delete_activity_fixtures, "delete_no_recurse")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.dataset_name == fixture["expected"]["dataset_name"]
+    assert result.recursive is False
+    assert result.folder_path == fixture["expected"]["folder_path"]
+
+
+def test_delete_with_wildcard(delete_activity_fixtures: list[dict]) -> None:
+    """Test translation of a Delete activity with wildcard file name."""
+    fixture = get_fixture(delete_activity_fixtures, "delete_with_wildcard")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.dataset_name == fixture["expected"]["dataset_name"]
+    assert result.wildcard_file_name == fixture["expected"]["wildcard_file_name"]
+    assert result.wildcard_folder_path == fixture["expected"]["wildcard_folder_path"]
+
+
+def test_delete_with_logging_warns(delete_activity_fixtures: list[dict]) -> None:
+    """Test that enableLogging on a Delete activity emits warnings."""
+    fixture = get_fixture(delete_activity_fixtures, "delete_with_logging")
+
+    with pytest.warns(UserWarning):
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.dataset_name == fixture["expected"]["dataset_name"]
+
+
+def test_delete_with_dependency(delete_activity_fixtures: list[dict]) -> None:
+    """Test translation of a Delete activity with an upstream dependency."""
+    fixture = get_fixture(delete_activity_fixtures, "delete_with_dependency")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.depends_on is not None
+    assert len(result.depends_on) == 1
+    assert result.depends_on[0].task_key == "copy_to_target"
+
+
+def test_delete_missing_dataset_returns_unsupported(delete_activity_fixtures: list[dict]) -> None:
+    """Test that a missing dataset returns UnsupportedValue."""
+    fixture = get_fixture(delete_activity_fixtures, "missing_dataset")
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_delete_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_delete_missing_dataset_reference_name_returns_unsupported(delete_activity_fixtures: list[dict]) -> None:
+    """Test that a missing dataset reference name returns UnsupportedValue."""
+    fixture = get_fixture(delete_activity_fixtures, "missing_dataset_reference_name")
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_delete_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_delete_translate_activity_dispatch(delete_activity_fixtures: list[dict]) -> None:
+    """Test that translate_activity dispatches Delete to the correct translator."""
+    fixture = get_fixture(delete_activity_fixtures, "basic_delete")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.dataset_name == fixture["expected"]["dataset_name"]

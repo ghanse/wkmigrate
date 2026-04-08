@@ -8,6 +8,7 @@ from wkmigrate.models.ir.pipeline import (
     Authentication,
     ColumnMapping,
     CopyActivity,
+    DeleteActivity,
     ForEachActivity,
     LookupActivity,
     Pipeline,
@@ -15,6 +16,7 @@ from wkmigrate.models.ir.pipeline import (
     WebActivity,
 )
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
+from wkmigrate.preparers.delete_activity_preparer import prepare_delete_activity
 from wkmigrate.preparers.for_each_activity_preparer import prepare_for_each_activity
 from wkmigrate.preparers.lookup_activity_preparer import prepare_lookup_activity
 from wkmigrate.preparers.preparer import prepare_workflow
@@ -321,3 +323,94 @@ def _make_run_job_with_lookup_pipeline(name: str = "RunJobTest") -> RunJobActivi
         task_key=name.lower(),
         pipeline=_make_pipeline_with_lookup(),
     )
+
+
+def _make_delete_activity(name: str = "DeleteTest") -> DeleteActivity:
+    return DeleteActivity(
+        name=name,
+        task_key=name.lower(),
+        dataset_name="StagingDataset",
+        folder_path="data/staging",
+        recursive=True,
+    )
+
+
+def test_delete_preparer_produces_notebook() -> None:
+    """prepare_delete_activity produces a notebook with dbutils.fs.rm."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.notebooks is not None
+    assert len(result.notebooks) == 1
+    notebook_content = result.notebooks[0].content
+    assert "dbutils.fs.rm" in notebook_content
+    assert "data/staging" in notebook_content
+
+
+def test_delete_preparer_notebook_path() -> None:
+    """prepare_delete_activity sets the correct notebook path."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert result.notebooks[0].file_path == "/wkmigrate/delete_activity_notebooks/deletetest"
+
+
+def test_delete_preparer_task_has_notebook_task() -> None:
+    """prepare_delete_activity creates a task with a notebook_task entry."""
+    activity = _make_delete_activity()
+
+    result = prepare_delete_activity(activity)
+
+    assert "notebook_task" in result.task
+    assert result.task["notebook_task"]["notebook_path"] == "/wkmigrate/delete_activity_notebooks/deletetest"
+
+
+def test_delete_preparer_recursive_flag_in_notebook() -> None:
+    """prepare_delete_activity includes the recursive flag in the notebook content."""
+    activity = DeleteActivity(
+        name="NonRecursiveDelete",
+        task_key="non_recursive_delete",
+        dataset_name="TestDataset",
+        recursive=False,
+    )
+
+    result = prepare_delete_activity(activity)
+
+    notebook_content = result.notebooks[0].content
+    assert "recurse=False" in notebook_content
+
+
+def test_delete_preparer_wildcard_in_notebook() -> None:
+    """prepare_delete_activity includes wildcard logic in the notebook when wildcard is set."""
+    activity = DeleteActivity(
+        name="WildcardDelete",
+        task_key="wildcard_delete",
+        dataset_name="TestDataset",
+        wildcard_file_name="*.csv",
+        recursive=True,
+    )
+
+    result = prepare_delete_activity(activity)
+
+    notebook_content = result.notebooks[0].content
+    assert "fnmatch" in notebook_content
+    assert "*.csv" in notebook_content
+
+
+def test_prepare_workflow_dispatches_delete_activity() -> None:
+    """prepare_workflow correctly dispatches a DeleteActivity."""
+    pipeline = Pipeline(
+        name="test_delete_pipeline",
+        tasks=[_make_delete_activity()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline)
+
+    assert len(result.activities) == 1
+    assert result.activities[0].notebooks is not None
+    assert "dbutils.fs.rm" in result.activities[0].notebooks[0].content
