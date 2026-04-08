@@ -70,8 +70,8 @@ def _build_notebook_content(activity: DeleteActivity) -> str:
     lines: list[str] = [
         "# Databricks notebook source",
         "",
-        f"# Delete activity: {activity.name}",
-        f"# Dataset: {activity.dataset_name}",
+        f"# Delete activity: {activity.name.replace(chr(10), ' ').replace(chr(13), ' ')}",
+        f"# Dataset: {activity.dataset_name.replace(chr(10), ' ').replace(chr(13), ' ')}",
     ]
 
     _append_path_assignment(lines, activity.dataset_name, activity.folder_path)
@@ -97,8 +97,8 @@ def _append_path_assignment(lines: list[str], dataset_name: str, folder_path: st
             ),
             stacklevel=2,
         )
-        lines.append(f"# TODO: Resolve storage path for dataset '{dataset_name}'")
-        lines.append(f"path = '<UNRESOLVED_PATH_FOR_{dataset_name}>'")
+        lines.append(f"# TODO: Resolve storage path for dataset {dataset_name!r}")
+        lines.append(f"path = '<UNRESOLVED_PATH_FOR_' + {dataset_name!r} + '>'")
 
 
 def _append_delete_logic(
@@ -232,7 +232,7 @@ def _build_volume_notebook_content(
         'spark.sql(f"""',
         '    CREATE EXTERNAL VOLUME IF NOT EXISTS',
         '    `{catalog}`.`{schema}`.`{volume_name}`',
-        "    LOCATION '{storage_location}'",
+        "    LOCATION '{storage_location.replace(chr(39), chr(39)*2)}'",
         "    COMMENT 'External volume created by wkmigrate for delete activity.'",
         '""")',
         '',

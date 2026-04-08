@@ -467,7 +467,8 @@ def test_delete_preparer_missing_folder_path_emits_warning() -> None:
 
     notebook_content = result.notebooks[0].content
     assert "TODO" in notebook_content
-    assert "UNRESOLVED_PATH_FOR_StagingDataset" in notebook_content
+    assert "UNRESOLVED_PATH_FOR_" in notebook_content
+    assert "'StagingDataset'" in notebook_content
 
 
 def test_prepare_workflow_dispatches_delete_activity() -> None:
@@ -591,7 +592,7 @@ def test_all_setup_tasks_property_includes_activity_level() -> None:
     )
     workflow = prepare_workflow(pipeline)
 
-    assert len(workflow.all_setup_tasks) >= 1
+    assert len(workflow.all_setup_tasks) == 1
     assert any("CREATE EXTERNAL VOLUME" in st.notebooks[0].content for st in workflow.all_setup_tasks if st.notebooks)
 
 

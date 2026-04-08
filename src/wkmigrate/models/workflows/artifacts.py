@@ -72,13 +72,16 @@ class PreparedWorkflow:
 
     @property
     def all_setup_tasks(self) -> list["PreparedActivity"]:
-        """All setup tasks across this workflow and any nested inner workflows."""
+        """All setup tasks across this workflow and any nested inner workflows.
+
+        Setup tasks from individual activities are hoisted into
+        ``self.setup_tasks`` by ``prepare_workflow``, so we only need to
+        collect from there and recurse into inner workflows.
+        """
         result: list[PreparedActivity] = []
         if self.setup_tasks:
             result.extend(self.setup_tasks)
         for activity in self.activities:
-            if activity.setup_tasks:
-                result.extend(activity.setup_tasks)
             if activity.inner_workflow:
                 result.extend(activity.inner_workflow.all_setup_tasks)
         return result
