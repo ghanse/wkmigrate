@@ -6,10 +6,13 @@ from cloud storage using ``dbutils.fs.rm()``.
 
 from __future__ import annotations
 
+import warnings
+
 import autopep8  # type: ignore
 
 from wkmigrate.models.ir.pipeline import DeleteActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.preparers.utils import get_base_task
 from wkmigrate.utils import parse_mapping
 
@@ -62,31 +65,65 @@ def _get_delete_activity_notebook_content(
     Returns:
         Formatted Python notebook source as a ``str``.
     """
-    path = folder_path or dataset_name
-
     script_lines = [
         "# Databricks notebook source",
         "",
         f"# Delete activity: {activity_name}",
         f"# Dataset: {dataset_name}",
-        f"path = {path!r}",
     ]
 
-    if wildcard_file_name:
-        script_lines.append(f"wildcard_file_name = {wildcard_file_name!r}")
-        script_lines.append("# NOTE: Wildcard deletion requires listing and filtering files manually.")
-        script_lines.append("import fnmatch")
-        if wildcard_folder_path:
-            script_lines.append(f"wildcard_folder_path = {wildcard_folder_path!r}")
-            script_lines.append(
-                "# Filter folders matching the wildcard folder path, then files matching the wildcard file name."
-            )
+    if folder_path:
+        script_lines.append(f"path = {folder_path!r}")
+    else:
+        warnings.warn(
+            NotTranslatableWarning(
+                "folder_path",
+                f"Storage path could not be resolved from dataset reference '{dataset_name}'. "
+                "Replace the placeholder path below with the actual storage location.",
+            ),
+            stacklevel=2,
+        )
+        script_lines.append(f"# TODO: Resolve storage path for dataset '{dataset_name}'")
+        script_lines.append(f"path = '<UNRESOLVED_PATH_FOR_{dataset_name}>'")
+
+    if wildcard_folder_path and wildcard_file_name:
+        # Two-level listing: filter folders by wildcard_folder_path, then files by wildcard_file_name.
         script_lines.extend(
             [
+                "import fnmatch",
+                f"wildcard_folder_path = {wildcard_folder_path!r}",
+                f"wildcard_file_name = {wildcard_file_name!r}",
+                "folders = dbutils.fs.ls(path)",
+                "for folder in folders:",
+                "    if fnmatch.fnmatch(folder.name, wildcard_folder_path):",
+                "        files = dbutils.fs.ls(folder.path)",
+                "        for f in files:",
+                "            if fnmatch.fnmatch(f.name, wildcard_file_name):",
+                f"                dbutils.fs.rm(f.path, recurse={recursive})",
+            ]
+        )
+    elif wildcard_file_name:
+        # Single-level listing: filter files at path by wildcard_file_name.
+        script_lines.extend(
+            [
+                "import fnmatch",
+                f"wildcard_file_name = {wildcard_file_name!r}",
                 "files = dbutils.fs.ls(path)",
                 "for f in files:",
                 "    if fnmatch.fnmatch(f.name, wildcard_file_name):",
                 f"        dbutils.fs.rm(f.path, recurse={recursive})",
+            ]
+        )
+    elif wildcard_folder_path:
+        # Folder-only wildcard: filter folders at path by wildcard_folder_path and delete each match.
+        script_lines.extend(
+            [
+                "import fnmatch",
+                f"wildcard_folder_path = {wildcard_folder_path!r}",
+                "folders = dbutils.fs.ls(path)",
+                "for folder in folders:",
+                "    if fnmatch.fnmatch(folder.name, wildcard_folder_path):",
+                f"        dbutils.fs.rm(folder.path, recurse={recursive})",
             ]
         )
     else:

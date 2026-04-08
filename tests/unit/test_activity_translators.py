@@ -1565,6 +1565,17 @@ def test_delete_missing_dataset_reference_name_returns_unsupported(delete_activi
     assert fixture["expected_message"] in result.message
 
 
+def test_delete_with_wildcard_folder_only(delete_activity_fixtures: list[dict]) -> None:
+    """Test translation of a Delete activity with wildcard_folder_path but no wildcard_file_name."""
+    fixture = get_fixture(delete_activity_fixtures, "delete_with_wildcard_folder_only")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DeleteActivity)
+    assert result.dataset_name == fixture["expected"]["dataset_name"]
+    assert result.wildcard_folder_path == fixture["expected"]["wildcard_folder_path"]
+    assert result.wildcard_file_name is None
+
+
 def test_delete_translate_activity_dispatch(delete_activity_fixtures: list[dict]) -> None:
     """Test that translate_activity dispatches Delete to the correct translator."""
     fixture = get_fixture(delete_activity_fixtures, "basic_delete")

@@ -135,6 +135,32 @@
     }
   },
   {
+    "id": "delete_with_wildcard_folder_only",
+    "description": "Delete activity - wildcard folder path without wildcard file name",
+    "input": {
+      "name": "delete_old_folders",
+      "type": "Delete",
+      "description": "Remove folders matching a wildcard pattern",
+      "depends_on": [],
+      "dataset": {
+        "reference_name": "ArchiveDataset",
+        "type": "DatasetReference"
+      },
+      "recursive": true,
+      "store_settings": {
+        "type": "AzureBlobFSReadSettings",
+        "wildcard_folder_path": "archive/2023-*"
+      }
+    },
+    "expected": {
+      "name": "delete_old_folders",
+      "task_key": "delete_old_folders",
+      "dataset_name": "ArchiveDataset",
+      "recursive": true,
+      "wildcard_folder_path": "archive/2023-*"
+    }
+  },
+  {
     "id": "missing_dataset",
     "description": "Delete activity - missing dataset returns UnsupportedValue",
     "input": {

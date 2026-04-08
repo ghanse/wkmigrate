@@ -399,6 +399,78 @@ def test_delete_preparer_wildcard_in_notebook() -> None:
     assert "*.csv" in notebook_content
 
 
+def test_delete_preparer_wildcard_folder_only() -> None:
+    """prepare_delete_activity generates folder-wildcard filtering when only wildcard_folder_path is set."""
+    activity = DeleteActivity(
+        name="FolderWildcardDelete",
+        task_key="folder_wildcard_delete",
+        dataset_name="TestDataset",
+        folder_path="data/archive",
+        recursive=True,
+        wildcard_folder_path="2023-*",
+    )
+
+    result = prepare_delete_activity(activity)
+
+    notebook_content = result.notebooks[0].content
+    assert "fnmatch" in notebook_content
+    assert "2023-*" in notebook_content
+    assert "folders = dbutils.fs.ls(path)" in notebook_content
+    assert "fnmatch.fnmatch(folder.name, wildcard_folder_path)" in notebook_content
+    assert "dbutils.fs.rm(folder.path" in notebook_content
+
+
+def test_delete_preparer_two_level_wildcard() -> None:
+    """prepare_delete_activity generates two-level filtering when both wildcards are set."""
+    activity = DeleteActivity(
+        name="TwoLevelDelete",
+        task_key="two_level_delete",
+        dataset_name="TestDataset",
+        folder_path="data/raw",
+        recursive=True,
+        wildcard_file_name="*.csv",
+        wildcard_folder_path="data/raw/*",
+    )
+
+    result = prepare_delete_activity(activity)
+
+    notebook_content = result.notebooks[0].content
+    assert "fnmatch" in notebook_content
+    assert "wildcard_folder_path" in notebook_content
+    assert "wildcard_file_name" in notebook_content
+    assert "folders = dbutils.fs.ls(path)" in notebook_content
+    assert "files = dbutils.fs.ls(folder.path)" in notebook_content
+    assert "fnmatch.fnmatch(folder.name, wildcard_folder_path)" in notebook_content
+    assert "fnmatch.fnmatch(f.name, wildcard_file_name)" in notebook_content
+
+
+def test_delete_preparer_missing_folder_path_emits_warning() -> None:
+    """prepare_delete_activity emits NotTranslatableWarning when folder_path is None."""
+    import warnings
+
+    from wkmigrate.not_translatable import NotTranslatableWarning
+
+    activity = DeleteActivity(
+        name="NoPathDelete",
+        task_key="no_path_delete",
+        dataset_name="StagingDataset",
+        recursive=True,
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = prepare_delete_activity(activity)
+
+    warning_messages = [w for w in caught if issubclass(w.category, NotTranslatableWarning)]
+    assert len(warning_messages) == 1
+    assert "StagingDataset" in str(warning_messages[0].message)
+    assert "could not be resolved" in str(warning_messages[0].message)
+
+    notebook_content = result.notebooks[0].content
+    assert "TODO" in notebook_content
+    assert "UNRESOLVED_PATH_FOR_StagingDataset" in notebook_content
+
+
 def test_prepare_workflow_dispatches_delete_activity() -> None:
     """prepare_workflow correctly dispatches a DeleteActivity."""
     pipeline = Pipeline(
