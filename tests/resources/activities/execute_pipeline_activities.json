@@ -1,0 +1,223 @@
+[
+  {
+    "id": "basic",
+    "description": "Basic Execute Pipeline activity with child pipeline reference",
+    "input": {
+      "name": "run_child_pipeline",
+      "type": "ExecutePipeline",
+      "description": "Invoke child pipeline",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00",
+        "retry": 0,
+        "retry_interval_in_seconds": 30
+      },
+      "pipeline": {
+        "reference_name": "child_etl_pipeline",
+        "type": "PipelineReference"
+      },
+      "wait_on_completion": true
+    },
+    "expected": {
+      "name": "run_child_pipeline",
+      "task_key": "run_child_pipeline",
+      "description": "Invoke child pipeline",
+      "timeout_seconds": 3600,
+      "max_retries": 0,
+      "min_retry_interval_millis": 30000,
+      "pipeline_name": "child_etl_pipeline",
+      "parameters": null,
+      "wait_on_completion": true
+    }
+  },
+  {
+    "id": "with_parameters",
+    "description": "Execute Pipeline activity with parameters passed to child",
+    "input": {
+      "name": "run_parameterized_child",
+      "type": "ExecutePipeline",
+      "description": "Run child pipeline with parameters",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 0,
+        "retry_interval_in_seconds": 30
+      },
+      "pipeline": {
+        "reference_name": "child_load_pipeline",
+        "type": "PipelineReference"
+      },
+      "parameters": {
+        "env": "production",
+        "input_path": "/mnt/data/input",
+        "batch_date": "2026-02-26"
+      },
+      "wait_on_completion": true
+    },
+    "expected": {
+      "name": "run_parameterized_child",
+      "task_key": "run_parameterized_child",
+      "pipeline_name": "child_load_pipeline",
+      "parameters": {
+        "env": "production",
+        "input_path": "/mnt/data/input",
+        "batch_date": "2026-02-26"
+      },
+      "wait_on_completion": true
+    }
+  },
+  {
+    "id": "no_wait",
+    "description": "Execute Pipeline activity with waitOnCompletion set to false",
+    "input": {
+      "name": "fire_and_forget",
+      "type": "ExecutePipeline",
+      "description": "Fire and forget child pipeline",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "pipeline": {
+        "reference_name": "async_cleanup_pipeline",
+        "type": "PipelineReference"
+      },
+      "wait_on_completion": false
+    },
+    "expected": {
+      "name": "fire_and_forget",
+      "task_key": "fire_and_forget",
+      "pipeline_name": "async_cleanup_pipeline",
+      "parameters": null,
+      "wait_on_completion": false
+    }
+  },
+  {
+    "id": "with_dependency",
+    "description": "Execute Pipeline activity with upstream dependency",
+    "input": {
+      "name": "run_after_load",
+      "type": "ExecutePipeline",
+      "description": "Run child after upstream task completes",
+      "depends_on": [
+        {
+          "activity": "load_data",
+          "dependency_conditions": [
+            "Succeeded"
+          ]
+        }
+      ],
+      "policy": {
+        "timeout": "0.02:00:00",
+        "retry": 1,
+        "retry_interval_in_seconds": 60
+      },
+      "pipeline": {
+        "reference_name": "transform_pipeline",
+        "type": "PipelineReference"
+      },
+      "wait_on_completion": true
+    },
+    "expected": {
+      "name": "run_after_load",
+      "task_key": "run_after_load",
+      "timeout_seconds": 7200,
+      "max_retries": 1,
+      "min_retry_interval_millis": 60000,
+      "pipeline_name": "transform_pipeline",
+      "depends_on": [
+        {
+          "task_key": "load_data",
+          "outcome": null
+        }
+      ],
+      "wait_on_completion": true
+    }
+  },
+  {
+    "id": "missing_pipeline_ref",
+    "description": "Execute Pipeline activity missing pipeline reference (should return UnsupportedValue)",
+    "input": {
+      "name": "invalid_execute_pipeline",
+      "type": "ExecutePipeline",
+      "description": "Missing pipeline reference",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      }
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing property 'pipeline'"
+  },
+  {
+    "id": "missing_reference_name",
+    "description": "Execute Pipeline activity with pipeline ref but no reference_name",
+    "input": {
+      "name": "invalid_no_ref_name",
+      "type": "ExecutePipeline",
+      "description": "Pipeline ref without reference_name",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "pipeline": {
+        "type": "PipelineReference"
+      }
+    },
+    "expected_unsupported": true,
+    "expected_message": "Missing property 'reference_name'"
+  },
+  {
+    "id": "with_pipeline_definition",
+    "description": "Execute Pipeline activity with an embedded child pipeline definition (enriched by adapter)",
+    "input": {
+      "name": "run_enriched_child",
+      "type": "ExecutePipeline",
+      "description": "Run child pipeline with embedded definition",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00",
+        "retry": 0,
+        "retry_interval_in_seconds": 30
+      },
+      "pipeline": {
+        "reference_name": "child_notebook_pipeline",
+        "type": "PipelineReference"
+      },
+      "parameters": {
+        "run_date": "2026-04-01"
+      },
+      "wait_on_completion": true,
+      "pipeline_definition": {
+        "name": "child_notebook_pipeline",
+        "activities": [
+          {
+            "name": "child_notebook_task",
+            "type": "DatabricksNotebook",
+            "depends_on": [],
+            "policy": {
+              "timeout": "0.01:00:00"
+            },
+            "notebook_path": "/notebooks/child_etl"
+          }
+        ],
+        "parameters": null,
+        "trigger": null,
+        "tags": {}
+      }
+    },
+    "expected": {
+      "name": "run_enriched_child",
+      "task_key": "run_enriched_child",
+      "timeout_seconds": 3600,
+      "max_retries": 0,
+      "min_retry_interval_millis": 30000,
+      "pipeline_name": "child_notebook_pipeline",
+      "parameters": {
+        "run_date": "2026-04-01"
+      },
+      "wait_on_completion": true,
+      "child_pipeline_name": "child_notebook_pipeline",
+      "child_pipeline_has_tasks": true
+    }
+  }
+]

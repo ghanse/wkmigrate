@@ -8,6 +8,7 @@ from wkmigrate.models.ir.pipeline import (
     Authentication,
     ColumnMapping,
     CopyActivity,
+    ExecutePipelineActivity,
     ForEachActivity,
     LookupActivity,
     Pipeline,
@@ -15,6 +16,7 @@ from wkmigrate.models.ir.pipeline import (
     WebActivity,
 )
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
+from wkmigrate.preparers.execute_pipeline_activity_preparer import prepare_execute_pipeline_activity
 from wkmigrate.preparers.for_each_activity_preparer import prepare_for_each_activity
 from wkmigrate.preparers.lookup_activity_preparer import prepare_lookup_activity
 from wkmigrate.preparers.preparer import prepare_workflow
@@ -321,3 +323,96 @@ def _make_run_job_with_lookup_pipeline(name: str = "RunJobTest") -> RunJobActivi
         task_key=name.lower(),
         pipeline=_make_pipeline_with_lookup(),
     )
+
+
+def _make_execute_pipeline_with_child(name: str = "ExecPipelineTest") -> ExecutePipelineActivity:
+    child_pipeline = Pipeline(
+        name="child_pipeline",
+        tasks=[_make_lookup_activity("ChildLookup")],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    return ExecutePipelineActivity(
+        name=name,
+        task_key=name.lower(),
+        pipeline_name="child_pipeline",
+        pipeline=child_pipeline,
+        parameters={"env": "prod"},
+    )
+
+
+def _make_execute_pipeline_without_child(name: str = "ExecPipelineNoChild") -> ExecutePipelineActivity:
+    return ExecutePipelineActivity(
+        name=name,
+        task_key=name.lower(),
+        pipeline_name="unresolved_pipeline",
+        pipeline=None,
+        parameters={"batch_id": "123"},
+    )
+
+
+def test_execute_pipeline_preparer_with_child_produces_inner_workflow() -> None:
+    """prepare_execute_pipeline_activity creates an inner workflow when the child pipeline is available."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is not None
+    assert len(result.inner_workflow.activities) == 1
+    assert "__INNER_JOB__:child_pipeline" in str(result.task.get("run_job_task"))
+
+
+def test_execute_pipeline_preparer_without_child_produces_placeholder() -> None:
+    """prepare_execute_pipeline_activity emits a placeholder when the child pipeline is not resolved."""
+    activity = _make_execute_pipeline_without_child()
+
+    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is None
+    run_job_task = result.task.get("run_job_task")
+    assert run_job_task is not None
+    assert "job_id_for_unresolved_pipeline" in str(run_job_task.get("job_id"))
+
+
+def test_execute_pipeline_preparer_default_scope_in_inner_notebook() -> None:
+    """prepare_execute_pipeline_activity passes DEFAULT_CREDENTIALS_SCOPE into the nested workflow."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_execute_pipeline_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is not None
+    notebook_content = result.inner_workflow.activities[0].notebooks[0].content
+    assert f'scope="{DEFAULT_CREDENTIALS_SCOPE}"' in notebook_content
+
+
+def test_execute_pipeline_preparer_custom_scope_in_inner_notebook() -> None:
+    """prepare_execute_pipeline_activity forwards credentials_scope into nested prepared notebooks."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_execute_pipeline_activity(
+        activity,
+        default_files_to_delta_sinks=None,
+        credentials_scope="exec_vault",
+    )
+
+    assert result.inner_workflow is not None
+    notebook_content = result.inner_workflow.activities[0].notebooks[0].content
+    assert 'scope="exec_vault"' in notebook_content
+    assert DEFAULT_CREDENTIALS_SCOPE not in notebook_content
+
+
+def test_prepare_workflow_dispatches_execute_pipeline() -> None:
+    """prepare_workflow routes ExecutePipelineActivity through the preparer."""
+    pipeline = Pipeline(
+        name="parent_pipeline",
+        tasks=[_make_execute_pipeline_with_child()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline)
+
+    assert len(result.activities) == 1
+    assert result.activities[0].inner_workflow is not None

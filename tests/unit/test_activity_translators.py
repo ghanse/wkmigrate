@@ -16,6 +16,7 @@ from wkmigrate.models.ir.pipeline import (
     CopyActivity,
     Authentication,
     DatabricksNotebookActivity,
+    ExecutePipelineActivity,
     ForEachActivity,
     IfConditionActivity,
     LookupActivity,
@@ -27,6 +28,9 @@ from wkmigrate.models.ir.pipeline import (
 )
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
+)
+from wkmigrate.translators.activity_translators.execute_pipeline_activity_translator import (
+    translate_execute_pipeline_activity,
 )
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.activity_translators.activity_translator import (
@@ -427,12 +431,14 @@ def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: lis
     assert result.notebook_path == fixture["expected"]["notebook_path"]
 
 
-def test_execute_pipeline_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
-    """Test that ExecutePipeline activity creates placeholder."""
+def test_execute_pipeline_dispatches_correctly(unsupported_activity_fixtures: list[dict]) -> None:
+    """Test that ExecutePipeline activity is dispatched to the execute pipeline translator."""
     fixture = get_fixture(unsupported_activity_fixtures, "execute_pipeline")
     result = translate_activity(fixture["input"])
 
-    assert result.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.pipeline_name == "child_pipeline"
+    assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
 
 
 def test_wait_creates_placeholder_with_dependency(unsupported_activity_fixtures: list[dict]) -> None:
@@ -1479,3 +1485,99 @@ def test_copy_invalid_translator_returns_unsupported(copy_activity_fixtures: lis
 
     assert isinstance(result, UnsupportedValue)
     assert "translator" in result.message.lower()
+
+
+# ── Execute Pipeline activity tests ──────────────────────────────────────
+
+
+def test_basic_execute_pipeline_activity(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test translation of a basic Execute Pipeline activity."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "basic")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.name == fixture["expected"]["name"]
+    assert result.task_key == fixture["expected"]["task_key"]
+    assert result.pipeline_name == fixture["expected"]["pipeline_name"]
+    assert result.timeout_seconds == fixture["expected"]["timeout_seconds"]
+    assert result.max_retries == fixture["expected"]["max_retries"]
+    assert result.parameters is None
+    assert result.wait_on_completion is True
+
+
+def test_execute_pipeline_with_parameters(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test translation of an Execute Pipeline activity with parameters."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "with_parameters")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.pipeline_name == fixture["expected"]["pipeline_name"]
+    assert result.parameters == fixture["expected"]["parameters"]
+
+
+def test_execute_pipeline_no_wait(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test translation of an Execute Pipeline activity with waitOnCompletion=false."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "no_wait")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.pipeline_name == fixture["expected"]["pipeline_name"]
+    assert result.wait_on_completion is False
+
+
+def test_execute_pipeline_with_dependency(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test translation of an Execute Pipeline activity with upstream dependency."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "with_dependency")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.pipeline_name == fixture["expected"]["pipeline_name"]
+    assert result.depends_on is not None
+    assert len(result.depends_on) == 1
+    assert result.depends_on[0].task_key == "load_data"
+
+
+def test_execute_pipeline_missing_pipeline_ref_returns_unsupported(
+    execute_pipeline_activity_fixtures: list[dict],
+) -> None:
+    """Test that a missing pipeline reference returns UnsupportedValue."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "missing_pipeline_ref")
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_execute_pipeline_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_execute_pipeline_missing_reference_name_returns_unsupported(
+    execute_pipeline_activity_fixtures: list[dict],
+) -> None:
+    """Test that a pipeline ref with no reference_name returns UnsupportedValue."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "missing_reference_name")
+    base_kwargs = get_base_kwargs(fixture["input"])
+    result = translate_execute_pipeline_activity(fixture["input"], base_kwargs)
+
+    assert isinstance(result, UnsupportedValue)
+    assert fixture["expected_message"] in result.message
+
+
+def test_execute_pipeline_with_embedded_definition(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test that an embedded child pipeline definition is translated into a Pipeline IR."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "with_pipeline_definition")
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, ExecutePipelineActivity)
+    assert result.pipeline_name == fixture["expected"]["pipeline_name"]
+    assert result.parameters == fixture["expected"]["parameters"]
+    assert result.pipeline is not None
+    assert result.pipeline.name == fixture["expected"]["child_pipeline_name"]
+    assert len(result.pipeline.tasks) > 0
+
+
+def test_execute_pipeline_without_definition_warns(execute_pipeline_activity_fixtures: list[dict]) -> None:
+    """Test that a missing pipeline_definition emits a NotTranslatableWarning."""
+    fixture = get_fixture(execute_pipeline_activity_fixtures, "basic")
+
+    with pytest.warns(UserWarning, match="definition was not resolved"):
+        base_kwargs = get_base_kwargs(fixture["input"])
+        translate_execute_pipeline_activity(fixture["input"], base_kwargs)

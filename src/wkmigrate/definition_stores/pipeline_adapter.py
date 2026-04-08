@@ -16,12 +16,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from wkmigrate.enums.source_property_case import SourcePropertyCase
-from wkmigrate.utils import recursive_camel_to_snake
+from wkmigrate.utils import normalize_arm_pipeline, recursive_camel_to_snake
 
 logger = logging.getLogger(__name__)
 
 DatasetGetter = Callable[[str], dict]
 LinkedServiceGetter = Callable[[str], dict]
+PipelineGetter = Callable[[str], dict]
 
 
 @dataclass(slots=True, frozen=True)
@@ -33,12 +34,15 @@ class PipelineAdapter:
     Attributes:
         get_dataset: Returns a dataset dict given a dataset name.
         get_linked_service: Returns a linked-service dict given a name.
+        get_pipeline: Optional callable that returns a pipeline dict given a pipeline name.
+            When provided, Execute Pipeline activities are enriched with the child pipeline definition.
         source_property_case: Property casing of the source data. When ``CAMEL``,
             fetched dicts are normalized to snake_case.
     """
 
     get_dataset: DatasetGetter
     get_linked_service: LinkedServiceGetter
+    get_pipeline: PipelineGetter | None = None
     source_property_case: SourcePropertyCase = SourcePropertyCase.SNAKE
     _normalized_cache: dict[tuple[str, str], dict] = field(init=False, default_factory=dict, hash=False, compare=False)
 
@@ -83,16 +87,17 @@ class PipelineAdapter:
 
     def _enrich_activity(self, activity: dict) -> dict:
         """
-        Returns an activity dict enriched with datasets and linked services.
+        Returns an activity dict enriched with datasets, linked services, and child pipelines.
 
         Args:
             activity: Input activity as a dictionary.
 
         Returns:
-            Activity with dataset and linked service metadata.
+            Activity with dataset, linked service, and child pipeline metadata.
         """
         result = self._enrich_datasets(activity)
         result = self._enrich_linked_service(result)
+        result = self._enrich_execute_pipeline(result)
         return result
 
     def _enrich_datasets(self, activity: dict) -> dict:
@@ -132,6 +137,68 @@ class PipelineAdapter:
         if not additions:
             return activity
         return {**activity, **additions}
+
+    def _enrich_execute_pipeline(self, activity: dict) -> dict:
+        """
+        Returns an activity dictionary enriched with the child pipeline definition for Execute Pipeline activities.
+
+        When a ``get_pipeline`` callable is available and the activity type is
+        ``ExecutePipeline``, the referenced child pipeline is fetched, normalized,
+        enriched (recursively), and embedded under the ``pipeline_definition`` key.
+
+        Args:
+            activity: Input activity as a dictionary.
+
+        Returns:
+            Activity with child pipeline metadata when applicable, otherwise unchanged.
+        """
+        if self.get_pipeline is None:
+            return activity
+
+        activity_type = activity.get("type")
+        if activity_type != "ExecutePipeline":
+            return activity
+
+        pipeline_ref = activity.get("pipeline")
+        if not isinstance(pipeline_ref, dict):
+            return activity
+
+        pipeline_name = pipeline_ref.get("reference_name")
+        if not pipeline_name:
+            return activity
+
+        try:
+            raw_pipeline = self.get_pipeline(pipeline_name)
+            normalized = self.normalize_casing(raw_pipeline, ("pipeline", pipeline_name))
+            if normalized is not None:
+                raw_pipeline = normalized
+            enriched = self._adapt_child_pipeline(raw_pipeline)
+            return {**activity, "pipeline_definition": enriched}
+        except (ValueError, KeyError):
+            logger.warning(
+                f"Child pipeline '{pipeline_name}' not found; Execute Pipeline activity will use a placeholder."
+            )
+            return activity
+
+    def _adapt_child_pipeline(self, pipeline: dict) -> dict:
+        """
+        Enriches a child pipeline dict with datasets and linked services.
+
+        Unlike ``adapt`` this skips trigger resolution since child pipelines
+        invoked by Execute Pipeline do not carry their own triggers.
+        ``normalize_arm_pipeline`` is applied first to flatten any ``properties``
+        wrapper and merge ``typeProperties`` into activity dicts.
+
+        Args:
+            pipeline: Raw child pipeline definition.
+
+        Returns:
+            Enriched pipeline dict ready for translation.
+        """
+        pipeline = normalize_arm_pipeline(pipeline)
+        activities = pipeline.get("activities") or []
+        enriched_activities = [self._enrich_activity(a) for a in activities]
+        return {**pipeline, "activities": enriched_activities, "trigger": None}
 
     def _enrich_linked_service(self, activity: dict) -> dict:
         """

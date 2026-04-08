@@ -87,6 +87,7 @@ class FactoryDefinitionStore(DefinitionStore):
         self._adapter = PipelineAdapter(
             get_dataset=self._client.get_dataset,
             get_linked_service=self._client.get_linked_service,
+            get_pipeline=self._client.get_pipeline,
             source_property_case=self.source_property_case,
         )
 

@@ -107,6 +107,7 @@ class JsonDefinitionStore(DefinitionStore):
         self._adapter = PipelineAdapter(
             get_dataset=self.get_dataset,
             get_linked_service=self.get_linked_service,
+            get_pipeline=self._get_raw_pipeline,
             source_property_case=SourcePropertyCase.SNAKE,  # already normalized
         )
 
@@ -178,6 +179,20 @@ class JsonDefinitionStore(DefinitionStore):
                 ):
                     return trigger
         return None
+
+    def _get_raw_pipeline(self, pipeline_name: str) -> dict:
+        """Return a normalized pipeline dict suitable for adapter enrichment.
+
+        Unlike ``get_pipeline`` this applies ARM normalization so the adapter
+        receives a flat dict with ``activities``, ``parameters``, etc.
+
+        Args:
+            pipeline_name: Name of the pipeline to look up.
+
+        Returns:
+            Normalized pipeline dict.
+        """
+        return normalize_arm_pipeline(dict(self.get_pipeline(pipeline_name)))
 
     def get_dataset(self, dataset_name: str) -> dict:
         """Return the dataset dict for the given name."""
