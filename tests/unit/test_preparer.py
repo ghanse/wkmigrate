@@ -405,6 +405,17 @@ def test_execute_pipeline_preparer_custom_scope_in_inner_notebook() -> None:
     assert DEFAULT_CREDENTIALS_SCOPE not in notebook_content
 
 
+def test_run_job_preparer_emits_dict_run_job_task() -> None:
+    """prepare_run_job_activity emits run_job_task as a dict with job_id placeholder."""
+    activity = _make_run_job_with_lookup_pipeline()
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
+
+    run_job_task = result.task.get("run_job_task")
+    assert isinstance(run_job_task, dict), "run_job_task must be a dict, not a plain string"
+    assert run_job_task.get("job_id") == f"__INNER_JOB__:{activity.name}"
+
+
 def test_prepare_workflow_dispatches_execute_pipeline() -> None:
     """prepare_workflow routes ExecutePipelineActivity through the preparer."""
     pipeline = Pipeline(
@@ -419,3 +430,48 @@ def test_prepare_workflow_dispatches_execute_pipeline() -> None:
 
     assert len(result.activities) == 1
     assert result.activities[0].inner_workflow is not None
+
+
+def test_assign_inner_job_ids_resolves_run_job_activity_placeholder(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_ids resolves __INNER_JOB__: placeholders in RunJobActivity dict format."""
+    tasks = [
+        {"task_key": "run_inner", "run_job_task": {"job_id": "__INNER_JOB__:child_job"}},
+    ]
+    job_id_map = {"child_job": 42}
+
+    workspace_definition_store._assign_inner_job_ids(tasks, job_id_map)
+
+    assert tasks[0]["run_job_task"]["job_id"] == 42
+
+
+def test_assign_inner_job_ids_resolves_execute_pipeline_placeholder(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_ids resolves __INNER_JOB__: placeholders in ExecutePipelineActivity dict format."""
+    tasks = [
+        {
+            "task_key": "exec_pipeline",
+            "run_job_task": {"job_id": "__INNER_JOB__:child_pipeline", "job_parameters": {"env": "prod"}},
+        },
+    ]
+    job_id_map = {"child_pipeline": 99}
+
+    workspace_definition_store._assign_inner_job_ids(tasks, job_id_map)
+
+    assert tasks[0]["run_job_task"]["job_id"] == 99
+    assert tasks[0]["run_job_task"]["job_parameters"] == {"env": "prod"}
+
+
+def test_assign_inner_job_refs_resolves_dict_placeholder(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_refs replaces __INNER_JOB__: placeholders with bundle resource refs."""
+    tasks = [
+        {"task_key": "run_inner", "run_job_task": {"job_id": "__INNER_JOB__:child_job"}},
+    ]
+
+    workspace_definition_store._assign_inner_job_refs(tasks)
+
+    assert tasks[0]["run_job_task"]["job_id"] == "${resources.jobs.child_job.id}"

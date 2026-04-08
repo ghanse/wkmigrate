@@ -44,7 +44,11 @@ def prepare_run_job_activity(
     preparer = import_module("wkmigrate.preparers.preparer")
     inner_workflow = preparer.prepare_workflow(activity.pipeline, default_files_to_delta_sinks, credentials_scope)
 
+    run_job_task_dict: dict = {"job_id": f"__INNER_JOB__:{activity.name}"}
+    if activity.job_parameters:
+        run_job_task_dict["job_parameters"] = activity.job_parameters
+
     return PreparedActivity(
-        task=parse_mapping({**get_base_task(activity), "run_job_task": f"__INNER_JOB__:{activity.name}"}),
+        task=parse_mapping({**get_base_task(activity), "run_job_task": run_job_task_dict}),
         inner_workflow=inner_workflow,
     )
