@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 from wkmigrate.code_generator import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
@@ -15,6 +17,7 @@ from wkmigrate.models.ir.pipeline import (
     RunJobActivity,
     WebActivity,
 )
+from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.preparers.copy_activity_preparer import prepare_copy_activity
 from wkmigrate.preparers.delete_activity_preparer import prepare_delete_activity
 from wkmigrate.preparers.for_each_activity_preparer import prepare_for_each_activity
@@ -336,7 +339,7 @@ def _make_delete_activity(name: str = "DeleteTest") -> DeleteActivity:
 
 
 def test_delete_preparer_produces_notebook() -> None:
-    """prepare_delete_activity produces a notebook with dbutils.fs.rm."""
+    """Notebook contains dbutils.fs.rm and the resolved folder path."""
     activity = _make_delete_activity()
 
     result = prepare_delete_activity(activity)
@@ -349,7 +352,7 @@ def test_delete_preparer_produces_notebook() -> None:
 
 
 def test_delete_preparer_notebook_path() -> None:
-    """prepare_delete_activity sets the correct notebook path."""
+    """Notebook artifact path uses the activity task_key."""
     activity = _make_delete_activity()
 
     result = prepare_delete_activity(activity)
@@ -358,7 +361,7 @@ def test_delete_preparer_notebook_path() -> None:
 
 
 def test_delete_preparer_task_has_notebook_task() -> None:
-    """prepare_delete_activity creates a task with a notebook_task entry."""
+    """Task payload includes notebook_task pointing to the generated notebook."""
     activity = _make_delete_activity()
 
     result = prepare_delete_activity(activity)
@@ -368,7 +371,7 @@ def test_delete_preparer_task_has_notebook_task() -> None:
 
 
 def test_delete_preparer_recursive_flag_in_notebook() -> None:
-    """prepare_delete_activity includes the recursive flag in the notebook content."""
+    """Notebook respects recursive=False in the dbutils.fs.rm call."""
     activity = DeleteActivity(
         name="NonRecursiveDelete",
         task_key="non_recursive_delete",
@@ -383,7 +386,7 @@ def test_delete_preparer_recursive_flag_in_notebook() -> None:
 
 
 def test_delete_preparer_wildcard_in_notebook() -> None:
-    """prepare_delete_activity includes wildcard logic in the notebook when wildcard is set."""
+    """Notebook uses fnmatch filtering when wildcard_file_name is set."""
     activity = DeleteActivity(
         name="WildcardDelete",
         task_key="wildcard_delete",
@@ -400,7 +403,7 @@ def test_delete_preparer_wildcard_in_notebook() -> None:
 
 
 def test_delete_preparer_wildcard_folder_only() -> None:
-    """prepare_delete_activity generates folder-wildcard filtering when only wildcard_folder_path is set."""
+    """Notebook filters folders by wildcard_folder_path when wildcard_file_name is absent."""
     activity = DeleteActivity(
         name="FolderWildcardDelete",
         task_key="folder_wildcard_delete",
@@ -421,7 +424,7 @@ def test_delete_preparer_wildcard_folder_only() -> None:
 
 
 def test_delete_preparer_two_level_wildcard() -> None:
-    """prepare_delete_activity generates two-level filtering when both wildcards are set."""
+    """Notebook uses two-level listing when both wildcard_folder_path and wildcard_file_name are set."""
     activity = DeleteActivity(
         name="TwoLevelDelete",
         task_key="two_level_delete",
@@ -445,11 +448,7 @@ def test_delete_preparer_two_level_wildcard() -> None:
 
 
 def test_delete_preparer_missing_folder_path_emits_warning() -> None:
-    """prepare_delete_activity emits NotTranslatableWarning when folder_path is None."""
-    import warnings
-
-    from wkmigrate.not_translatable import NotTranslatableWarning
-
+    """Unresolved folder_path emits NotTranslatableWarning and inserts a TODO placeholder."""
     activity = DeleteActivity(
         name="NoPathDelete",
         task_key="no_path_delete",
@@ -472,7 +471,7 @@ def test_delete_preparer_missing_folder_path_emits_warning() -> None:
 
 
 def test_prepare_workflow_dispatches_delete_activity() -> None:
-    """prepare_workflow correctly dispatches a DeleteActivity."""
+    """prepare_workflow routes DeleteActivity to prepare_delete_activity."""
     pipeline = Pipeline(
         name="test_delete_pipeline",
         tasks=[_make_delete_activity()],

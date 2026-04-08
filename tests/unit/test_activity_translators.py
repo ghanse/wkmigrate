@@ -1487,7 +1487,7 @@ def test_copy_invalid_translator_returns_unsupported(copy_activity_fixtures: lis
 
 
 def test_basic_delete_activity(delete_activity_fixtures: list[dict]) -> None:
-    """Test translation of a basic recursive Delete activity."""
+    """Recursive Delete activity translates with correct metadata and policy."""
     fixture = get_fixture(delete_activity_fixtures, "basic_delete")
     result = translate_activity(fixture["input"])
 
@@ -1502,7 +1502,7 @@ def test_basic_delete_activity(delete_activity_fixtures: list[dict]) -> None:
 
 
 def test_delete_no_recurse(delete_activity_fixtures: list[dict]) -> None:
-    """Test translation of a Delete activity with recursive=false."""
+    """Non-recursive Delete preserves recursive=False and folder_path."""
     fixture = get_fixture(delete_activity_fixtures, "delete_no_recurse")
     result = translate_activity(fixture["input"])
 
@@ -1513,7 +1513,7 @@ def test_delete_no_recurse(delete_activity_fixtures: list[dict]) -> None:
 
 
 def test_delete_with_wildcard(delete_activity_fixtures: list[dict]) -> None:
-    """Test translation of a Delete activity with wildcard file name."""
+    """Delete with store_settings wildcards extracts both file and folder patterns."""
     fixture = get_fixture(delete_activity_fixtures, "delete_with_wildcard")
     result = translate_activity(fixture["input"])
 
@@ -1524,7 +1524,7 @@ def test_delete_with_wildcard(delete_activity_fixtures: list[dict]) -> None:
 
 
 def test_delete_with_logging_warns(delete_activity_fixtures: list[dict]) -> None:
-    """Test that enableLogging on a Delete activity emits warnings."""
+    """Delete with enableLogging and logStorageSettings emits warnings."""
     fixture = get_fixture(delete_activity_fixtures, "delete_with_logging")
 
     with pytest.warns(UserWarning):
@@ -1535,7 +1535,7 @@ def test_delete_with_logging_warns(delete_activity_fixtures: list[dict]) -> None
 
 
 def test_delete_with_dependency(delete_activity_fixtures: list[dict]) -> None:
-    """Test translation of a Delete activity with an upstream dependency."""
+    """Delete with depends_on resolves upstream task reference."""
     fixture = get_fixture(delete_activity_fixtures, "delete_with_dependency")
     result = translate_activity(fixture["input"])
 
@@ -1546,7 +1546,7 @@ def test_delete_with_dependency(delete_activity_fixtures: list[dict]) -> None:
 
 
 def test_delete_missing_dataset_returns_unsupported(delete_activity_fixtures: list[dict]) -> None:
-    """Test that a missing dataset returns UnsupportedValue."""
+    """Missing dataset key returns UnsupportedValue."""
     fixture = get_fixture(delete_activity_fixtures, "missing_dataset")
     base_kwargs = get_base_kwargs(fixture["input"])
     result = translate_delete_activity(fixture["input"], base_kwargs)
@@ -1556,7 +1556,7 @@ def test_delete_missing_dataset_returns_unsupported(delete_activity_fixtures: li
 
 
 def test_delete_missing_dataset_reference_name_returns_unsupported(delete_activity_fixtures: list[dict]) -> None:
-    """Test that a missing dataset reference name returns UnsupportedValue."""
+    """Missing dataset.referenceName returns UnsupportedValue."""
     fixture = get_fixture(delete_activity_fixtures, "missing_dataset_reference_name")
     base_kwargs = get_base_kwargs(fixture["input"])
     result = translate_delete_activity(fixture["input"], base_kwargs)
@@ -1566,7 +1566,7 @@ def test_delete_missing_dataset_reference_name_returns_unsupported(delete_activi
 
 
 def test_delete_with_wildcard_folder_only(delete_activity_fixtures: list[dict]) -> None:
-    """Test translation of a Delete activity with wildcard_folder_path but no wildcard_file_name."""
+    """Delete with wildcard_folder_path only leaves wildcard_file_name as None."""
     fixture = get_fixture(delete_activity_fixtures, "delete_with_wildcard_folder_only")
     result = translate_activity(fixture["input"])
 
@@ -1577,7 +1577,7 @@ def test_delete_with_wildcard_folder_only(delete_activity_fixtures: list[dict]) 
 
 
 def test_delete_translate_activity_dispatch(delete_activity_fixtures: list[dict]) -> None:
-    """Test that translate_activity dispatches Delete to the correct translator."""
+    """translate_activity dispatches type 'Delete' to translate_delete_activity."""
     fixture = get_fixture(delete_activity_fixtures, "basic_delete")
     result = translate_activity(fixture["input"])
 

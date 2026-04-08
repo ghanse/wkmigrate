@@ -1,7 +1,7 @@
-"""This module defines a preparer for Delete activities.
+"""Preparer for Delete activities.
 
-The preparer builds a Databricks notebook task that removes files or folders
-from cloud storage using ``dbutils.fs.rm()``.
+Builds a Databricks notebook task that removes files or folders from cloud
+storage using ``dbutils.fs.rm()``.
 """
 
 from __future__ import annotations
@@ -29,14 +29,7 @@ def prepare_delete_activity(activity: DeleteActivity) -> PreparedActivity:
     Returns:
         PreparedActivity containing the notebook task configuration and artifacts.
     """
-    notebook_content = _get_delete_activity_notebook_content(
-        activity_name=activity.name,
-        dataset_name=activity.dataset_name,
-        folder_path=activity.folder_path,
-        recursive=activity.recursive,
-        wildcard_file_name=activity.wildcard_file_name,
-        wildcard_folder_path=activity.wildcard_folder_path,
-    )
+    notebook_content = _build_notebook_content(activity)
     notebook_path = f"/wkmigrate/delete_activity_notebooks/{activity.task_key}"
     notebook = NotebookArtifact(file_path=notebook_path, content=notebook_content)
     base_task = get_base_task(activity)
@@ -44,36 +37,40 @@ def prepare_delete_activity(activity: DeleteActivity) -> PreparedActivity:
     return PreparedActivity(task=task, notebooks=[notebook])
 
 
-def _get_delete_activity_notebook_content(
-    activity_name: str,
-    dataset_name: str,
-    folder_path: str | None,
-    recursive: bool,
-    wildcard_file_name: str | None,
-    wildcard_folder_path: str | None,
-) -> str:
-    """Generates notebook source for a Delete activity.
+def _build_notebook_content(activity: DeleteActivity) -> str:
+    """Generates formatted Python notebook source for a Delete activity.
+
+    Produces a self-contained Databricks notebook that deletes files or folders
+    via ``dbutils.fs.rm()``. When wildcard patterns are present the notebook
+    lists directory contents and filters with ``fnmatch``.
 
     Args:
-        activity_name: Logical name of the activity being translated.
-        dataset_name: Reference name of the dataset that identifies the storage location.
-        folder_path: Optional folder path within the dataset to delete.
-        recursive: When ``True`` the delete operation removes contents recursively.
-        wildcard_file_name: Optional wildcard pattern to match file names for deletion.
-        wildcard_folder_path: Optional wildcard pattern to match folder paths for deletion.
+        activity: Fully populated ``DeleteActivity`` IR object.
 
     Returns:
-        Formatted Python notebook source as a ``str``.
+        Formatted Python notebook source.
     """
-    script_lines = [
+    lines: list[str] = [
         "# Databricks notebook source",
         "",
-        f"# Delete activity: {activity_name}",
-        f"# Dataset: {dataset_name}",
+        f"# Delete activity: {activity.name}",
+        f"# Dataset: {activity.dataset_name}",
     ]
 
+    _append_path_assignment(lines, activity.dataset_name, activity.folder_path)
+    _append_delete_logic(lines, activity.recursive, activity.wildcard_file_name, activity.wildcard_folder_path)
+
+    return autopep8.fix_code("\n".join(lines))
+
+
+def _append_path_assignment(lines: list[str], dataset_name: str, folder_path: str | None) -> None:
+    """Appends the ``path`` variable assignment to notebook lines.
+
+    Emits a ``NotTranslatableWarning`` and a TODO placeholder when the
+    folder path cannot be resolved from the dataset reference.
+    """
     if folder_path:
-        script_lines.append(f"path = {folder_path!r}")
+        lines.append(f"path = {folder_path!r}")
     else:
         warnings.warn(
             NotTranslatableWarning(
@@ -83,12 +80,23 @@ def _get_delete_activity_notebook_content(
             ),
             stacklevel=2,
         )
-        script_lines.append(f"# TODO: Resolve storage path for dataset '{dataset_name}'")
-        script_lines.append(f"path = '<UNRESOLVED_PATH_FOR_{dataset_name}>'")
+        lines.append(f"# TODO: Resolve storage path for dataset '{dataset_name}'")
+        lines.append(f"path = '<UNRESOLVED_PATH_FOR_{dataset_name}>'")
 
+
+def _append_delete_logic(
+    lines: list[str],
+    recursive: bool,
+    wildcard_file_name: str | None,
+    wildcard_folder_path: str | None,
+) -> None:
+    """Appends the ``dbutils.fs.rm`` call(s) to notebook lines.
+
+    Chooses the appropriate deletion strategy based on which wildcard
+    patterns are set: two-level, file-only, folder-only, or direct.
+    """
     if wildcard_folder_path and wildcard_file_name:
-        # Two-level listing: filter folders by wildcard_folder_path, then files by wildcard_file_name.
-        script_lines.extend(
+        lines.extend(
             [
                 "import fnmatch",
                 f"wildcard_folder_path = {wildcard_folder_path!r}",
@@ -103,8 +111,7 @@ def _get_delete_activity_notebook_content(
             ]
         )
     elif wildcard_file_name:
-        # Single-level listing: filter files at path by wildcard_file_name.
-        script_lines.extend(
+        lines.extend(
             [
                 "import fnmatch",
                 f"wildcard_file_name = {wildcard_file_name!r}",
@@ -115,8 +122,7 @@ def _get_delete_activity_notebook_content(
             ]
         )
     elif wildcard_folder_path:
-        # Folder-only wildcard: filter folders at path by wildcard_folder_path and delete each match.
-        script_lines.extend(
+        lines.extend(
             [
                 "import fnmatch",
                 f"wildcard_folder_path = {wildcard_folder_path!r}",
@@ -127,6 +133,4 @@ def _get_delete_activity_notebook_content(
             ]
         )
     else:
-        script_lines.append(f"dbutils.fs.rm(path, recurse={recursive})")
-
-    return autopep8.fix_code("\n".join(script_lines))
+        lines.append(f"dbutils.fs.rm(path, recurse={recursive})")

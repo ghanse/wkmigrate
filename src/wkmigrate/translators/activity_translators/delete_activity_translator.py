@@ -1,10 +1,8 @@
-"""This module defines a translator for translating Delete activities.
+"""Translator for ADF Delete activities.
 
-Translators in this module normalize ADF Delete activity payloads into internal
-representations. The Delete activity removes files or folders from supported
-storage stores.  Each translator must validate required fields, parse the
-dataset reference and store settings, and emit ``NotTranslatableWarning``
-objects for any features that cannot be migrated.
+Normalizes ADF Delete activity payloads into ``DeleteActivity`` IR objects.
+Validates required fields (dataset reference, store settings) and emits
+``NotTranslatableWarning`` for unsupported features like delete logging.
 """
 
 import warnings
@@ -15,14 +13,19 @@ from wkmigrate.not_translatable import NotTranslatableWarning
 
 
 def translate_delete_activity(activity: dict, base_kwargs: dict) -> DeleteActivity | UnsupportedValue:
-    """Translates an ADF Delete activity into a ``DeleteActivity`` object.
+    """Translates an ADF Delete activity into a ``DeleteActivity`` IR object.
+
+    Validates the dataset reference and extracts store settings (wildcard
+    patterns, folder path). Emits warnings for unsupported ADF features
+    like ``enableLogging`` and ``logStorageSettings``.
 
     Args:
-        activity: Delete activity definition as a ``dict``.
-        base_kwargs: Common activity metadata.
+        activity: Raw ADF Delete activity payload.
+        base_kwargs: Common activity metadata produced by the dispatcher.
 
     Returns:
-        ``DeleteActivity`` representation of the delete task.
+        ``DeleteActivity`` on success, or ``UnsupportedValue`` when required
+        fields are missing.
     """
     dataset_ref = activity.get("dataset")
     if not isinstance(dataset_ref, dict):
