@@ -24,6 +24,11 @@ _DEFAULT_CATALOG = 'main'
 _DEFAULT_SCHEMA = 'default'
 
 
+def _strip_newlines(value: str) -> str:
+    """Replace CR/LF characters with spaces so *value* is safe for a single-line notebook comment."""
+    return value.replace('\n', ' ').replace('\r', ' ')
+
+
 def prepare_delete_activity(
     activity: DeleteActivity,
     *,
@@ -70,8 +75,8 @@ def _build_notebook_content(activity: DeleteActivity) -> str:
     lines: list[str] = [
         "# Databricks notebook source",
         "",
-        f"# Delete activity: {activity.name.replace(chr(10), ' ').replace(chr(13), ' ')}",
-        f"# Dataset: {activity.dataset_name.replace(chr(10), ' ').replace(chr(13), ' ')}",
+        f"# Delete activity: {_strip_newlines(activity.name)}",
+        f"# Dataset: {_strip_newlines(activity.dataset_name)}",
     ]
 
     _append_path_assignment(lines, activity.dataset_name, activity.folder_path)
@@ -85,6 +90,11 @@ def _append_path_assignment(lines: list[str], dataset_name: str, folder_path: st
 
     Emits a ``NotTranslatableWarning`` and a TODO placeholder when the
     folder path cannot be resolved from the dataset reference.
+
+    Args:
+        lines: Mutable list of notebook source lines to extend.
+        dataset_name: Reference name of the dataset (used in the placeholder).
+        folder_path: Resolved storage path, or ``None`` when unresolved.
     """
     if folder_path:
         lines.append(f"path = {folder_path!r}")
@@ -111,6 +121,12 @@ def _append_delete_logic(
 
     Chooses the appropriate deletion strategy based on which wildcard
     patterns are set: two-level, file-only, folder-only, or direct.
+
+    Args:
+        lines: Mutable list of notebook source lines to extend.
+        recursive: Whether deletes should recurse into sub-directories.
+        wildcard_file_name: Glob pattern to filter files, or ``None``.
+        wildcard_folder_path: Glob pattern to filter folders, or ``None``.
     """
     if wildcard_folder_path and wildcard_file_name:
         lines.extend(
@@ -232,7 +248,7 @@ def _build_volume_notebook_content(
         'spark.sql(f"""',
         '    CREATE EXTERNAL VOLUME IF NOT EXISTS',
         '    `{catalog}`.`{schema}`.`{volume_name}`',
-        "    LOCATION '{storage_location.replace(chr(39), chr(39)*2)}'",
+        "    LOCATION '{storage_location.replace(chr(39), chr(39)*2)}'",  # escape single quotes for SQL
         "    COMMENT 'External volume created by wkmigrate for delete activity.'",
         '""")',
         '',
