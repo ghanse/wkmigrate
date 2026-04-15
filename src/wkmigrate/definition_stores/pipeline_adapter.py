@@ -157,9 +157,7 @@ class PipelineAdapter:
             raw = self.get_linked_service(linked_service_name)
             definition = self.normalize_casing(raw, ("linked_service", linked_service_name))
         except ValueError:
-            logger.warning(
-                f"Linked service '{linked_service_name}' not found; skipping cluster spec for activity."
-            )
+            logger.warning(f"Linked service '{linked_service_name}' not found; skipping cluster spec for activity.")
             return activity
 
         return {**activity, "linked_service_definition": definition}
