@@ -9,6 +9,7 @@ import yaml
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
 from wkmigrate.definition_stores.json_definition_store import JsonDefinitionStore
+from wkmigrate.definition_stores.pipeline_adapter import PipelineAdapter
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
@@ -19,6 +20,7 @@ from wkmigrate.models.ir.pipeline import (
 )
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
 from wkmigrate.models.workflows.instructions import PipelineInstruction
+from wkmigrate.utils import _normalize_activity_type_properties
 
 _CAMEL_JSON_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "resources", "json", "camel")
 
@@ -923,3 +925,231 @@ def test_download_notebooks_with_root_path_rewrites_inner_workflow_tasks(mock_wo
     for task in inner_tasks:
         nb_path = task.get('notebook_task', {}).get('notebook_path', '')
         assert nb_path.startswith('/migrated/'), f"Expected /migrated/ prefix, got: {nb_path}"
+
+
+# --- FactoryDefinitionStore Copy activity normalization tests ---
+
+
+def test_factory_store_normalizes_copy_activity_type_properties(monkeypatch) -> None:
+    """Copy activities from the ADF API have source/sink inside type_properties.
+
+    FactoryDefinitionStore.load() must flatten type_properties so the copy
+    translator can find source, sink, and translator at the activity root.
+    """
+    from wkmigrate.definition_stores import factory_definition_store
+    from wkmigrate.models.ir.pipeline import CopyActivity
+
+    # Simulate the format returned by Azure SDK's as_dict() — activities
+    # have type_properties wrapping source/sink, and inputs/outputs at root.
+    api_pipeline = {
+        "name": "pl_copy_csv_to_delta",
+        "activities": [
+            {
+                "name": "copy_csv",
+                "type": "Copy",
+                "type_properties": {
+                    "source": {"type": "DelimitedTextSource"},
+                    "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+                },
+                "inputs": [{"reference_name": "src_csv", "type": "DatasetReference"}],
+                "outputs": [{"reference_name": "sink_delta", "type": "DatasetReference"}],
+            }
+        ],
+    }
+
+    datasets = {
+        "src_csv": {
+            "name": "src_csv",
+            "properties": {
+                "type": "DelimitedText",
+                "location": {
+                    "type": "AzureBlobFSLocation",
+                    "container": "raw",
+                    "folder_path": "csv",
+                },
+                "first_row_as_header": True,
+                "column_delimiter": ",",
+            },
+            "linked_service_definition": {
+                "name": "ls_storage",
+                "properties": {
+                    "type": "AzureBlobFS",
+                    "url": "DefaultEndpointsProtocol=https;AccountName=sourceaccount;EndpointSuffix=core.windows.net;",
+                    "storage_account_name": "DefaultEndpointsProtocol=https;AccountName=sourceaccount;EndpointSuffix=core.windows.net;",
+                },
+            },
+        },
+        "sink_delta": {
+            "name": "sink_delta",
+            "properties": {
+                "type": "AzureDatabricksDeltaLakeDataset",
+                "database": "db",
+                "table": "tbl",
+            },
+            "linked_service_definition": {
+                "name": "ls_dbx",
+                "properties": {
+                    "type": "AzureDatabricks",
+                    "domain": "https://adb-123.azuredatabricks.net",
+                },
+            },
+        },
+    }
+
+    class _FakeClient:
+        def __init__(self, **_):
+            pass
+
+        def list_pipelines(self):
+            return ["pl_copy_csv_to_delta"]
+
+        def get_pipeline(self, name):
+            return api_pipeline
+
+        def get_trigger(self, name):
+            return None
+
+        def get_dataset(self, name):
+            if name in datasets:
+                return datasets[name]
+            raise ValueError(f"Dataset '{name}' not found")
+
+        def get_linked_service(self, name):
+            raise ValueError(f"Linked service '{name}' not found")
+
+    monkeypatch.setattr(factory_definition_store, "FactoryClient", _FakeClient)
+
+    store = FactoryDefinitionStore(
+        tenant_id="T",
+        client_id="C",
+        client_secret="S",
+        subscription_id="SUB",
+        resource_group_name="RG",
+        factory_name="ADF",
+    )
+
+    pipeline = store.load("pl_copy_csv_to_delta")
+    assert len(pipeline.tasks) == 1
+    task = pipeline.tasks[0]
+    assert isinstance(task, CopyActivity), (
+        f"Expected CopyActivity but got {type(task).__name__}. "
+        "Copy activities with type_properties are being treated as unsupported."
+    )
+    assert task.source_dataset.dataset_type == "DelimitedText"
+    assert task.sink_dataset.dataset_type == "delta"
+
+
+# --- PipelineAdapter nested enrichment tests ---
+
+
+def _make_adapter(datasets: dict[str, dict], linked_services: dict[str, dict] | None = None) -> PipelineAdapter:
+    """Create a PipelineAdapter with in-memory dataset/linked-service lookups."""
+
+    def get_dataset(name: str) -> dict:
+        if name not in datasets:
+            raise ValueError(f"Dataset '{name}' not found")
+        return datasets[name]
+
+    def get_linked_service(name: str) -> dict:
+        if linked_services and name in linked_services:
+            return linked_services[name]
+        raise ValueError(f"Linked service '{name}' not found")
+
+    return PipelineAdapter(get_dataset=get_dataset, get_linked_service=get_linked_service)
+
+
+def test_adapter_enriches_nested_copy_in_foreach() -> None:
+    """Copy activities nested inside ForEach should get input/output dataset definitions."""
+    source_ds = {"name": "src", "properties": {"type": "Parquet", "location": {"type": "AzureBlobFSLocation"}}}
+    sink_ds = {"name": "snk", "properties": {"type": "AzureDatabricksDeltaLakeDataset", "table": "t"}}
+    adapter = _make_adapter({"src": source_ds, "snk": sink_ds})
+
+    pipeline = {
+        "activities": [
+            {
+                "name": "loop",
+                "type": "ForEach",
+                "items": {"value": "@array(['a'])"},
+                "activities": [
+                    {
+                        "name": "copy_inner",
+                        "type": "Copy",
+                        "inputs": [{"reference_name": "src", "type": "DatasetReference"}],
+                        "outputs": [{"reference_name": "snk", "type": "DatasetReference"}],
+                        "source": {"type": "ParquetSource"},
+                        "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+                    }
+                ],
+            }
+        ]
+    }
+    enriched = adapter.adapt(pipeline)
+    inner_copy = enriched["activities"][0]["activities"][0]
+    assert "input_dataset_definitions" in inner_copy
+    assert "output_dataset_definitions" in inner_copy
+    assert inner_copy["input_dataset_definitions"][0]["name"] == "src"
+    assert inner_copy["output_dataset_definitions"][0]["name"] == "snk"
+
+
+def test_adapter_enriches_nested_copy_in_if_condition() -> None:
+    """Copy activities inside IfCondition branches should get dataset definitions."""
+    ds = {"name": "ds1", "properties": {"type": "DelimitedText", "location": {"type": "AzureBlobFSLocation"}}}
+    adapter = _make_adapter({"ds1": ds})
+
+    pipeline = {
+        "activities": [
+            {
+                "name": "branch",
+                "type": "IfCondition",
+                "if_true_activities": [
+                    {
+                        "name": "copy_true",
+                        "type": "Copy",
+                        "inputs": [{"reference_name": "ds1", "type": "DatasetReference"}],
+                        "source": {"type": "DelimitedTextSource"},
+                        "sink": {"type": "ParquetSink"},
+                    }
+                ],
+                "if_false_activities": [
+                    {
+                        "name": "copy_false",
+                        "type": "Copy",
+                        "inputs": [{"reference_name": "ds1", "type": "DatasetReference"}],
+                        "source": {"type": "DelimitedTextSource"},
+                        "sink": {"type": "ParquetSink"},
+                    }
+                ],
+            }
+        ]
+    }
+    enriched = adapter.adapt(pipeline)
+    true_copy = enriched["activities"][0]["if_true_activities"][0]
+    false_copy = enriched["activities"][0]["if_false_activities"][0]
+    assert "input_dataset_definitions" in true_copy
+    assert "input_dataset_definitions" in false_copy
+
+
+def test_normalize_type_properties_recurses_into_nested_activities() -> None:
+    """type_properties of nested activities inside ForEach should be flattened."""
+    activity = {
+        "name": "loop",
+        "type": "ForEach",
+        "type_properties": {
+            "items": {"value": "@array(['x'])"},
+            "activities": [
+                {
+                    "name": "inner_copy",
+                    "type": "Copy",
+                    "type_properties": {
+                        "source": {"type": "ParquetSource"},
+                        "sink": {"type": "ParquetSink"},
+                    },
+                }
+            ],
+        },
+    }
+    normalized = _normalize_activity_type_properties(activity)
+    inner = normalized["activities"][0]
+    assert "source" in inner, "Nested activity type_properties should be flattened"
+    assert "sink" in inner, "Nested activity type_properties should be flattened"
+    assert "type_properties" not in inner

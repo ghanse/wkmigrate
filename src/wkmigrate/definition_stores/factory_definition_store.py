@@ -31,6 +31,7 @@ from wkmigrate.definition_stores.pipeline_adapter import PipelineAdapter
 from wkmigrate.enums.source_property_case import SourcePropertyCase
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
+from wkmigrate.utils import normalize_arm_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ class FactoryDefinitionStore(DefinitionStore):
         normalized = self._adapter.normalize_casing(pipeline)
         if normalized is not None:
             pipeline = normalized
+        pipeline = normalize_arm_pipeline(pipeline)
         trigger = self._client.get_trigger(pipeline_name)
 
         enriched = self._adapter.adapt(pipeline, trigger)

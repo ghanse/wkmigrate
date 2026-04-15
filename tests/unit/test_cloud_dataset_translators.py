@@ -222,8 +222,8 @@ def test_translate_gcs_dataset_parquet() -> None:
     assert result.provider_type == "gcs"
 
 
-def test_translate_gcs_dataset_missing_file_name() -> None:
-    """Test GCS dataset with missing file_name returns UnsupportedValue."""
+def test_translate_gcs_dataset_folder_path_only() -> None:
+    """Test GCS dataset with only folder_path (no file_name) uses folder_path as the path."""
     dataset = {
         "name": "gcs_no_file",
         "properties": {
@@ -238,8 +238,27 @@ def test_translate_gcs_dataset_missing_file_name() -> None:
     }
     result = translate_file_dataset("DelimitedText", dataset, "gcs")
 
+    assert isinstance(result, FileDataset)
+    assert result.folder_path == "data"
+
+
+def test_translate_gcs_dataset_missing_both_path_fields() -> None:
+    """Test GCS dataset with neither folder_path nor file_name returns UnsupportedValue."""
+    dataset = {
+        "name": "gcs_no_path",
+        "properties": {
+            "type": "DelimitedText",
+            "location": {
+                "type": "GoogleCloudStorageLocation",
+                "bucket_name": "my-bucket",
+            },
+        },
+        "linked_service_definition": {"name": "svc", "properties": {}},
+    }
+    result = translate_file_dataset("DelimitedText", dataset, "gcs")
+
     assert isinstance(result, UnsupportedValue)
-    assert "file_name" in result.message
+    assert "folder_path" in result.message and "file_name" in result.message
 
 
 def test_translate_gcs_dataset_null_returns_unsupported() -> None:
