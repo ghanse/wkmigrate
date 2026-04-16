@@ -15,8 +15,10 @@ from wkmigrate.models.ir.pipeline import SetVariableActivity
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.parsers.expression_parsers import parse_variable_value
+from wkmigrate.supported_types import translates_activity
 
 
+@translates_activity("SetVariable")
 def translate_set_variable_activity(
     activity: dict, base_kwargs: dict, context: TranslationContext | None = None
 ) -> tuple[SetVariableActivity | UnsupportedValue, TranslationContext]:

@@ -7,8 +7,10 @@ and emit ``UnsupportedValue`` objects for any unparsable inputs.
 
 from wkmigrate.models.ir.pipeline import SparkPythonActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.supported_types import translates_activity
 
 
+@translates_activity("DatabricksSparkPython")
 def translate_spark_python_activity(activity: dict, base_kwargs: dict) -> SparkPythonActivity | UnsupportedValue:
     """
     Translates an ADF Databricks Spark Python activity into a ``SparkPythonActivity`` object.

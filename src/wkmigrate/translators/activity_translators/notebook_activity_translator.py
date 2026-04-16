@@ -9,8 +9,10 @@ import warnings
 from wkmigrate.models.ir.pipeline import DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.not_translatable import NotTranslatableWarning
+from wkmigrate.supported_types import translates_activity
 
 
+@translates_activity("DatabricksNotebook")
 def translate_notebook_activity(activity: dict, base_kwargs: dict) -> DatabricksNotebookActivity | UnsupportedValue:
     """
     Translates an ADF Databricks Notebook activity into a ``DatabricksNotebookActivity`` object.

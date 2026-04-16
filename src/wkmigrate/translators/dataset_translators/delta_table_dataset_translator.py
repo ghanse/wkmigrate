@@ -7,9 +7,11 @@ objects, parsing Databricks linked-service metadata and table properties.
 from wkmigrate.models.ir.datasets import DeltaTableDataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators.utils import get_linked_service_definition
+from wkmigrate.supported_types import translates_dataset
 from wkmigrate.translators.linked_service_translators import translate_databricks_cluster_spec
 
 
+@translates_dataset("AzureDatabricksDeltaLakeDataset")
 def translate_delta_table_dataset(dataset: dict) -> DeltaTableDataset | UnsupportedValue:
     """
     Translates a Delta table dataset definition into a ``DeltaTableDataset`` object.

@@ -17,6 +17,7 @@ from wkmigrate.translators.dataset_translators.utils import (
     parse_cloud_file_path,
     parse_format_options,
 )
+from wkmigrate.supported_types import translates_dataset
 from wkmigrate.translators.linked_service_translators import (
     translate_abfs_spec,
     translate_azure_blob_spec,
@@ -31,6 +32,7 @@ _CLOUD_TRANSLATORS: dict[str, Callable] = {
 }
 
 
+@translates_dataset("Avro", "DelimitedText", "Json", "Orc", "Parquet")
 def translate_file_dataset(
     dataset_type: str, dataset: dict, provider_type: str | None = None
 ) -> FileDataset | UnsupportedValue:

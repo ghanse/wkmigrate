@@ -7,9 +7,11 @@ objects for any unparsable inputs.
 
 from wkmigrate.models.ir.pipeline import RunJobActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.supported_types import translates_activity
 from wkmigrate.utils import parse_mapping
 
 
+@translates_activity("DatabricksJob")
 def translate_databricks_job_activity(activity: dict, base_kwargs: dict) -> RunJobActivity | UnsupportedValue:
     """
     Translates an ADF Databricks Job activity into a ``RunJobActivity`` object.

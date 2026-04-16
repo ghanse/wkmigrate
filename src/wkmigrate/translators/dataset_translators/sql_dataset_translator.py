@@ -10,6 +10,7 @@ from wkmigrate.models.ir.datasets import SqlTableDataset
 from wkmigrate.models.ir.linked_services import SqlLinkedService
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.translators.dataset_translators.utils import get_linked_service_definition
+from wkmigrate.supported_types import translates_dataset
 from wkmigrate.translators.linked_service_translators import (
     translate_mysql_spec,
     translate_oracle_spec,
@@ -18,6 +19,7 @@ from wkmigrate.translators.linked_service_translators import (
 )
 
 
+@translates_dataset("AzureSqlTable")
 def translate_sql_server_dataset(dataset: dict) -> SqlTableDataset | UnsupportedValue:
     """
     Translates a SQL Server dataset definition into a ``SqlTableDataset`` object.
@@ -33,6 +35,7 @@ def translate_sql_server_dataset(dataset: dict) -> SqlTableDataset | Unsupported
     return _translate_sql_dataset(dataset, "sqlserver", translate_sql_server_spec, table, schema)
 
 
+@translates_dataset("AzurePostgreSqlTable")
 def translate_postgresql_dataset(dataset: dict) -> SqlTableDataset | UnsupportedValue:
     """
     Translates an Azure Database for PostgreSQL dataset definition into a ``SqlTableDataset`` object.
@@ -48,6 +51,7 @@ def translate_postgresql_dataset(dataset: dict) -> SqlTableDataset | Unsupported
     return _translate_sql_dataset(dataset, "postgresql", translate_postgresql_spec, table, schema)
 
 
+@translates_dataset("AzureMySqlTable")
 def translate_mysql_dataset(dataset: dict) -> SqlTableDataset | UnsupportedValue:
     """
     Translates an Azure Database for MySQL dataset definition into a ``SqlTableDataset`` object.
@@ -65,6 +69,7 @@ def translate_mysql_dataset(dataset: dict) -> SqlTableDataset | UnsupportedValue
     return _translate_sql_dataset(dataset, "mysql", translate_mysql_spec, table)
 
 
+@translates_dataset("OracleTable")
 def translate_oracle_dataset(dataset: dict) -> SqlTableDataset | UnsupportedValue:
     """
     Translates an Oracle Database dataset definition into a ``SqlTableDataset`` object.

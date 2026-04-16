@@ -9,6 +9,7 @@ unparsable inputs.
 from wkmigrate.models.ir.pipeline import ColumnMapping, CopyActivity
 from wkmigrate.models.ir.datasets import Dataset
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.supported_types import translates_activity
 from wkmigrate.utils import (
     get_data_source_definition,
     get_data_source_properties,
@@ -17,6 +18,7 @@ from wkmigrate.utils import (
 )
 
 
+@translates_activity("Copy")
 def translate_copy_activity(activity: dict, base_kwargs: dict) -> CopyActivity | UnsupportedValue:
     """
     Translates an ADF Copy activity into a ``CopyActivity`` object. Copy activities are translated

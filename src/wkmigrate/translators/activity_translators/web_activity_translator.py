@@ -8,9 +8,11 @@ objects for any unparsable inputs.
 
 from wkmigrate.models.ir.pipeline import WebActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.supported_types import translates_activity
 from wkmigrate.utils import parse_timeout_string, parse_authentication
 
 
+@translates_activity("WebActivity")
 def translate_web_activity(activity: dict, base_kwargs: dict) -> WebActivity | UnsupportedValue:
     """
     Translates an ADF Web activity into a ``WebActivity`` object.
