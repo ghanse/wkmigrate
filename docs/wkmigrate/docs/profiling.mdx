@@ -1,0 +1,108 @@
+---
+sidebar_position: 2
+---
+
+import Admonition from '@theme/Admonition';
+
+# Profiling a Data Factory
+
+Before migrating pipelines, you can profile an Azure Data Factory resource to assess migration readiness. The profiler inspects every pipeline, dataset, linked service, trigger, and integration runtime in the factory and classifies each object as *supported* or *unsupported* based on the activity and dataset types that wkmigrate can translate.
+
+<Admonition type="info" title="When to profile">
+Run the profiler before starting a migration to understand scope, identify unsupported constructs early, and plan remediation for any activities or datasets that require manual migration.
+</Admonition>
+
+## Create a Factory Client
+
+The profiler uses a `FactoryClient` to connect to Azure Data Factory. Authenticate with an Azure service principal that has read access to the factory.
+
+```python
+from wkmigrate.clients.factory_client import FactoryClient
+
+client = FactoryClient(
+    tenant_id="<YOUR AZURE TENANT ID>",
+    client_id="<YOUR SERVICE PRINCIPAL CLIENT ID>",
+    client_secret="<YOUR SERVICE PRINCIPAL CLIENT SECRET>",
+    subscription_id="<YOUR AZURE SUBSCRIPTION ID>",
+    resource_group_name="<RESOURCE GROUP WITH YOUR ADF INSTANCE>",
+    factory_name="<YOUR ADF FACTORY NAME>",
+)
+```
+
+<Admonition type="warning" title="Permissions">
+Your service principal must have permissions to list pipelines, datasets, linked services, triggers, and integration runtimes. The Data Factory Reader role provides adequate permissions for profiling.
+</Admonition>
+
+## Profile the factory
+
+Pass the authenticated client to `profile_factory` to generate a `FactoryProfile` containing counts and details for every object in the factory.
+
+```python
+from wkmigrate.profiler import profile_factory
+
+profile = profile_factory(client)
+```
+
+## View the profile
+
+Use `format_profile` to render a human-readable summary.
+
+```python
+from wkmigrate.profiler import format_profile
+
+print(format_profile(profile))
+```
+
+Example output:
+
+```text
+Azure Data Factory Profile: my-data-factory
+============================================================
+
+Object Counts:
+  Pipelines:            12
+  Activities:           47 (39 supported, 8 unsupported)
+  Linked Services:      6 (5 supported, 1 unsupported)
+  Datasets:             18 (15 supported, 3 unsupported)
+  Triggers:             4
+  Integration Runtimes: 2
+
+Unsupported Activity Types:
+  - ExecutePipeline
+  - AzureFunctionActivity
+
+Unsupported Dataset Types:
+  - SalesforceObject
+
+Dataset Details:
+  - orders_parquet (Parquet) via adls_storage [AzureBlobFS]
+  - customer_sql (AzureSqlTable) via sql_server [AzureSqlDatabase]
+  - crm_export (SalesforceObject) via sf_conn [SalesforceLinkedService]
+
+Integration Runtimes:
+  - AutoResolveIR (Managed)
+  - OnPremIR (SelfHosted, 4 nodes)
+```
+
+## Work with the profile programmatically
+
+The `FactoryProfile` object exposes structured fields that you can inspect in code.
+
+```python
+# Overall counts
+print(f"Total activities: {profile.activities.total}")
+print(f"Supported: {profile.activities.supported}")
+print(f"Unsupported: {profile.activities.unsupported}")
+
+# List unsupported types that need manual migration
+for activity_type in profile.unsupported_activity_types:
+    print(f"  Needs manual migration: {activity_type}")
+
+# Inspect dataset-to-linked-service mapping
+for detail in profile.dataset_details:
+    print(f"  {detail.dataset_name} -> {detail.linked_service_name} ({detail.linked_service_type})")
+```
+
+## Supported types
+
+The profiler classifies objects using the same type registries as the translator. See [Capabilities](./capabilities) for the full list of supported activities, datasets, and linked services.
