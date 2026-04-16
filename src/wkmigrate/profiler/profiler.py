@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.profiler.profile import (
     DatasetDetail,
