@@ -11,6 +11,7 @@ objects, parsing Databricks linked-service metadata and table properties.
 #### translate\_delta\_table\_dataset
 
 ```python
+@translates_dataset("AzureDatabricksDeltaLakeDataset")
 def translate_delta_table_dataset(
         dataset: dict) -> DeltaTableDataset | UnsupportedValue
 ```

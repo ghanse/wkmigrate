@@ -12,6 +12,7 @@ Each translator must validate required fields, parse the activity's condition ex
 #### translate\_if\_condition\_activity
 
 ```python
+@translates_activity("IfCondition")
 def translate_if_condition_activity(
     activity: dict,
     base_kwargs: dict,

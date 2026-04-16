@@ -49,6 +49,22 @@ Lists the names of all pipelines available in the Data Factory.
 
   Pipeline names as a ``list[str]``.
 
+#### list\_pipeline\_definitions
+
+```python
+def list_pipeline_definitions() -> list[dict]
+```
+
+Lists full pipeline definitions available in the Data Factory.
+
+Unlike ``list_pipelines``, which returns only names, this method returns
+the complete pipeline definition dictionaries including activities,
+parameters, and other metadata.
+
+**Returns**:
+
+  Pipeline definitions as a ``list[dict]``.
+
 #### get\_pipeline
 
 ```python
@@ -100,6 +116,18 @@ Gets the trigger associated with a pipeline.
 
   Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
 
+#### list\_triggers
+
+```python
+def list_triggers() -> list[dict]
+```
+
+Lists triggers available in the source Data Factory.
+
+**Returns**:
+
+  List of trigger definitions as ``list[dict]``.
+
 #### get\_dataset
 
 ```python
@@ -116,4 +144,40 @@ Gets the dataset definition for a specified dataset name.
 **Returns**:
 
   Dataset definition as a ``dict``.
+
+#### list\_datasets
+
+```python
+def list_datasets() -> list[dict]
+```
+
+Lists dataset definitions available in the source Data Factory.
+
+**Returns**:
+
+  List of dataset definitions as ``list[dict]``.
+
+#### list\_linked\_services
+
+```python
+def list_linked_services() -> list[dict]
+```
+
+Lists all linked-service definitions available in the Data Factory.
+
+**Returns**:
+
+  Linked-service definitions as a ``list[dict]``.
+
+#### list\_integration\_runtimes
+
+```python
+def list_integration_runtimes() -> list[dict]
+```
+
+Lists all integration-runtime definitions available in the Data Factory.
+
+**Returns**:
+
+  Integration-runtime definitions as a ``list[dict]``.
 

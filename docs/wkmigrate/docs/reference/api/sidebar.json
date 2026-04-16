@@ -88,6 +88,14 @@
         },
         {
           "items": [
+            "reference/api/wkmigrate/profiler/profile",
+            "reference/api/wkmigrate/profiler/profiler"
+          ],
+          "label": "wkmigrate.profiler",
+          "type": "category"
+        },
+        {
+          "items": [
             {
               "items": [
                 "reference/api/wkmigrate/translators/activity_translators/activity_translator",
@@ -149,6 +157,7 @@
         },
         "reference/api/wkmigrate/code_generator",
         "reference/api/wkmigrate/not_translatable",
+        "reference/api/wkmigrate/supported_types",
         "reference/api/wkmigrate/utils"
       ],
       "label": "wkmigrate",

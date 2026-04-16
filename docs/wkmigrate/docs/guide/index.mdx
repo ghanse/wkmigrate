@@ -1,19 +1,21 @@
 ---
-sidebar_position: 1
+sidebar_position: 30
 ---
 
 import Admonition from '@theme/Admonition';
 
 # Usage Guide
 
-wkmigrate is a Python library which automates migrations from Azure Data Factory pipelines to Databricks Lakeflow jobs. A typical migration has two phases: **profiling** the source factory and **translating** pipelines to Databricks.
+wkmigrate is a Python library for automating migrations from Azure Data Factory pipelines to Databricks Lakeflow jobs. A typical migration has two phases: 
+- *Profiling* the source Data Factory
+- *Translating* pipelines to Databricks jobs
 
 <Admonition type="info" title="Prerequisites">
 You must have the following to use wkmigrate:
 
-- A working Python environment with wkmigrate installed (e.g. using `pip install wkmigrate`).
-- An Azure Service Principal with Data Factory permissions or a set of exported pipeline JSON files.
-- A Databricks Service Principal or personal access token.
+- A working Python environment with wkmigrate installed (e.g. using `pip install wkmigrate`)
+- An Azure Service Principal with Data Factory permissions or a set of exported pipeline JSON files
+- A Databricks Service Principal or personal access token
 </Admonition>
 
 ## Profiling a Data Factory
@@ -37,7 +39,7 @@ profile = profile_factory(client)
 print(format_profile(profile))
 ```
 
-See [Profiling a Data Factory](./profiling) for full details on interpreting the profile output and working with the results programmatically.
+See [Profiling a Data Factory](/docs/guide/profiling) for full details on interpreting the profile output and working with the results programmatically.
 
 ## Translating Pipelines
 
@@ -67,4 +69,4 @@ workspace_store = WorkspaceDefinitionStore(
 job_id = workspace_store.to_job(pipeline_ir)
 ```
 
-See [Translating Pipelines](./translating) for the complete guide covering definition stores, batch translation, asset bundles, and customization options.
+See [Translating Pipelines](/docs/guide/translating) for the complete guide covering definition stores, batch translation, asset bundles, and customization options.

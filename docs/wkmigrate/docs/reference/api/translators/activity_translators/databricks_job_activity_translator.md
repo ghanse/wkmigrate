@@ -12,6 +12,7 @@ objects for any unparsable inputs.
 #### translate\_databricks\_job\_activity
 
 ```python
+@translates_activity("DatabricksJob")
 def translate_databricks_job_activity(
         activity: dict,
         base_kwargs: dict) -> RunJobActivity | UnsupportedValue

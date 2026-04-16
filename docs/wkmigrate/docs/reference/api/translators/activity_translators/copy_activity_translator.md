@@ -13,6 +13,7 @@ unparsable inputs.
 #### translate\_copy\_activity
 
 ```python
+@translates_activity("Copy")
 def translate_copy_activity(
         activity: dict, base_kwargs: dict) -> CopyActivity | UnsupportedValue
 ```

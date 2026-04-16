@@ -11,6 +11,7 @@ into ``SqlTableDataset`` objects, parsing table/schema names and linked-service 
 #### translate\_sql\_server\_dataset
 
 ```python
+@translates_dataset("AzureSqlTable")
 def translate_sql_server_dataset(
         dataset: dict) -> SqlTableDataset | UnsupportedValue
 ```
@@ -29,6 +30,7 @@ Translates a SQL Server dataset definition into a ``SqlTableDataset`` object.
 #### translate\_postgresql\_dataset
 
 ```python
+@translates_dataset("AzurePostgreSqlTable")
 def translate_postgresql_dataset(
         dataset: dict) -> SqlTableDataset | UnsupportedValue
 ```
@@ -47,6 +49,7 @@ Translates an Azure Database for PostgreSQL dataset definition into a ``SqlTable
 #### translate\_mysql\_dataset
 
 ```python
+@translates_dataset("AzureMySqlTable")
 def translate_mysql_dataset(
         dataset: dict) -> SqlTableDataset | UnsupportedValue
 ```
@@ -68,6 +71,7 @@ and ``dbtable`` contains only the bare table name.
 #### translate\_oracle\_dataset
 
 ```python
+@translates_dataset("OracleTable")
 def translate_oracle_dataset(
         dataset: dict) -> SqlTableDataset | UnsupportedValue
 ```

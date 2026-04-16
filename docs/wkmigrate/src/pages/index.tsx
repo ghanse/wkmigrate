@@ -28,17 +28,17 @@ const Hero = () => {
         <Button
           variant="secondary"
           outline={true}
-          link="/docs/guide"
+          link="/docs/capabilities"
           size="large"
-          label={"Usage Guide"}
+          label={"Capabilities"}
           className="w-64"
         />
         <Button
           variant="secondary"
           outline={true}
-          link="/docs/capabilities"
+          link="/docs/guide"
           size="large"
-          label={"Capabilities"}
+          label={"Usage Guide"}
           className="w-64"
         />
         <Button

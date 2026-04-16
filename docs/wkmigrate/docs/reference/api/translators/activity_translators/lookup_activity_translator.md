@@ -14,6 +14,7 @@ properties, and emit ``UnsupportedValue`` objects for any unparsable inputs.
 #### translate\_lookup\_activity
 
 ```python
+@translates_activity("Lookup")
 def translate_lookup_activity(
         activity: dict,
         base_kwargs: dict) -> LookupActivity | UnsupportedValue

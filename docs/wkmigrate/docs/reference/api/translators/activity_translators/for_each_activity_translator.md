@@ -12,6 +12,7 @@ Each translator must validate required fields, parse the activity's items expres
 #### translate\_for\_each\_activity
 
 ```python
+@translates_activity("ForEach")
 def translate_for_each_activity(
     activity: dict,
     base_kwargs: dict,

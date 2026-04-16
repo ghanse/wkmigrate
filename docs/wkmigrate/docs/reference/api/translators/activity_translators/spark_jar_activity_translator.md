@@ -12,6 +12,7 @@ and emit ``UnsupportedValue`` objects for any unparsable inputs.
 #### translate\_spark\_jar\_activity
 
 ```python
+@translates_activity("DatabricksSparkJar")
 def translate_spark_jar_activity(
         activity: dict,
         base_kwargs: dict) -> SparkJarActivity | UnsupportedValue

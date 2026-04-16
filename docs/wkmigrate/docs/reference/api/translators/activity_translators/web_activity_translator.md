@@ -13,6 +13,7 @@ objects for any unparsable inputs.
 #### translate\_web\_activity
 
 ```python
+@translates_activity("WebActivity")
 def translate_web_activity(
         activity: dict, base_kwargs: dict) -> WebActivity | UnsupportedValue
 ```

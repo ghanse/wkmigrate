@@ -14,6 +14,7 @@ the expression is parsed into an equivalent Python expression.
 #### translate\_set\_variable\_activity
 
 ```python
+@translates_activity("SetVariable")
 def translate_set_variable_activity(
     activity: dict,
     base_kwargs: dict,

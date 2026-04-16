@@ -12,6 +12,7 @@ Amazon S3, Google Cloud Storage, and Azure Blob Storage locations.
 #### translate\_file\_dataset
 
 ```python
+@translates_dataset("Avro", "DelimitedText", "Json", "Orc", "Parquet")
 def translate_file_dataset(
         dataset_type: str,
         dataset: dict,
