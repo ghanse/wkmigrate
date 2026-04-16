@@ -43,6 +43,10 @@ dev = [
     "types-pyyaml>=6.0.12.20250915,<7",
     "pydoc-markdown>=4.8.2,<5",
 ]
+profiler = [
+    "azure-identity>=1.16.1,<2",
+    "azure-mgmt-datafactory>=9.0.0,<10",
+]
 
 [build-system]
 requires = ["hatchling==1.29.0"]
