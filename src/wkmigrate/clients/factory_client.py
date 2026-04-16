@@ -68,6 +68,24 @@ class FactoryClient:
         )
         return [pipeline.name for pipeline in pipelines if pipeline.name is not None]  # type: ignore[misc]
 
+    def list_pipeline_definitions(self) -> list[dict]:
+        """
+        Lists full pipeline definitions available in the Data Factory.
+
+        Unlike ``list_pipelines``, which returns only names, this method returns
+        the complete pipeline definition dictionaries including activities,
+        parameters, and other metadata.
+
+        Returns:
+            Pipeline definitions as a ``list[dict]``.
+        """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
+        pipelines = self.management_client.pipelines.list_by_factory(
+            resource_group_name=self.resource_group_name, factory_name=self.factory_name
+        )
+        return [dict(pipeline.as_dict()) for pipeline in pipelines]
+
     def get_pipeline(self, pipeline_name: str) -> dict:
         """
         Gets a pipeline definition with the specified name.
@@ -116,7 +134,7 @@ class FactoryClient:
         Returns:
             Trigger definition as a ``dict``, or ``None`` if the pipeline has no trigger.
         """
-        triggers = self._list_triggers()
+        triggers = self.list_triggers()
         for trigger in triggers:
             properties = trigger.get("properties")
             if properties is None:
@@ -139,7 +157,7 @@ class FactoryClient:
                 return trigger
         return None
 
-    def _list_triggers(self) -> list[dict]:
+    def list_triggers(self) -> list[dict]:
         """
         Lists triggers available in the source Data Factory.
 
@@ -165,7 +183,7 @@ class FactoryClient:
         Returns:
             Dataset definition as a ``dict``.
         """
-        datasets = self._list_datasets()
+        datasets = self.list_datasets()
         for dataset in datasets:
             if dataset.get("name") != dataset_name:
                 continue
@@ -181,7 +199,7 @@ class FactoryClient:
             return dataset
         raise ValueError(f'No dataset found for factory with name "{dataset_name}"')
 
-    def _list_datasets(self) -> list[dict]:
+    def list_datasets(self) -> list[dict]:
         """
         Lists dataset definitions available in the source Data Factory.
 
@@ -196,3 +214,31 @@ class FactoryClient:
         if datasets is None:
             raise ValueError(f'No datasets found for factory "{self.factory_name}"')
         return [dict(dataset.as_dict()) for dataset in datasets]
+
+    def list_linked_services(self) -> list[dict]:
+        """
+        Lists all linked-service definitions available in the Data Factory.
+
+        Returns:
+            Linked-service definitions as a ``list[dict]``.
+        """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
+        linked_services = self.management_client.linked_services.list_by_factory(
+            resource_group_name=self.resource_group_name, factory_name=self.factory_name
+        )
+        return [dict(ls.as_dict()) for ls in linked_services]
+
+    def list_integration_runtimes(self) -> list[dict]:
+        """
+        Lists all integration-runtime definitions available in the Data Factory.
+
+        Returns:
+            Integration-runtime definitions as a ``list[dict]``.
+        """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
+        runtimes = self.management_client.integration_runtimes.list_by_factory(
+            resource_group_name=self.resource_group_name, factory_name=self.factory_name
+        )
+        return [dict(ir.as_dict()) for ir in runtimes]

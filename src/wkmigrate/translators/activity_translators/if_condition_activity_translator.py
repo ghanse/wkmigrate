@@ -16,8 +16,10 @@ from wkmigrate.models.ir.pipeline import Activity, IfConditionActivity
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.supported_types import translates_activity
 
 
+@translates_activity("IfCondition")
 def translate_if_condition_activity(
     activity: dict,
     base_kwargs: dict,
