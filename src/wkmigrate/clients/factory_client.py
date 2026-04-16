@@ -54,30 +54,37 @@ class FactoryClient:
         )
         self.management_client = DataFactoryManagementClient(credential, self.subscription_id)
 
-    def list_pipelines(self, include_metadata: bool = False) -> list[str] | list[dict]:
+    def list_pipelines(self) -> list[str]:
         """
-        Lists pipelines available in the Data Factory.
-
-        When ``include_metadata`` is *False* (the default) only pipeline names
-        are returned, preserving backward compatibility.  When *True*, full
-        pipeline definitions are returned as dictionaries.
-
-        Args:
-            include_metadata: If ``True``, return full pipeline dicts instead
-                of name strings.
+        Lists the names of all pipelines available in the Data Factory.
 
         Returns:
-            Pipeline names as ``list[str]`` or full definitions as
-            ``list[dict]``.
+            Pipeline names as a ``list[str]``.
         """
         if self.management_client is None:
             raise ValueError("management_client is not initialized")
         pipelines = self.management_client.pipelines.list_by_factory(
             resource_group_name=self.resource_group_name, factory_name=self.factory_name
         )
-        if include_metadata:
-            return [dict(pipeline.as_dict()) for pipeline in pipelines]
         return [pipeline.name for pipeline in pipelines if pipeline.name is not None]  # type: ignore[misc]
+
+    def list_pipeline_definitions(self) -> list[dict]:
+        """
+        Lists full pipeline definitions available in the Data Factory.
+
+        Unlike ``list_pipelines``, which returns only names, this method returns
+        the complete pipeline definition dictionaries including activities,
+        parameters, and other metadata.
+
+        Returns:
+            Pipeline definitions as a ``list[dict]``.
+        """
+        if self.management_client is None:
+            raise ValueError("management_client is not initialized")
+        pipelines = self.management_client.pipelines.list_by_factory(
+            resource_group_name=self.resource_group_name, factory_name=self.factory_name
+        )
+        return [dict(pipeline.as_dict()) for pipeline in pipelines]
 
     def get_pipeline(self, pipeline_name: str) -> dict:
         """

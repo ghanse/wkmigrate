@@ -1,6 +1,7 @@
 """Profile an Azure Data Factory resource to assess migration readiness."""
 
 from __future__ import annotations
+
 import logging
 
 from wkmigrate.clients.factory_client import FactoryClient
@@ -10,46 +11,13 @@ from wkmigrate.profiler.profile import (
     IntegrationRuntimeDetail,
     ObjectCount,
 )
+from wkmigrate.supported_types import (
+    SUPPORTED_ACTIVITY_TYPES,
+    SUPPORTED_DATASET_TYPES,
+    SUPPORTED_LINKED_SERVICE_TYPES,
+)
 
 logger = logging.getLogger(__name__)
-
-SUPPORTED_ACTIVITY_TYPES = {
-    "Copy",
-    "DatabricksJob",
-    "DatabricksNotebook",
-    "DatabricksSparkJar",
-    "DatabricksSparkPython",
-    "ForEach",
-    "IfCondition",
-    "Lookup",
-    "SetVariable",
-    "WebActivity",
-}
-
-SUPPORTED_DATASET_TYPES = {
-    "Avro",
-    "DelimitedText",
-    "Json",
-    "Orc",
-    "Parquet",
-    "AzureSqlTable",
-    "AzurePostgreSqlTable",
-    "AzureMySqlTable",
-    "OracleTable",
-    "AzureDatabricksDeltaLakeDataset",
-}
-
-SUPPORTED_LINKED_SERVICE_TYPES = {
-    "AzureBlobFS",
-    "AzureBlobStorage",
-    "AzureSqlDatabase",
-    "AzureDatabricks",
-    "AmazonS3",
-    "GoogleCloudStorage",
-    "AzurePostgreSql",
-    "AzureMySql",
-    "Oracle",
-}
 
 
 def profile_factory(client: FactoryClient) -> FactoryProfile:
@@ -61,7 +29,7 @@ def profile_factory(client: FactoryClient) -> FactoryProfile:
     Returns:
         A ``FactoryProfile`` summarising the factory contents.
     """
-    pipelines = client.list_pipelines(include_metadata=True)
+    pipelines = client.list_pipeline_definitions()
     datasets = client.list_datasets()
     linked_services = client.list_linked_services()
     triggers = client.list_triggers()

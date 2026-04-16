@@ -7,11 +7,13 @@ from wkmigrate.profiler.profile import (
     ObjectCount,
 )
 from wkmigrate.profiler.profiler import (
+    format_profile,
+    profile_factory,
+)
+from wkmigrate.supported_types import (
     SUPPORTED_ACTIVITY_TYPES,
     SUPPORTED_DATASET_TYPES,
     SUPPORTED_LINKED_SERVICE_TYPES,
-    format_profile,
-    profile_factory,
 )
 
 __all__ = [
