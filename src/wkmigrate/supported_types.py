@@ -63,13 +63,3 @@ def translates_dataset(*adf_type_names: str) -> Callable[[_F], _F]:
         return func
 
     return decorator
-
-
-# ---------------------------------------------------------------------------
-# Trigger translator imports so every decorator fires at module-load time.
-# The decorators (above) are already defined, so the circular reference
-# through each translator's ``from wkmigrate.supported_types import ...``
-# resolves safely against this partially-initialised module.
-# ---------------------------------------------------------------------------
-import wkmigrate.translators.activity_translators.activity_translator as _activity_reg  # noqa: E402,F401
-import wkmigrate.translators.dataset_translators.dataset_translator as _dataset_reg  # noqa: E402,F401

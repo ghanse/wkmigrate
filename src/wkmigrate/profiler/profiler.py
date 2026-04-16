@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import logging
+
+# Import translator dispatchers first so every @translates_activity /
+# @translates_dataset decorator fires before we read the sets.
+import wkmigrate.translators.activity_translators.activity_translator as _activity_reg  # noqa: F401
+import wkmigrate.translators.dataset_translators.dataset_translator as _dataset_reg  # noqa: F401
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.profiler.profile import (
     DatasetDetail,
