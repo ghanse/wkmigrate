@@ -21,13 +21,10 @@ from wkmigrate.profiler.profiler import (
     _count_linked_services,
     _leaf_resource_name,
     _load_from_arm,
-    _load_from_git_export,
+    _load_template,
     format_profile,
     profile_factory,
 )
-
-
-# -- _collect_activities -------------------------------------------------------
 
 
 def test_collect_flat_activities():
@@ -84,9 +81,6 @@ def test_collect_activities_does_not_mutate_input():
     assert len(activities) == 2
 
 
-# -- _count_activities ---------------------------------------------------------
-
-
 def test_count_all_supported():
     pipelines = [{"activities": [{"type": "Copy"}, {"type": "Lookup"}]}]
     counts, unsupported = _count_activities(pipelines)
@@ -132,9 +126,6 @@ def test_count_activities_skips_non_dict_pipelines():
     assert counts.total == 1
 
 
-# -- _count_datasets -----------------------------------------------------------
-
-
 def test_count_datasets_supported():
     datasets = [
         {"name": "ds1", "properties": {"type": "Parquet", "linked_service_name": {"reference_name": "ls1"}}},
@@ -168,9 +159,6 @@ def test_count_datasets_missing_type():
     assert details[0].dataset_type == "Unknown"
 
 
-# -- _count_linked_services ----------------------------------------------------
-
-
 def test_count_linked_services_mixed():
     linked_services = [
         {"name": "ls1", "properties": {"type": "AzureBlobFS"}},
@@ -179,9 +167,6 @@ def test_count_linked_services_mixed():
     ]
     counts = _count_linked_services(linked_services)
     assert counts == ObjectCount(total=3, supported=2, unsupported=1)
-
-
-# -- _build_integration_runtime_details ----------------------------------------
 
 
 def test_integration_runtime_managed():
@@ -203,9 +188,6 @@ def test_integration_runtime_self_hosted_with_nodes():
     ]
     _, details = _build_integration_runtime_details(runtimes)
     assert details[0].node_count == 4
-
-
-# -- format_profile ------------------------------------------------------------
 
 
 def test_format_profile_basic():
@@ -272,9 +254,6 @@ def test_format_profile_integration_runtime_details():
     assert "ir-self (SelfHosted, 4 nodes)" in text
 
 
-# -- profile_factory argument validation ---------------------------------------
-
-
 def test_profile_factory_requires_client_or_arm_template():
     with pytest.raises(ValueError, match="must be provided"):
         profile_factory()
@@ -287,13 +266,10 @@ def test_profile_factory_rejects_multiple_sources():
         factory_name = "f"
 
     with pytest.raises(ValueError, match="Only one of"):
-        profile_factory(client=_Sentinel(), arm_template={"resources": []})  # type: ignore[arg-type]
+        profile_factory(client=_Sentinel(), template={"resources": []})  # type: ignore[arg-type]
 
     with pytest.raises(ValueError, match="Only one of"):
-        profile_factory(arm_template={"resources": []}, git_export_root="/tmp/whatever")
-
-
-# -- _camel_to_snake / _leaf_resource_name -------------------------------------
+        profile_factory(template={"resources": []}, template_path="/tmp/whatever")
 
 
 def test_camel_to_snake_basic():
@@ -309,9 +285,6 @@ def test_leaf_resource_name_strips_factory_prefix():
     assert _leaf_resource_name("my-factory/my-pipeline") == "my-pipeline"
     assert _leaf_resource_name("standalone-name") == "standalone-name"
     assert _leaf_resource_name("") == ""
-
-
-# -- _load_from_arm ------------------------------------------------------------
 
 
 def _arm_template_sample() -> dict:
@@ -462,7 +435,7 @@ def test_load_from_arm_factory_name_unknown_when_neither_source_present():
 
 def test_profile_factory_via_arm_template_end_to_end():
     """Full end-to-end profiling against a parsed ARM template."""
-    profile = profile_factory(arm_template=_arm_template_sample())
+    profile = profile_factory(template=_arm_template_sample())
     assert profile.factory_name == "my-factory"
     assert profile.pipelines.total == 2
     # 3 activities total: Copy + DatabricksNotebook + (none in idle pipeline)
@@ -477,11 +450,8 @@ def test_profile_factory_via_arm_template_end_to_end():
     assert profile.integration_runtimes.total == 1
 
 
-# -- _build_pipeline_details ---------------------------------------------------
-
-
 def test_pipeline_details_via_arm_template():
-    profile = profile_factory(arm_template=_arm_template_sample())
+    profile = profile_factory(template=_arm_template_sample())
     details_by_name = {pd.pipeline_name: pd for pd in profile.pipeline_details}
     assert set(details_by_name) == {"orders-etl", "idle-pipeline"}
 
@@ -652,9 +622,6 @@ def test_format_profile_pipeline_details_section_rendered():
     assert "Triggers: 1, Integration Runtimes: 1" in text
 
 
-# -- _load_from_git_export -----------------------------------------------------
-
-
 def _write_arm_resources_as_git_export(root: Path) -> None:
     """Materialises ``_arm_template_sample()``'s resources as a Git-mode tree under *root*.
 
@@ -686,10 +653,10 @@ def _write_arm_resources_as_git_export(root: Path) -> None:
         (target / f"{leaf_name}.json").write_text(_json.dumps(file_body, indent=2))
 
 
-def test_load_from_git_export_round_trips_arm_sample(tmp_path):
+def test_load_template_round_trips_arm_sample(tmp_path):
     """Writing the ARM sample out as Git-mode files and loading back yields the same content."""
     _write_arm_resources_as_git_export(tmp_path)
-    loaded = _load_from_git_export(tmp_path)
+    loaded = _load_template(tmp_path)
     assert loaded["factory_name"] == "my-factory"
     assert {p["name"] for p in loaded["pipelines"]} == {"orders-etl", "idle-pipeline"}
     assert {d["name"] for d in loaded["datasets"]} == {"ds_blob_orders", "ds_sql_orders"}
@@ -703,28 +670,28 @@ def test_load_from_git_export_round_trips_arm_sample(tmp_path):
     assert orders["activities"][0]["inputs"][0]["reference_name"] == "ds_blob_orders"
 
 
-def test_load_from_git_export_uses_factory_subdir_for_name(tmp_path):
+def test_load_template_uses_factory_subdir_for_name(tmp_path):
     factory_dir = tmp_path / "factory"
     factory_dir.mkdir()
     (factory_dir / "my-factory.json").write_text('{"name": "my-factory", "properties": {}}')
     (tmp_path / "pipeline").mkdir()
     (tmp_path / "pipeline" / "p.json").write_text('{"name": "p", "properties": {"activities": []}}')
-    loaded = _load_from_git_export(tmp_path)
+    loaded = _load_template(tmp_path)
     assert loaded["factory_name"] == "my-factory"
 
 
-def test_load_from_git_export_falls_back_to_override_when_no_factory_subdir(tmp_path):
+def test_load_template_falls_back_to_override_when_no_factory_subdir(tmp_path):
     (tmp_path / "pipeline").mkdir()
     (tmp_path / "pipeline" / "p.json").write_text('{"name": "p", "properties": {"activities": []}}')
-    loaded = _load_from_git_export(tmp_path, factory_name_override="from-override")
+    loaded = _load_template(tmp_path, factory_name_override="from-override")
     assert loaded["factory_name"] == "from-override"
 
 
-def test_load_from_git_export_skips_missing_subdirectories(tmp_path):
+def test_load_template_skips_missing_subdirectories(tmp_path):
     """A factory with only pipelines should not blow up on missing dataset/trigger/etc dirs."""
     (tmp_path / "pipeline").mkdir()
     (tmp_path / "pipeline" / "only.json").write_text('{"name": "only", "properties": {"activities": []}}')
-    loaded = _load_from_git_export(tmp_path, factory_name_override="sparse")
+    loaded = _load_template(tmp_path, factory_name_override="sparse")
     assert [p["name"] for p in loaded["pipelines"]] == ["only"]
     assert loaded["datasets"] == []
     assert loaded["linked_services"] == []
@@ -732,34 +699,34 @@ def test_load_from_git_export_skips_missing_subdirectories(tmp_path):
     assert loaded["integration_runtimes"] == []
 
 
-def test_load_from_git_export_skips_malformed_json(tmp_path, caplog):
+def test_load_template_skips_malformed_json(tmp_path, caplog):
     (tmp_path / "pipeline").mkdir()
     (tmp_path / "pipeline" / "good.json").write_text('{"name": "good", "properties": {"activities": []}}')
     (tmp_path / "pipeline" / "broken.json").write_text("not valid json {{{")
     with caplog.at_level("WARNING"):
-        loaded = _load_from_git_export(tmp_path, factory_name_override="f")
+        loaded = _load_template(tmp_path, factory_name_override="f")
     assert [p["name"] for p in loaded["pipelines"]] == ["good"]
     assert any("malformed" in record.message.lower() for record in caplog.records)
 
 
-def test_load_from_git_export_falls_back_to_filename_stem_when_name_missing(tmp_path):
+def test_load_template_falls_back_to_filename_stem_when_name_missing(tmp_path):
     """A file lacking a top-level 'name' field uses its filename stem instead."""
     (tmp_path / "pipeline").mkdir()
     (tmp_path / "pipeline" / "pipeline_from_stem.json").write_text('{"properties": {"activities": []}}')
-    loaded = _load_from_git_export(tmp_path, factory_name_override="f")
+    loaded = _load_template(tmp_path, factory_name_override="f")
     assert [p["name"] for p in loaded["pipelines"]] == ["pipeline_from_stem"]
 
 
-def test_load_from_git_export_raises_when_root_missing(tmp_path):
+def test_load_template_raises_when_root_missing(tmp_path):
     missing = tmp_path / "does-not-exist"
     with pytest.raises(ValueError, match="not a directory"):
-        _load_from_git_export(missing)
+        _load_template(missing)
 
 
 def test_profile_factory_via_git_export_end_to_end(tmp_path):
     """End-to-end: Git-mode tree → profile_factory → FactoryProfile with pipeline_details."""
     _write_arm_resources_as_git_export(tmp_path)
-    profile = profile_factory(git_export_root=tmp_path)
+    profile = profile_factory(template_path=tmp_path)
     assert profile.factory_name == "my-factory"
     assert profile.pipelines.total == 2
     # Same factory-wide totals as the ARM-template path
@@ -775,5 +742,5 @@ def test_profile_factory_via_git_export_end_to_end(tmp_path):
 def test_profile_factory_git_export_path_accepts_string(tmp_path):
     """``git_export_root`` accepts both Path and string."""
     _write_arm_resources_as_git_export(tmp_path)
-    profile = profile_factory(git_export_root=str(tmp_path))
+    profile = profile_factory(template_path=str(tmp_path))
     assert profile.factory_name == "my-factory"
