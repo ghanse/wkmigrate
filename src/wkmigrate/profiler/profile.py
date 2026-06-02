@@ -34,6 +34,21 @@ class IntegrationRuntimeDetail:
 
 
 @dataclass(slots=True)
+class PipelineDetail:
+    """Per-pipeline breakdown of translatability and referenced resources."""
+
+    pipeline_name: str
+    activities: ObjectCount
+    datasets: ObjectCount
+    linked_services: ObjectCount
+    total_activities: int = 0
+    total_datasets: int = 0
+    total_linked_services: int = 0
+    total_triggers: int = 0
+    total_integration_runtimes: int = 0
+
+
+@dataclass(slots=True)
 class FactoryProfile:
     """Complete profile of an Azure Data Factory resource."""
 
@@ -46,5 +61,6 @@ class FactoryProfile:
     integration_runtimes: ObjectCount
     dataset_details: list[DatasetDetail] = field(default_factory=list)
     integration_runtime_details: list[IntegrationRuntimeDetail] = field(default_factory=list)
+    pipeline_details: list[PipelineDetail] = field(default_factory=list)
     unsupported_activity_types: list[str] = field(default_factory=list)
     unsupported_dataset_types: list[str] = field(default_factory=list)

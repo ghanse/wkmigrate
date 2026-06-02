@@ -5,6 +5,7 @@ from wkmigrate.profiler.profile import (
     FactoryProfile,
     IntegrationRuntimeDetail,
     ObjectCount,
+    PipelineDetail,
 )
 from wkmigrate.profiler.profiler import (
     format_profile,
@@ -21,6 +22,7 @@ __all__ = [
     "FactoryProfile",
     "IntegrationRuntimeDetail",
     "ObjectCount",
+    "PipelineDetail",
     "SUPPORTED_ACTIVITY_TYPES",
     "SUPPORTED_DATASET_TYPES",
     "SUPPORTED_LINKED_SERVICE_TYPES",
