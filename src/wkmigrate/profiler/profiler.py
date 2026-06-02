@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 import wkmigrate.translators.activity_translators.activity_translator as _activity_translator_registry  # noqa: F401
@@ -36,31 +38,51 @@ def profile_factory(
     client: FactoryClient | None = None,
     *,
     arm_template: dict[str, Any] | None = None,
+    git_export_root: str | Path | None = None,
     factory_name: str | None = None,
 ) -> FactoryProfile:
     """Profiles an Azure Data Factory resource.
 
-    Uses either an authenticated FactoryClient to profile using API calls against a deployed
-    Data Factory or an ARM template dict for offline profiling against exported ARM templates
-    (e.g. 'ARMTemplateForFactory.json').
+    Accepts one of three input sources (mutually exclusive — exactly one must be
+    provided):
+
+    * ``client``: live profiling against a deployed Data Factory via the
+      authenticated ``FactoryClient``.
+    * ``arm_template``: offline profiling against a parsed ARM template dict
+      (the shape ``ARMTemplateForFactory.json`` deserializes to, or the output
+      of an in-memory composition such as ``to_arm_template()``).
+    * ``git_export_root``: offline profiling against an ADF Git-mode export on
+      disk — the directory layout written by ADF Studio's Git integration,
+      with one JSON file per resource under per-kind subdirectories
+      (``pipeline/``, ``dataset/``, ``linkedService/``, ``trigger/``,
+      ``integrationRuntime/`` and optionally ``factory/``).
 
     Args:
         client: Authenticated FactoryClient for the target factory.
         arm_template: Parsed ARM JSON template.
-        factory_name: Override for the factory display name. Required when profiling an ARM
-            template that does not embed a ``Microsoft.DataFactory/factories`` resource.
-            Ignored when a client is supplied.
+        git_export_root: Filesystem path to the root of an ADF Git-mode export.
+        factory_name: Override for the factory display name. Used when
+            profiling an ARM template that does not embed a
+            ``Microsoft.DataFactory/factories`` resource, or a Git-mode export
+            that does not include a ``factory/`` subdirectory. Ignored when a
+            client is supplied.
 
     Returns:
         A ``FactoryProfile`` summarising the factory contents.
 
     Raises:
-        ValueError: If neither 'client' nor 'arm_template' was supplied, or if both were supplied.
+        ValueError: If zero or more than one of ``client``, ``arm_template``,
+            or ``git_export_root`` was supplied.
     """
-    if client is not None and arm_template is not None:
-        raise ValueError("'client' and 'arm_template' must not both be provided")
-    if client is None and arm_template is None:
-        raise ValueError("Either 'client' or 'arm_template' must be provided")
+    provided = [name for name, value in (
+        ("client", client),
+        ("arm_template", arm_template),
+        ("git_export_root", git_export_root),
+    ) if value is not None]
+    if len(provided) > 1:
+        raise ValueError(f"Only one of 'client', 'arm_template', or 'git_export_root' may be provided; got {provided}")
+    if not provided:
+        raise ValueError("One of 'client', 'arm_template', or 'git_export_root' must be provided")
 
     if client is not None:
         resolved_factory_name = client.factory_name
@@ -70,8 +92,11 @@ def profile_factory(
         triggers = client.list_triggers()
         integration_runtimes = client.list_integration_runtimes()
     else:
-        # arm_template is not None per the guards above; rebind for the typechecker.
-        loaded = _load_from_arm(arm_template, factory_name_override=factory_name)
+        if arm_template is not None:
+            loaded = _load_from_arm(arm_template, factory_name_override=factory_name)
+        else:
+            # git_export_root is not None per the guards above
+            loaded = _load_from_git_export(Path(git_export_root), factory_name_override=factory_name)
         resolved_factory_name = loaded["factory_name"]
         pipelines = loaded["pipelines"]
         datasets = loaded["datasets"]
@@ -213,7 +238,7 @@ def _load_from_arm(arm_template: dict[str, Any], *, factory_name_override: str |
         if resource_type == _ARM_FACTORY_TYPE:
             if factory_name is None:
                 factory_name = leaf_name
-        elif resource_type == _ARM_PIPELINE_TYPE:
+        if resource_type == _ARM_PIPELINE_TYPE:
             pipelines.append(
                 {
                     "name": leaf_name,
@@ -222,13 +247,13 @@ def _load_from_arm(arm_template: dict[str, Any], *, factory_name_override: str |
                     "properties": properties,
                 }
             )
-        elif resource_type == _ARM_DATASET_TYPE:
+        if resource_type == _ARM_DATASET_TYPE:
             datasets.append({"name": leaf_name, "properties": properties})
-        elif resource_type == _ARM_LINKED_SERVICE_TYPE:
+        if resource_type == _ARM_LINKED_SERVICE_TYPE:
             linked_services.append({"name": leaf_name, "properties": properties})
-        elif resource_type == _ARM_TRIGGER_TYPE:
+        if resource_type == _ARM_TRIGGER_TYPE:
             triggers.append({"name": leaf_name, "properties": properties})
-        elif resource_type == _ARM_INTEGRATION_RUNTIME_TYPE:
+        if resource_type == _ARM_INTEGRATION_RUNTIME_TYPE:
             integration_runtimes.append({"name": leaf_name, "properties": properties})
 
     if factory_name is None:
@@ -242,6 +267,85 @@ def _load_from_arm(arm_template: dict[str, Any], *, factory_name_override: str |
         "triggers": triggers,
         "integration_runtimes": integration_runtimes,
     }
+
+
+_GIT_EXPORT_KIND_TO_ARM_TYPE: dict[str, str] = {
+    "pipeline": _ARM_PIPELINE_TYPE,
+    "dataset": _ARM_DATASET_TYPE,
+    "linkedService": _ARM_LINKED_SERVICE_TYPE,
+    "trigger": _ARM_TRIGGER_TYPE,
+    "integrationRuntime": _ARM_INTEGRATION_RUNTIME_TYPE,
+}
+
+
+def _load_from_git_export(root: Path, *, factory_name_override: str | None = None) -> dict[str, Any]:
+    """Loads an ADF Git-mode export from disk and normalises it into ARM shape.
+
+    ADF Studio's Git integration writes each resource as its own JSON file
+    under a per-kind subdirectory of the configured root folder
+    (``pipeline/<name>.json``, ``dataset/<name>.json``,
+    ``linkedService/<name>.json``, ``trigger/<name>.json``,
+    ``integrationRuntime/<name>.json``, with optional ``factory/<name>.json``
+    metadata).  This loader walks those subdirectories, reads each file, wraps
+    the contents in the ARM-resource envelope, and then delegates to
+    :func:`_load_from_arm` so the snake_case key conversion and pipeline-shape
+    normalisation stay in a single place.
+
+    Args:
+        root: Filesystem path to the root of the Git-mode export.
+        factory_name_override: Optional factory display name.  Used when the
+            export does not include a ``factory/`` subdirectory.
+
+    Returns:
+        Dict with keys ``factory_name``, ``pipelines``, ``datasets``,
+        ``linked_services``, ``triggers``, and ``integration_runtimes`` -- the
+        same shape :func:`_load_from_arm` returns.
+
+    Raises:
+        ValueError: If ``root`` is not an existing directory.
+
+    Notes:
+        - Subdirectories that don't exist are skipped silently — a factory
+          with no triggers simply yields an empty ``triggers`` list.
+        - Files that fail to parse as JSON emit a warning and are skipped so
+          one bad file doesn't abort the whole profile.
+        - Files without a top-level ``name`` field fall back to the file stem.
+    """
+    if not root.is_dir():
+        raise ValueError(f"git_export_root {root!r} is not a directory")
+
+    factory_name: str | None = factory_name_override
+    factory_dir = root / "factory"
+    if factory_name is None and factory_dir.is_dir():
+        for factory_file in sorted(factory_dir.glob("*.json")):
+            try:
+                body = json.loads(factory_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning("Skipping malformed Git-mode factory file %s: %s", factory_file, exc)
+                continue
+            factory_name = body.get("name") or factory_file.stem
+            break
+
+    resources: list[dict] = []
+    for kind, arm_type in _GIT_EXPORT_KIND_TO_ARM_TYPE.items():
+        kind_dir = root / kind
+        if not kind_dir.is_dir():
+            continue
+        for resource_file in sorted(kind_dir.glob("*.json")):
+            try:
+                body = json.loads(resource_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning("Skipping malformed Git-mode file %s: %s", resource_file, exc)
+                continue
+            resources.append(
+                {
+                    "type": arm_type,
+                    "name": body.get("name") or resource_file.stem,
+                    "properties": body.get("properties", {}),
+                }
+            )
+
+    return _load_from_arm({"resources": resources}, factory_name_override=factory_name)
 
 
 def _leaf_resource_name(arm_name: str) -> str:
@@ -734,9 +838,7 @@ def _build_integration_runtime_details(
         properties = integration_runtime.get("properties", {})
         node_count = None
         if properties.get("type") == "SelfHosted":
-            node_count = (
-                properties.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
-            )
+            node_count = properties.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
         details.append(
             IntegrationRuntimeDetail(
                 name=integration_runtime.get("name", "Unknown"),

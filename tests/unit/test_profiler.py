@@ -1,5 +1,7 @@
 """Unit tests for the profiler package."""
 
+from pathlib import Path
+
 import pytest
 
 from wkmigrate.profiler.profile import (
@@ -19,6 +21,7 @@ from wkmigrate.profiler.profiler import (
     _count_linked_services,
     _leaf_resource_name,
     _load_from_arm,
+    _load_from_git_export,
     format_profile,
     profile_factory,
 )
@@ -277,13 +280,17 @@ def test_profile_factory_requires_client_or_arm_template():
         profile_factory()
 
 
-def test_profile_factory_rejects_both_client_and_arm_template():
-    # Minimal sentinel; we won't reach the client path.
+def test_profile_factory_rejects_multiple_sources():
+    """At most one input source may be provided."""
+
     class _Sentinel:
         factory_name = "f"
 
-    with pytest.raises(ValueError, match="not both"):
+    with pytest.raises(ValueError, match="Only one of"):
         profile_factory(client=_Sentinel(), arm_template={"resources": []})  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="Only one of"):
+        profile_factory(arm_template={"resources": []}, git_export_root="/tmp/whatever")
 
 
 # -- _camel_to_snake / _leaf_resource_name -------------------------------------
@@ -643,3 +650,130 @@ def test_format_profile_pipeline_details_section_rendered():
     assert "Datasets:        2 (2 supported, 0 unsupported)" in text
     assert "Linked Services: 2 (1 supported, 1 unsupported)" in text
     assert "Triggers: 1, Integration Runtimes: 1" in text
+
+
+# -- _load_from_git_export -----------------------------------------------------
+
+
+def _write_arm_resources_as_git_export(root: Path) -> None:
+    """Materialises ``_arm_template_sample()``'s resources as a Git-mode tree under *root*.
+
+    Mirrors how ADF Studio's Git integration writes one JSON file per
+    resource under per-kind subdirectories.  Used by the Git-mode loader
+    tests so they exercise the real filesystem-walk path.
+    """
+    import json as _json
+
+    arm_to_subdir: dict[str, str] = {
+        "Microsoft.DataFactory/factories": "factory",
+        "Microsoft.DataFactory/factories/pipelines": "pipeline",
+        "Microsoft.DataFactory/factories/datasets": "dataset",
+        "Microsoft.DataFactory/factories/linkedservices": "linkedService",
+        "Microsoft.DataFactory/factories/triggers": "trigger",
+        "Microsoft.DataFactory/factories/integrationRuntimes": "integrationRuntime",
+    }
+    for resource in _arm_template_sample()["resources"]:
+        resource_type = resource["type"]
+        # The ARM-template test sample uses mixed casing on
+        # ``integrationRuntimes`` but the subdir convention is camelCase
+        subdir = arm_to_subdir.get(resource_type)
+        if subdir is None:
+            continue
+        target = root / subdir
+        target.mkdir(parents=True, exist_ok=True)
+        leaf_name = resource["name"].split("/")[-1]
+        file_body = {"name": leaf_name, "properties": resource["properties"], "type": resource_type}
+        (target / f"{leaf_name}.json").write_text(_json.dumps(file_body, indent=2))
+
+
+def test_load_from_git_export_round_trips_arm_sample(tmp_path):
+    """Writing the ARM sample out as Git-mode files and loading back yields the same content."""
+    _write_arm_resources_as_git_export(tmp_path)
+    loaded = _load_from_git_export(tmp_path)
+    assert loaded["factory_name"] == "my-factory"
+    assert {p["name"] for p in loaded["pipelines"]} == {"orders-etl", "idle-pipeline"}
+    assert {d["name"] for d in loaded["datasets"]} == {"ds_blob_orders", "ds_sql_orders"}
+    assert {ls["name"] for ls in loaded["linked_services"]} == {
+        "AzureBlobFS_LS",
+        "AzureSql_LS",
+        "AzureDatabricks_LS",
+    }
+    # camelCase → snake_case normalisation still happens
+    orders = next(p for p in loaded["pipelines"] if p["name"] == "orders-etl")
+    assert orders["activities"][0]["inputs"][0]["reference_name"] == "ds_blob_orders"
+
+
+def test_load_from_git_export_uses_factory_subdir_for_name(tmp_path):
+    factory_dir = tmp_path / "factory"
+    factory_dir.mkdir()
+    (factory_dir / "my-factory.json").write_text('{"name": "my-factory", "properties": {}}')
+    (tmp_path / "pipeline").mkdir()
+    (tmp_path / "pipeline" / "p.json").write_text('{"name": "p", "properties": {"activities": []}}')
+    loaded = _load_from_git_export(tmp_path)
+    assert loaded["factory_name"] == "my-factory"
+
+
+def test_load_from_git_export_falls_back_to_override_when_no_factory_subdir(tmp_path):
+    (tmp_path / "pipeline").mkdir()
+    (tmp_path / "pipeline" / "p.json").write_text('{"name": "p", "properties": {"activities": []}}')
+    loaded = _load_from_git_export(tmp_path, factory_name_override="from-override")
+    assert loaded["factory_name"] == "from-override"
+
+
+def test_load_from_git_export_skips_missing_subdirectories(tmp_path):
+    """A factory with only pipelines should not blow up on missing dataset/trigger/etc dirs."""
+    (tmp_path / "pipeline").mkdir()
+    (tmp_path / "pipeline" / "only.json").write_text('{"name": "only", "properties": {"activities": []}}')
+    loaded = _load_from_git_export(tmp_path, factory_name_override="sparse")
+    assert [p["name"] for p in loaded["pipelines"]] == ["only"]
+    assert loaded["datasets"] == []
+    assert loaded["linked_services"] == []
+    assert loaded["triggers"] == []
+    assert loaded["integration_runtimes"] == []
+
+
+def test_load_from_git_export_skips_malformed_json(tmp_path, caplog):
+    (tmp_path / "pipeline").mkdir()
+    (tmp_path / "pipeline" / "good.json").write_text('{"name": "good", "properties": {"activities": []}}')
+    (tmp_path / "pipeline" / "broken.json").write_text("not valid json {{{")
+    with caplog.at_level("WARNING"):
+        loaded = _load_from_git_export(tmp_path, factory_name_override="f")
+    assert [p["name"] for p in loaded["pipelines"]] == ["good"]
+    assert any("malformed" in record.message.lower() for record in caplog.records)
+
+
+def test_load_from_git_export_falls_back_to_filename_stem_when_name_missing(tmp_path):
+    """A file lacking a top-level 'name' field uses its filename stem instead."""
+    (tmp_path / "pipeline").mkdir()
+    (tmp_path / "pipeline" / "pipeline_from_stem.json").write_text('{"properties": {"activities": []}}')
+    loaded = _load_from_git_export(tmp_path, factory_name_override="f")
+    assert [p["name"] for p in loaded["pipelines"]] == ["pipeline_from_stem"]
+
+
+def test_load_from_git_export_raises_when_root_missing(tmp_path):
+    missing = tmp_path / "does-not-exist"
+    with pytest.raises(ValueError, match="not a directory"):
+        _load_from_git_export(missing)
+
+
+def test_profile_factory_via_git_export_end_to_end(tmp_path):
+    """End-to-end: Git-mode tree → profile_factory → FactoryProfile with pipeline_details."""
+    _write_arm_resources_as_git_export(tmp_path)
+    profile = profile_factory(git_export_root=tmp_path)
+    assert profile.factory_name == "my-factory"
+    assert profile.pipelines.total == 2
+    # Same factory-wide totals as the ARM-template path
+    assert profile.activities.total == 2
+    assert profile.datasets.total == 2
+    assert profile.linked_services.total == 3
+    # pipeline_details still computed
+    details_by_name = {pd.pipeline_name: pd for pd in profile.pipeline_details}
+    assert details_by_name["orders-etl"].activities.supported == 2
+    assert details_by_name["orders-etl"].total_integration_runtimes == 1
+
+
+def test_profile_factory_git_export_path_accepts_string(tmp_path):
+    """``git_export_root`` accepts both Path and string."""
+    _write_arm_resources_as_git_export(tmp_path)
+    profile = profile_factory(git_export_root=str(tmp_path))
+    assert profile.factory_name == "my-factory"
