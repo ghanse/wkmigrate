@@ -29,8 +29,7 @@ from wkmigrate.profiler.profiler import (
 
 def test_collect_flat_activities():
     activities = [{"type": "Copy", "name": "A"}, {"type": "Lookup", "name": "B"}]
-    result: list[dict] = []
-    _collect_activities(activities, result)
+    result = _collect_activities(activities)
     assert len(result) == 2
 
 
@@ -45,8 +44,7 @@ def test_collect_nested_for_each():
             ],
         }
     ]
-    result: list[dict] = []
-    _collect_activities(activities, result)
+    result = _collect_activities(activities)
     assert len(result) == 3
 
 
@@ -62,19 +60,25 @@ def test_collect_nested_if_condition_branches():
             ],
         }
     ]
-    result: list[dict] = []
-    _collect_activities(activities, result)
+    result = _collect_activities(activities)
     # IfCondition itself + 1 true + 2 false = 4
     assert len(result) == 4
 
 
 def test_collect_empty_and_none():
-    result: list[dict] = []
-    _collect_activities([], result)
-    assert result == []
+    assert _collect_activities([]) == []
+    assert _collect_activities(None) == []
 
-    _collect_activities(None, result)
-    assert result == []
+
+def test_collect_activities_does_not_mutate_input():
+    """The pure-return contract: input activity list should not be modified."""
+    activities = [{"type": "Copy", "name": "A"}, {"type": "Lookup", "name": "B"}]
+    snapshot = [dict(a) for a in activities]
+    result = _collect_activities(activities)
+    assert activities == snapshot  # input untouched
+    # Result is a fresh list — appending to it must not mutate the caller's input
+    result.append({"type": "Wait", "name": "C"})
+    assert len(activities) == 2
 
 
 # -- _count_activities ---------------------------------------------------------
@@ -321,12 +325,8 @@ def _arm_template_sample() -> dict:
                         {
                             "type": "Copy",
                             "name": "copyOrders",
-                            "inputs": [
-                                {"referenceName": "ds_blob_orders", "type": "DatasetReference"}
-                            ],
-                            "outputs": [
-                                {"referenceName": "ds_sql_orders", "type": "DatasetReference"}
-                            ],
+                            "inputs": [{"referenceName": "ds_blob_orders", "type": "DatasetReference"}],
+                            "outputs": [{"referenceName": "ds_sql_orders", "type": "DatasetReference"}],
                         },
                         {
                             "type": "DatabricksNotebook",
@@ -516,9 +516,7 @@ def test_pipeline_details_supported_vs_unsupported_split():
                 {
                     "type": "Lookup",
                     "name": "look",
-                    "type_properties": {
-                        "dataset": {"reference_name": "unsupported_ds", "type": "DatasetReference"}
-                    },
+                    "type_properties": {"dataset": {"reference_name": "unsupported_ds", "type": "DatasetReference"}},
                 },
             ],
         }

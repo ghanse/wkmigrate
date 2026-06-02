@@ -6,8 +6,6 @@ import logging
 import re
 from typing import Any
 
-# Import translator dispatchers first so every @translates_activity /
-# @translates_dataset decorator fires before we read the sets.
 import wkmigrate.translators.activity_translators.activity_translator as _activity_reg  # noqa: F401
 import wkmigrate.translators.dataset_translators.dataset_translator as _dataset_reg  # noqa: F401
 from wkmigrate.clients.factory_client import FactoryClient
@@ -26,10 +24,6 @@ from wkmigrate.supported_types import (
 
 logger = logging.getLogger(__name__)
 
-# ARM resource types used in factory export JSON.  Matching is case-insensitive
-# because Azure portal exports the segment names with mixed casing
-# (``linkedServices`` vs ``linkedservices``, ``integrationRuntimes`` vs
-# ``integrationruntimes``).
 _ARM_PIPELINE_TYPE = "microsoft.datafactory/factories/pipelines"
 _ARM_DATASET_TYPE = "microsoft.datafactory/factories/datasets"
 _ARM_LINKED_SERVICE_TYPE = "microsoft.datafactory/factories/linkedservices"
@@ -44,38 +38,29 @@ def profile_factory(
     arm_template: dict[str, Any] | None = None,
     factory_name: str | None = None,
 ) -> FactoryProfile:
-    """Profile an Azure Data Factory resource.
+    """Profiles an Azure Data Factory resource.
 
-    Pass either an authenticated ``FactoryClient`` for live profiling against a
-    deployed Data Factory, or an ``arm_template`` dict for offline profiling
-    against an exported ARM JSON template (e.g. ``ARMTemplateForFactory.json``).
-    Exactly one of the two must be provided.
+    Uses either an authenticated FactoryClient to profile using API calls against a deployed
+    Data Factory or an ARM template dict for offline profiling against exported ARM templates
+    (e.g. 'ARMTemplateForFactory.json').
 
     Args:
-        client: Authenticated ``FactoryClient`` for the target factory.  When
-            omitted, ``arm_template`` must be supplied instead.
-        arm_template: Parsed Azure Resource Manager template for an ADF
-            factory.  The ``resources`` array is filtered by the standard
-            ``Microsoft.DataFactory/factories/*`` types and field names are
-            normalised from ARM camelCase to the SDK's snake_case shape so the
-            downstream helpers work without branching on input source.
-        factory_name: Override for the factory display name.  Required when
-            profiling an ARM template that does not embed a
-            ``Microsoft.DataFactory/factories`` resource.  Ignored when
-            ``client`` is supplied.
+        client: Authenticated FactoryClient for the target factory.
+        arm_template: Parsed ARM JSON template.
+        factory_name: Override for the factory display name. Required when profiling an ARM
+            template that does not embed a ``Microsoft.DataFactory/factories`` resource.
+            Ignored when a client is supplied.
 
     Returns:
-        A ``FactoryProfile`` summarising the factory contents, including a
-        per-pipeline breakdown in ``pipeline_details``.
+        A ``FactoryProfile`` summarising the factory contents.
 
     Raises:
-        ValueError: If neither ``client`` nor ``arm_template`` was supplied,
-            or if both were supplied.
+        ValueError: If neither 'client' nor 'arm_template' was supplied, or if both were supplied.
     """
     if client is not None and arm_template is not None:
-        raise ValueError("Pass either client= or arm_template=, not both.")
+        raise ValueError("'client' and 'arm_template' must not both be provided")
     if client is None and arm_template is None:
-        raise ValueError("One of client= or arm_template= must be provided.")
+        raise ValueError("Either 'client' or 'arm_template' must be provided")
 
     if client is not None:
         resolved_factory_name = client.factory_name
@@ -85,8 +70,7 @@ def profile_factory(
         triggers = client.list_triggers()
         integration_runtimes = client.list_integration_runtimes()
     else:
-        # arm_template is not None per the guard above; mypy/typecheckers
-        # benefit from the local rebind.
+        # arm_template is not None per the guards above; rebind for the typechecker.
         loaded = _load_from_arm(arm_template, factory_name_override=factory_name)
         resolved_factory_name = loaded["factory_name"]
         pipelines = loaded["pipelines"]
@@ -124,7 +108,7 @@ def profile_factory(
 
 
 def format_profile(profile: FactoryProfile) -> str:
-    """Format a FactoryProfile as human-readable text.
+    """Formats a FactoryProfile as human-readable text.
 
     Args:
         profile: The factory profile to format.
@@ -173,55 +157,38 @@ def format_profile(profile: FactoryProfile) -> str:
 
     if profile.pipeline_details:
         lines += ["", "Pipeline Details:"]
-        for pd in profile.pipeline_details:
-            lines.append(f"  - {pd.pipeline_name}")
+        for pipeline_detail in profile.pipeline_details:
+            lines.append(f"  - {pipeline_detail.pipeline_name}")
             lines.append(
-                f"      Activities:      {pd.activities.total}"
-                f" ({pd.activities.supported} supported, {pd.activities.unsupported} unsupported)"
+                f"      Activities:      {pipeline_detail.activities.total}"
+                f" ({pipeline_detail.activities.supported} supported, {pipeline_detail.activities.unsupported} unsupported)"
             )
             lines.append(
-                f"      Datasets:        {pd.datasets.total}"
-                f" ({pd.datasets.supported} supported, {pd.datasets.unsupported} unsupported)"
+                f"      Datasets:        {pipeline_detail.datasets.total}"
+                f" ({pipeline_detail.datasets.supported} supported, {pipeline_detail.datasets.unsupported} unsupported)"
             )
             lines.append(
-                f"      Linked Services: {pd.linked_services.total}"
-                f" ({pd.linked_services.supported} supported, {pd.linked_services.unsupported} unsupported)"
+                f"      Linked Services: {pipeline_detail.linked_services.total}"
+                f" ({pipeline_detail.linked_services.supported} supported, {pipeline_detail.linked_services.unsupported} unsupported)"
             )
             lines.append(
-                f"      Triggers: {pd.total_triggers}, Integration Runtimes: {pd.total_integration_runtimes}"
+                f"      Triggers: {pipeline_detail.total_triggers}, Integration Runtimes: {pipeline_detail.total_integration_runtimes}"
             )
 
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# ARM template loader
-# ---------------------------------------------------------------------------
-
-
-def _load_from_arm(
-    arm_template: dict[str, Any], *, factory_name_override: str | None = None
-) -> dict[str, Any]:
-    """Extracts ADF resources from an ARM template and normalises their shape.
-
-    The Azure Portal export uses ARM camelCase field names and nests pipeline
-    activities under ``properties.activities``.  The SDK ``as_dict()`` output
-    (and therefore the existing counter helpers) expects snake_case fields and
-    pipeline activities lifted to the top level.  This loader translates ARM
-    JSON into that internal shape so the rest of the profiler stays oblivious
-    to the input source.
+def _load_from_arm(arm_template: dict[str, Any], *, factory_name_override: str | None = None) -> dict[str, Any]:
+    """Extracts and normalizes ADF resources from an ARM template.
 
     Args:
-        arm_template: Parsed ARM template dict.  The ``resources`` array is
-            scanned; everything outside the Data Factory resource types is
-            ignored.
-        factory_name_override: Optional factory display name.  Used when the
-            ARM template does not include a top-level
-            ``Microsoft.DataFactory/factories`` resource.
+        arm_template: Parsed ARM template dict.
+        factory_name_override: Optional factory display name. Used when the
+            ARM template does not include a top-level 'Microsoft.DataFactory/factories' resource.
 
     Returns:
-        Dict with keys ``factory_name``, ``pipelines``, ``datasets``,
-        ``linked_services``, ``triggers``, and ``integration_runtimes``.
+        Dict with keys 'factory_name', 'pipelines', 'datasets', 'linked_services', 'triggers',
+        and 'integration_runtimes'.
     """
     resources = arm_template.get("resources") or []
     pipelines: list[dict] = []
@@ -242,8 +209,6 @@ def _load_from_arm(
             if factory_name is None:
                 factory_name = leaf_name
         elif resource_type == _ARM_PIPELINE_TYPE:
-            # Lift activities to top-level to match SDK shape; preserve
-            # the snake-cased ``properties`` for any downstream readers.
             pipelines.append(
                 {
                     "name": leaf_name,
@@ -275,18 +240,13 @@ def _load_from_arm(
 
 
 def _leaf_resource_name(arm_name: str) -> str:
-    """Strips the ``factory-name/`` prefix from an ARM resource name.
-
-    ARM names for nested resources look like ``factory-name/pipeline-name``.
-    This helper returns just the leaf segment so the resource name matches
-    what the SDK returns.
+    """Strips the 'factory_name/' prefix from an ARM resource name.
 
     Args:
-        arm_name: The raw ARM resource ``name`` field.
+        arm_name: ARM resource 'name' field.
 
     Returns:
-        The final ``/``-separated segment, or the input unchanged when there
-        is no slash.
+        Reformatted leaf resource name.
     """
     if "/" not in arm_name:
         return arm_name
@@ -297,10 +257,7 @@ _CAMEL_TO_SNAKE_RE = re.compile(r"(?<!^)(?=[A-Z])")
 
 
 def _arm_to_snake(value: Any) -> Any:
-    """Recursively converts camelCase dict keys to snake_case.
-
-    Walks dicts and lists; leaves leaf values (strings, numbers, bools,
-    ``None``) untouched.
+    """Converts camelCase property keys to snake_case.
 
     Args:
         value: Any JSON-decoded value from an ARM template.
@@ -322,14 +279,9 @@ def _camel_to_snake(name: str) -> str:
         name: Identifier to convert.
 
     Returns:
-        snake_cased identifier; pass-through for already-snake names.
+        snake_cased identifier.
     """
     return _CAMEL_TO_SNAKE_RE.sub("_", name).lower()
-
-
-# ---------------------------------------------------------------------------
-# Per-pipeline detail computation
-# ---------------------------------------------------------------------------
 
 
 def _build_pipeline_details(
@@ -340,153 +292,258 @@ def _build_pipeline_details(
     triggers: list[dict],
     integration_runtimes: list[dict],  # noqa: ARG001 -- accepted for caller symmetry
 ) -> list[PipelineDetail]:
-    """Computes the per-pipeline breakdown used by ``FactoryProfile``.
+    """Computes a per-pipeline breakdown of activities, datasets, linked services,
+    triggers, and integration runtimes.
 
-    For each pipeline, walks its activities (including nested ones inside
-    ``ForEach`` and ``IfCondition``) to collect activity types and any
-    ``reference_name`` strings that resolve to a known dataset or linked
-    service.  Linked-service references are augmented with the linked services
-    transitively reached via the pipeline's datasets so a dataset that points
-    at ``AzureSqlDatabase_LS`` counts toward the pipeline's linked-service
-    total even when the activity itself only names the dataset.
-
-    The integration-runtime count is derived from the ``connect_via``
-    reference on each linked service the pipeline reaches.
+    All input objects should be normalized to snake case.
 
     Args:
-        pipelines: Pipeline definitions in SDK (snake_case) shape.
-        datasets: Dataset definitions in SDK shape.
-        linked_services: Linked-service definitions in SDK shape.
-        triggers: Trigger definitions in SDK shape.
-        integration_runtimes: Integration-runtime definitions in SDK shape.
-            Accepted for API symmetry; the per-pipeline IR count is derived
-            from linked-service ``connect_via`` references.
+        pipelines: Pipeline definitions.
+        datasets: Dataset definitions.
+        linked_services: Linked-service definitions.
+        triggers: Trigger definitions.
+        integration_runtimes: Integration-runtime definitions.  Accepted for
+            caller symmetry; the per-pipeline IR count is derived from each
+            linked service's ``connect_via`` reference rather than this list.
 
     Returns:
-        One ``PipelineDetail`` per pipeline, in input order.
+        A list of ``PipelineDetail`` objects for each pipeline.
     """
-    dataset_by_name: dict[str, dict] = {ds.get("name", ""): ds for ds in datasets if isinstance(ds, dict)}
-    ls_by_name: dict[str, dict] = {ls.get("name", ""): ls for ls in linked_services if isinstance(ls, dict)}
+    del integration_runtimes  # see docstring — derived from linked-service connect_via
+    dataset_by_name = {ds.get("name", ""): ds for ds in datasets if isinstance(ds, dict)}
+    ls_by_name = {ls.get("name", ""): ls for ls in linked_services if isinstance(ls, dict)}
 
     details: list[PipelineDetail] = []
     for pipeline in pipelines:
         if not isinstance(pipeline, dict):
             logger.warning("Skipping non-dictionary pipeline in pipeline_details computation")
             continue
-        pipeline_name = pipeline.get("name", "Unknown")
-
-        # Walk every nested activity once
-        activities: list[dict] = []
-        _collect_activities(pipeline.get("activities") or [], activities)
-
-        # Activity supported/unsupported counts within this pipeline
-        activity_supported = sum(1 for a in activities if (a.get("type") or "Unknown") in SUPPORTED_ACTIVITY_TYPES)
-        activity_total = len(activities)
-        activity_counts = ObjectCount(
-            total=activity_total,
-            supported=activity_supported,
-            unsupported=activity_total - activity_supported,
-        )
-
-        # Datasets referenced by THIS pipeline's activities
-        referenced_dataset_names = _collect_referenced_dataset_names(activities, dataset_by_name)
-        ds_supported = 0
-        ds_unsupported = 0
-        for ds_name in referenced_dataset_names:
-            ds = dataset_by_name.get(ds_name)
-            if ds is None:
-                ds_unsupported += 1
-                continue
-            ds_type = (ds.get("properties") or {}).get("type") or "Unknown"
-            if ds_type in SUPPORTED_DATASET_TYPES:
-                ds_supported += 1
-            else:
-                ds_unsupported += 1
-        dataset_counts = ObjectCount(
-            total=len(referenced_dataset_names),
-            supported=ds_supported,
-            unsupported=ds_unsupported,
-        )
-
-        # Linked services: those referenced directly by activities + those
-        # reached transitively via referenced datasets
-        ls_names: set[str] = set()
-        ls_names.update(_collect_referenced_linked_service_names(activities, ls_by_name))
-        for ds_name in referenced_dataset_names:
-            ds = dataset_by_name.get(ds_name)
-            if ds is None:
-                continue
-            ls_ref = (ds.get("properties") or {}).get("linked_service_name") or {}
-            ls_ref_name = ls_ref.get("reference_name") if isinstance(ls_ref, dict) else None
-            if ls_ref_name:
-                ls_names.add(ls_ref_name)
-
-        ls_supported = 0
-        ls_unsupported = 0
-        for ls_name in sorted(ls_names):
-            ls = ls_by_name.get(ls_name)
-            if ls is None:
-                ls_unsupported += 1
-                continue
-            ls_type = (ls.get("properties") or {}).get("type") or "Unknown"
-            if ls_type in SUPPORTED_LINKED_SERVICE_TYPES:
-                ls_supported += 1
-            else:
-                ls_unsupported += 1
-        ls_counts = ObjectCount(
-            total=len(ls_names),
-            supported=ls_supported,
-            unsupported=ls_unsupported,
-        )
-
-        # Triggers binding this pipeline
-        trigger_count = _count_triggers_for_pipeline(pipeline_name, triggers)
-
-        # Distinct integration runtimes reached via this pipeline's linked services
-        ir_names: set[str] = set()
-        for ls_name in ls_names:
-            ls = ls_by_name.get(ls_name)
-            if ls is None:
-                continue
-            connect_via = (ls.get("properties") or {}).get("connect_via") or {}
-            ir_ref_name = connect_via.get("reference_name") if isinstance(connect_via, dict) else None
-            if ir_ref_name:
-                ir_names.add(ir_ref_name)
-
-        details.append(
-            PipelineDetail(
-                pipeline_name=pipeline_name,
-                activities=activity_counts,
-                datasets=dataset_counts,
-                linked_services=ls_counts,
-                total_activities=activity_counts.total,
-                total_datasets=dataset_counts.total,
-                total_linked_services=ls_counts.total,
-                total_triggers=trigger_count,
-                total_integration_runtimes=len(ir_names),
-            )
-        )
-
+        details.append(_build_pipeline_detail(pipeline, dataset_by_name, ls_by_name, triggers))
     return details
 
 
-def _collect_referenced_dataset_names(
-    activities: list[dict], dataset_by_name: dict[str, dict]
-) -> set[str]:
-    """Walks the activity tree collecting every dataset reference.
+def _build_pipeline_detail(
+    pipeline: dict,
+    dataset_by_name: dict[str, dict],
+    ls_by_name: dict[str, dict],
+    triggers: list[dict],
+) -> PipelineDetail:
+    """Builds a single ``PipelineDetail`` by delegating each sub-computation to a helper.
 
-    Dataset references appear as ``{"reference_name": ..., "type":
-    "DatasetReference"}`` blocks across ``inputs``, ``outputs``,
-    ``type_properties.dataset``, ``type_properties.source.dataset``,
-    ``type_properties.sink.dataset``, and a handful of other locations.
-    Instead of enumerating every spot, walk every nested dict in each activity
-    and pick out ``reference_name`` strings whose name matches a known
-    dataset.
+    Args:
+        pipeline: Pipeline definition in snake-case shape.
+        dataset_by_name: Name → dataset index for the factory.
+        ls_by_name: Name → linked-service index for the factory.
+        triggers: All triggers in the factory.
+
+    Returns:
+        A populated ``PipelineDetail``.
+    """
+    pipeline_name = pipeline.get("name", "Unknown")
+    activities = _collect_activities(pipeline.get("activities"))
+
+    activity_counts = _classify_pipeline_activities(activities)
+    referenced_dataset_names, dataset_counts = _classify_pipeline_datasets(activities, dataset_by_name)
+    linked_service_names, ls_counts = _classify_pipeline_linked_services(
+        activities=activities,
+        referenced_dataset_names=referenced_dataset_names,
+        dataset_by_name=dataset_by_name,
+        ls_by_name=ls_by_name,
+    )
+
+    return PipelineDetail(
+        pipeline_name=pipeline_name,
+        activities=activity_counts,
+        datasets=dataset_counts,
+        linked_services=ls_counts,
+        total_activities=activity_counts.total,
+        total_datasets=dataset_counts.total,
+        total_linked_services=ls_counts.total,
+        total_triggers=_count_triggers_for_pipeline(pipeline_name, triggers),
+        total_integration_runtimes=_count_integration_runtimes_for_pipeline(linked_service_names, ls_by_name),
+    )
+
+
+def _classify_pipeline_activities(activities: list[dict]) -> ObjectCount:
+    """Counts supported and unsupported activities within a single pipeline.
 
     Args:
         activities: Flat list of activity dicts (control-flow already expanded).
-        dataset_by_name: Index used to filter ``reference_name`` candidates so
-            we don't conflate linked-service or trigger references.
+
+    Returns:
+        ``ObjectCount`` with the total/supported/unsupported split.
+    """
+    supported = sum(1 for activity in activities if (activity.get("type") or "Unknown") in SUPPORTED_ACTIVITY_TYPES)
+    total = len(activities)
+    return ObjectCount(total=total, supported=supported, unsupported=total - supported)
+
+
+def _classify_pipeline_datasets(
+    activities: list[dict], dataset_by_name: dict[str, dict]
+) -> tuple[set[str], ObjectCount]:
+    """Collects every dataset name the activities reference, then classifies by supported type.
+
+    Args:
+        activities: Flat list of activity dicts.
+        dataset_by_name: Name → dataset index used to filter ``reference_name``
+            candidates and to look up dataset types.
+
+    Returns:
+        A tuple of ``(referenced_dataset_names, ObjectCount)``.  The set is
+        returned so the caller can feed it into the linked-service classifier
+        without re-walking the tree.
+    """
+    referenced = _collect_referenced_dataset_names(activities, dataset_by_name)
+    supported, unsupported = _count_supported_dataset_refs(referenced, dataset_by_name)
+    return referenced, ObjectCount(total=len(referenced), supported=supported, unsupported=unsupported)
+
+
+def _classify_pipeline_linked_services(
+    *,
+    activities: list[dict],
+    referenced_dataset_names: set[str],
+    dataset_by_name: dict[str, dict],
+    ls_by_name: dict[str, dict],
+) -> tuple[set[str], ObjectCount]:
+    """Resolves the linked services a pipeline reaches and classifies them.
+
+    A pipeline reaches a linked service in two ways: directly (an activity
+    such as ``WebActivity`` or ``SqlServerStoredProcedure`` carries a
+    ``LinkedServiceReference``) or transitively (an activity references a
+    dataset whose ``linked_service_name`` points at the LS).  Both paths are
+    unioned before classification.
+
+    Args:
+        activities: Flat list of activity dicts.
+        referenced_dataset_names: Datasets already known to be referenced by
+            this pipeline; their ``linked_service_name`` fields contribute the
+            transitive set of LS reachable via datasets.
+        dataset_by_name: Name → dataset index.
+        ls_by_name: Name → linked-service index.
+
+    Returns:
+        ``(linked_service_names, ObjectCount)``.  The set is returned so the
+        caller can pass it to :func:`_count_integration_runtimes_for_pipeline`.
+    """
+    linked_service_names = set(_collect_referenced_linked_service_names(activities, ls_by_name))
+    linked_service_names |= _collect_linked_service_names_from_datasets(referenced_dataset_names, dataset_by_name)
+    supported, unsupported = _count_supported_linked_service_refs(linked_service_names, ls_by_name)
+    return linked_service_names, ObjectCount(
+        total=len(linked_service_names), supported=supported, unsupported=unsupported
+    )
+
+
+def _collect_linked_service_names_from_datasets(
+    referenced_dataset_names: set[str], dataset_by_name: dict[str, dict]
+) -> set[str]:
+    """Returns LS names reached transitively via each dataset's ``linked_service_name``.
+
+    Args:
+        referenced_dataset_names: Datasets to inspect.
+        dataset_by_name: Name → dataset index.
+
+    Returns:
+        Unique LS names referenced by the given datasets.
+    """
+    found: set[str] = set()
+    for ds_name in referenced_dataset_names:
+        dataset = dataset_by_name.get(ds_name)
+        if dataset is None:
+            continue
+        ls_ref = (dataset.get("properties") or {}).get("linked_service_name") or {}
+        ref_name = ls_ref.get("reference_name") if isinstance(ls_ref, dict) else None
+        if ref_name:
+            found.add(ref_name)
+    return found
+
+
+def _count_supported_dataset_refs(
+    referenced_dataset_names: set[str], dataset_by_name: dict[str, dict]
+) -> tuple[int, int]:
+    """Tallies ``(supported, unsupported)`` references by looking up each dataset's type.
+
+    Args:
+        referenced_dataset_names: Dataset names to classify.
+        dataset_by_name: Name → dataset index.  Names not found are counted as
+            unsupported (the reference is broken or refers to a resource
+            outside this factory).
+
+    Returns:
+        ``(supported, unsupported)``.
+    """
+    supported = 0
+    unsupported = 0
+    for ds_name in referenced_dataset_names:
+        dataset = dataset_by_name.get(ds_name)
+        if dataset is None:
+            unsupported += 1
+            continue
+        ds_type = (dataset.get("properties") or {}).get("type") or "Unknown"
+        if ds_type in SUPPORTED_DATASET_TYPES:
+            supported += 1
+        else:
+            unsupported += 1
+    return supported, unsupported
+
+
+def _count_supported_linked_service_refs(
+    linked_service_names: set[str], ls_by_name: dict[str, dict]
+) -> tuple[int, int]:
+    """Tallies ``(supported, unsupported)`` references by looking up each LS's type.
+
+    Args:
+        linked_service_names: LS names to classify.
+        ls_by_name: Name → linked-service index.  Unknown names count as
+            unsupported.
+
+    Returns:
+        ``(supported, unsupported)``.
+    """
+    supported = 0
+    unsupported = 0
+    for ls_name in linked_service_names:
+        ls = ls_by_name.get(ls_name)
+        if ls is None:
+            unsupported += 1
+            continue
+        ls_type = (ls.get("properties") or {}).get("type") or "Unknown"
+        if ls_type in SUPPORTED_LINKED_SERVICE_TYPES:
+            supported += 1
+        else:
+            unsupported += 1
+    return supported, unsupported
+
+
+def _count_integration_runtimes_for_pipeline(
+    linked_service_names: set[str], ls_by_name: dict[str, dict]
+) -> int:
+    """Counts distinct integration runtimes reached via the given LS's ``connect_via``.
+
+    Args:
+        linked_service_names: LS names the pipeline reaches.
+        ls_by_name: Name → linked-service index.
+
+    Returns:
+        Count of unique IR names referenced.
+    """
+    ir_names: set[str] = set()
+    for ls_name in linked_service_names:
+        ls = ls_by_name.get(ls_name)
+        if ls is None:
+            continue
+        connect_via = (ls.get("properties") or {}).get("connect_via") or {}
+        ref_name = connect_via.get("reference_name") if isinstance(connect_via, dict) else None
+        if ref_name:
+            ir_names.add(ref_name)
+    return len(ir_names)
+
+
+def _collect_referenced_dataset_names(activities: list[dict], dataset_by_name: dict[str, dict]) -> set[str]:
+    """Walks the activity tree and collects dataset references.
+
+    Args:
+        activities: Flat list of activity dicts
+        dataset_by_name: Index used to filter dataset candidates
 
     Returns:
         Unique dataset names referenced anywhere in the activity tree.
@@ -503,17 +560,12 @@ def _collect_referenced_dataset_names(
     return found
 
 
-def _collect_referenced_linked_service_names(
-    activities: list[dict], ls_by_name: dict[str, dict]
-) -> set[str]:
-    """Walks the activity tree collecting every linked-service reference.
-
-    Some activities (e.g. ``SqlServerStoredProcedure``, ``WebActivity`` auth)
-    reference linked services directly without going through a dataset.
+def _collect_referenced_linked_service_names(activities: list[dict], ls_by_name: dict[str, dict]) -> set[str]:
+    """Walks the activity tree to collect linked-service references.
 
     Args:
         activities: Flat list of activity dicts.
-        ls_by_name: Index used to filter ``reference_name`` candidates.
+        ls_by_name: Index used to filter linked service reference candidates.
 
     Returns:
         Unique linked-service names referenced directly by activities.
@@ -528,10 +580,6 @@ def _collect_referenced_linked_service_names(
 
 def _iter_reference_pairs(value: Any):
     """Yields every ``(reference_name, type)`` pair found recursively in *value*.
-
-    ADF nests references as ``{"reference_name": "...", "type": "..."}`` (SDK
-    shape).  This helper walks dicts and lists yielding those pairs so the
-    caller can filter by reference type without enumerating every nesting site.
 
     Args:
         value: Any dict / list / scalar.
@@ -553,9 +601,6 @@ def _iter_reference_pairs(value: Any):
 
 def _count_triggers_for_pipeline(pipeline_name: str, triggers: list[dict]) -> int:
     """Counts triggers that bind to a given pipeline.
-
-    A trigger's ``properties.pipelines`` array carries ``pipeline_reference``
-    blocks; we match against the ``reference_name`` field.
 
     Args:
         pipeline_name: Logical pipeline name to match.
@@ -580,13 +625,8 @@ def _count_triggers_for_pipeline(pipeline_name: str, triggers: list[dict]) -> in
     return count
 
 
-# ---------------------------------------------------------------------------
-# Factory-wide counters (unchanged behaviour)
-# ---------------------------------------------------------------------------
-
-
 def _count_activities(pipelines: list) -> tuple[ObjectCount, list[str]]:
-    """Walk nested activities, classify supported/unsupported.
+    """Walks nested activities, classify supported/unsupported.
 
     Returns:
         A tuple of ``(ObjectCount, unsupported_type_names)``.
@@ -596,7 +636,7 @@ def _count_activities(pipelines: list) -> tuple[ObjectCount, list[str]]:
         if not isinstance(pipeline, dict):
             logger.warning("Skipping non-dictionary pipeline")
             continue
-        _collect_activities(pipeline.get("activities") or [], all_activities)
+        all_activities.extend(_collect_activities(pipeline.get("activities")))
 
     supported = 0
     unsupported_types: set[str] = set()
@@ -615,7 +655,7 @@ def _count_datasets(
     datasets: list[dict],
     linked_services: list[dict],
 ) -> tuple[ObjectCount, list[DatasetDetail], list[str]]:
-    """Classify datasets, build details.
+    """Classifies datasets and builds details.
 
     Returns:
         A tuple of ``(ObjectCount, dataset_details, unsupported_type_names)``.
@@ -687,24 +727,30 @@ def _build_integration_runtime_details(
     return ObjectCount(total, total, 0), details
 
 
-def _collect_activities(activities: list[dict] | None, result: list[dict]) -> None:
-    """Recursively collect all activities including nested ones.
+def _collect_activities(activities: list[dict] | None) -> list[dict]:
+    """Recursively collects every activity (including nested ones) into a new list.
+
+    Walks each activity's ``activities`` (ForEach inner) and
+    ``if_true_activities`` / ``if_false_activities`` (IfCondition branches),
+    appending the activity itself followed by its descendants in
+    pre-order.
 
     Args:
         activities: List of activity dicts to process, or ``None``.
-        result: Accumulator list where discovered activities are appended.
+
+    Returns:
+        A flat list of every activity dict found in *activities*.  An empty
+        list is returned when the input is ``None`` or empty.
     """
+    result: list[dict] = []
     for activity in activities or []:
         result.append(activity)
         # ForEach inner activities
-        inner = activity.get("activities") or []
-        if inner:
-            _collect_activities(inner, result)
+        result.extend(_collect_activities(activity.get("activities")))
         # IfCondition branches
         for branch_key in ("if_true_activities", "if_false_activities"):
-            branch = activity.get(branch_key) or []
-            if branch:
-                _collect_activities(branch, result)
+            result.extend(_collect_activities(activity.get(branch_key)))
+    return result
 
 
 def _build_linked_service_type_map(linked_services: list[dict]) -> dict[str, str | None]:
