@@ -6,8 +6,8 @@ import logging
 import re
 from typing import Any
 
-import wkmigrate.translators.activity_translators.activity_translator as _activity_reg  # noqa: F401
-import wkmigrate.translators.dataset_translators.dataset_translator as _dataset_reg  # noqa: F401
+import wkmigrate.translators.activity_translators.activity_translator as _activity_translator_registry  # noqa: F401
+import wkmigrate.translators.dataset_translators.dataset_translator as _dataset_translator_registry  # noqa: F401
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.profiler.profile import (
     DatasetDetail,
@@ -81,8 +81,8 @@ def profile_factory(
 
     activity_counts, unsupported_activity_types = _count_activities(pipelines)
     dataset_counts, dataset_details, unsupported_dataset_types = _count_datasets(datasets, linked_services)
-    ls_counts = _count_linked_services(linked_services)
-    ir_counts, ir_details = _build_integration_runtime_details(integration_runtimes)
+    linked_service_counts = _count_linked_services(linked_services)
+    integration_runtime_counts, integration_runtime_details = _build_integration_runtime_details(integration_runtimes)
     pipeline_details = _build_pipeline_details(
         pipelines=pipelines,
         datasets=datasets,
@@ -95,12 +95,12 @@ def profile_factory(
         factory_name=resolved_factory_name,
         pipelines=ObjectCount(len(pipelines), len(pipelines), 0),
         activities=activity_counts,
-        linked_services=ls_counts,
+        linked_services=linked_service_counts,
         datasets=dataset_counts,
         triggers=ObjectCount(len(triggers), len(triggers), 0),
-        integration_runtimes=ir_counts,
+        integration_runtimes=integration_runtime_counts,
         dataset_details=dataset_details,
-        integration_runtime_details=ir_details,
+        integration_runtime_details=integration_runtime_details,
         pipeline_details=pipeline_details,
         unsupported_activity_types=unsupported_activity_types,
         unsupported_dataset_types=unsupported_dataset_types,
@@ -145,15 +145,20 @@ def format_profile(profile: FactoryProfile) -> str:
     if profile.dataset_details:
         lines += ["", "Dataset Details:"]
         for detail in profile.dataset_details:
-            ls_name = detail.linked_service_name or "N/A"
-            ls_type = detail.linked_service_type or "N/A"
-            lines.append(f"  - {detail.dataset_name} ({detail.dataset_type}) via {ls_name} [{ls_type}]")
+            linked_service_name = detail.linked_service_name or "N/A"
+            linked_service_type = detail.linked_service_type or "N/A"
+            lines.append(
+                f"  - {detail.dataset_name} ({detail.dataset_type}) "
+                f"via {linked_service_name} [{linked_service_type}]"
+            )
 
     if profile.integration_runtime_details:
         lines += ["", "Integration Runtimes:"]
-        for irt in profile.integration_runtime_details:
-            node_info = f", {irt.node_count} nodes" if irt.node_count is not None else ""
-            lines.append(f"  - {irt.name} ({irt.runtime_type}{node_info})")
+        for integration_runtime in profile.integration_runtime_details:
+            node_info = (
+                f", {integration_runtime.node_count} nodes" if integration_runtime.node_count is not None else ""
+            )
+            lines.append(f"  - {integration_runtime.name} ({integration_runtime.runtime_type}{node_info})")
 
     if profile.pipeline_details:
         lines += ["", "Pipeline Details:"]
@@ -266,7 +271,7 @@ def _arm_to_snake(value: Any) -> Any:
         A new structure with the same shape and snake_cased keys.
     """
     if isinstance(value, dict):
-        return {_camel_to_snake(k): _arm_to_snake(v) for k, v in value.items()}
+        return {_camel_to_snake(key): _arm_to_snake(inner_value) for key, inner_value in value.items()}
     if isinstance(value, list):
         return [_arm_to_snake(item) for item in value]
     return value
@@ -310,22 +315,26 @@ def _build_pipeline_details(
         A list of ``PipelineDetail`` objects for each pipeline.
     """
     del integration_runtimes  # see docstring — derived from linked-service connect_via
-    dataset_by_name = {ds.get("name", ""): ds for ds in datasets if isinstance(ds, dict)}
-    ls_by_name = {ls.get("name", ""): ls for ls in linked_services if isinstance(ls, dict)}
+    dataset_by_name = {dataset.get("name", ""): dataset for dataset in datasets if isinstance(dataset, dict)}
+    linked_service_by_name = {
+        linked_service.get("name", ""): linked_service
+        for linked_service in linked_services
+        if isinstance(linked_service, dict)
+    }
 
     details: list[PipelineDetail] = []
     for pipeline in pipelines:
         if not isinstance(pipeline, dict):
             logger.warning("Skipping non-dictionary pipeline in pipeline_details computation")
             continue
-        details.append(_build_pipeline_detail(pipeline, dataset_by_name, ls_by_name, triggers))
+        details.append(_build_pipeline_detail(pipeline, dataset_by_name, linked_service_by_name, triggers))
     return details
 
 
 def _build_pipeline_detail(
     pipeline: dict,
     dataset_by_name: dict[str, dict],
-    ls_by_name: dict[str, dict],
+    linked_service_by_name: dict[str, dict],
     triggers: list[dict],
 ) -> PipelineDetail:
     """Builds a single ``PipelineDetail`` by delegating each sub-computation to a helper.
@@ -333,7 +342,7 @@ def _build_pipeline_detail(
     Args:
         pipeline: Pipeline definition in snake-case shape.
         dataset_by_name: Name → dataset index for the factory.
-        ls_by_name: Name → linked-service index for the factory.
+        linked_service_by_name: Name → linked-service index for the factory.
         triggers: All triggers in the factory.
 
     Returns:
@@ -344,23 +353,25 @@ def _build_pipeline_detail(
 
     activity_counts = _classify_pipeline_activities(activities)
     referenced_dataset_names, dataset_counts = _classify_pipeline_datasets(activities, dataset_by_name)
-    linked_service_names, ls_counts = _classify_pipeline_linked_services(
+    linked_service_names, linked_service_counts = _classify_pipeline_linked_services(
         activities=activities,
         referenced_dataset_names=referenced_dataset_names,
         dataset_by_name=dataset_by_name,
-        ls_by_name=ls_by_name,
+        linked_service_by_name=linked_service_by_name,
     )
 
     return PipelineDetail(
         pipeline_name=pipeline_name,
         activities=activity_counts,
         datasets=dataset_counts,
-        linked_services=ls_counts,
+        linked_services=linked_service_counts,
         total_activities=activity_counts.total,
         total_datasets=dataset_counts.total,
-        total_linked_services=ls_counts.total,
+        total_linked_services=linked_service_counts.total,
         total_triggers=_count_triggers_for_pipeline(pipeline_name, triggers),
-        total_integration_runtimes=_count_integration_runtimes_for_pipeline(linked_service_names, ls_by_name),
+        total_integration_runtimes=_count_integration_runtimes_for_pipeline(
+            linked_service_names, linked_service_by_name
+        ),
     )
 
 
@@ -403,31 +414,31 @@ def _classify_pipeline_linked_services(
     activities: list[dict],
     referenced_dataset_names: set[str],
     dataset_by_name: dict[str, dict],
-    ls_by_name: dict[str, dict],
+    linked_service_by_name: dict[str, dict],
 ) -> tuple[set[str], ObjectCount]:
     """Resolves the linked services a pipeline reaches and classifies them.
 
     A pipeline reaches a linked service in two ways: directly (an activity
     such as ``WebActivity`` or ``SqlServerStoredProcedure`` carries a
     ``LinkedServiceReference``) or transitively (an activity references a
-    dataset whose ``linked_service_name`` points at the LS).  Both paths are
-    unioned before classification.
+    dataset whose ``linked_service_name`` points at the linked service).
+    Both paths are unioned before classification.
 
     Args:
         activities: Flat list of activity dicts.
         referenced_dataset_names: Datasets already known to be referenced by
             this pipeline; their ``linked_service_name`` fields contribute the
-            transitive set of LS reachable via datasets.
+            transitive set of linked services reachable via datasets.
         dataset_by_name: Name → dataset index.
-        ls_by_name: Name → linked-service index.
+        linked_service_by_name: Name → linked-service index.
 
     Returns:
         ``(linked_service_names, ObjectCount)``.  The set is returned so the
         caller can pass it to :func:`_count_integration_runtimes_for_pipeline`.
     """
-    linked_service_names = set(_collect_referenced_linked_service_names(activities, ls_by_name))
+    linked_service_names = set(_collect_referenced_linked_service_names(activities, linked_service_by_name))
     linked_service_names |= _collect_linked_service_names_from_datasets(referenced_dataset_names, dataset_by_name)
-    supported, unsupported = _count_supported_linked_service_refs(linked_service_names, ls_by_name)
+    supported, unsupported = _count_supported_linked_service_refs(linked_service_names, linked_service_by_name)
     return linked_service_names, ObjectCount(
         total=len(linked_service_names), supported=supported, unsupported=unsupported
     )
@@ -446,14 +457,16 @@ def _collect_linked_service_names_from_datasets(
         Unique LS names referenced by the given datasets.
     """
     found: set[str] = set()
-    for ds_name in referenced_dataset_names:
-        dataset = dataset_by_name.get(ds_name)
+    for dataset_name in referenced_dataset_names:
+        dataset = dataset_by_name.get(dataset_name)
         if dataset is None:
             continue
-        ls_ref = (dataset.get("properties") or {}).get("linked_service_name") or {}
-        ref_name = ls_ref.get("reference_name") if isinstance(ls_ref, dict) else None
-        if ref_name:
-            found.add(ref_name)
+        linked_service_reference = (dataset.get("properties") or {}).get("linked_service_name") or {}
+        reference_name = (
+            linked_service_reference.get("reference_name") if isinstance(linked_service_reference, dict) else None
+        )
+        if reference_name:
+            found.add(reference_name)
     return found
 
 
@@ -473,13 +486,13 @@ def _count_supported_dataset_refs(
     """
     supported = 0
     unsupported = 0
-    for ds_name in referenced_dataset_names:
-        dataset = dataset_by_name.get(ds_name)
+    for dataset_name in referenced_dataset_names:
+        dataset = dataset_by_name.get(dataset_name)
         if dataset is None:
             unsupported += 1
             continue
-        ds_type = (dataset.get("properties") or {}).get("type") or "Unknown"
-        if ds_type in SUPPORTED_DATASET_TYPES:
+        dataset_type = (dataset.get("properties") or {}).get("type") or "Unknown"
+        if dataset_type in SUPPORTED_DATASET_TYPES:
             supported += 1
         else:
             unsupported += 1
@@ -487,27 +500,27 @@ def _count_supported_dataset_refs(
 
 
 def _count_supported_linked_service_refs(
-    linked_service_names: set[str], ls_by_name: dict[str, dict]
+    linked_service_names: set[str], linked_service_by_name: dict[str, dict]
 ) -> tuple[int, int]:
-    """Tallies ``(supported, unsupported)`` references by looking up each LS's type.
+    """Tallies ``(supported, unsupported)`` references by looking up each linked service's type.
 
     Args:
-        linked_service_names: LS names to classify.
-        ls_by_name: Name → linked-service index.  Unknown names count as
-            unsupported.
+        linked_service_names: Linked-service names to classify.
+        linked_service_by_name: Name → linked-service index.  Unknown names
+            count as unsupported.
 
     Returns:
         ``(supported, unsupported)``.
     """
     supported = 0
     unsupported = 0
-    for ls_name in linked_service_names:
-        ls = ls_by_name.get(ls_name)
-        if ls is None:
+    for linked_service_name in linked_service_names:
+        linked_service = linked_service_by_name.get(linked_service_name)
+        if linked_service is None:
             unsupported += 1
             continue
-        ls_type = (ls.get("properties") or {}).get("type") or "Unknown"
-        if ls_type in SUPPORTED_LINKED_SERVICE_TYPES:
+        linked_service_type = (linked_service.get("properties") or {}).get("type") or "Unknown"
+        if linked_service_type in SUPPORTED_LINKED_SERVICE_TYPES:
             supported += 1
         else:
             unsupported += 1
@@ -515,66 +528,68 @@ def _count_supported_linked_service_refs(
 
 
 def _count_integration_runtimes_for_pipeline(
-    linked_service_names: set[str], ls_by_name: dict[str, dict]
+    linked_service_names: set[str], linked_service_by_name: dict[str, dict]
 ) -> int:
-    """Counts distinct integration runtimes reached via the given LS's ``connect_via``.
+    """Counts distinct integration runtimes reached via each linked service's ``connect_via``.
 
     Args:
-        linked_service_names: LS names the pipeline reaches.
-        ls_by_name: Name → linked-service index.
+        linked_service_names: Linked-service names the pipeline reaches.
+        linked_service_by_name: Name → linked-service index.
 
     Returns:
-        Count of unique IR names referenced.
+        Count of unique integration-runtime names referenced.
     """
-    ir_names: set[str] = set()
-    for ls_name in linked_service_names:
-        ls = ls_by_name.get(ls_name)
-        if ls is None:
+    integration_runtime_names: set[str] = set()
+    for linked_service_name in linked_service_names:
+        linked_service = linked_service_by_name.get(linked_service_name)
+        if linked_service is None:
             continue
-        connect_via = (ls.get("properties") or {}).get("connect_via") or {}
-        ref_name = connect_via.get("reference_name") if isinstance(connect_via, dict) else None
-        if ref_name:
-            ir_names.add(ref_name)
-    return len(ir_names)
+        connect_via = (linked_service.get("properties") or {}).get("connect_via") or {}
+        reference_name = connect_via.get("reference_name") if isinstance(connect_via, dict) else None
+        if reference_name:
+            integration_runtime_names.add(reference_name)
+    return len(integration_runtime_names)
 
 
 def _collect_referenced_dataset_names(activities: list[dict], dataset_by_name: dict[str, dict]) -> set[str]:
     """Walks the activity tree and collects dataset references.
 
     Args:
-        activities: Flat list of activity dicts
-        dataset_by_name: Index used to filter dataset candidates
+        activities: Flat list of activity dicts.
+        dataset_by_name: Index used to filter dataset candidates.
 
     Returns:
         Unique dataset names referenced anywhere in the activity tree.
     """
     found: set[str] = set()
     for activity in activities:
-        for ref_name, ref_type in _iter_reference_pairs(activity):
-            if ref_type == "DatasetReference" and ref_name in dataset_by_name:
-                found.add(ref_name)
-            elif ref_type is None and ref_name in dataset_by_name:
+        for reference_name, reference_type in _iter_reference_pairs(activity):
+            if reference_type == "DatasetReference" and reference_name in dataset_by_name:
+                found.add(reference_name)
+            elif reference_type is None and reference_name in dataset_by_name:
                 # Some activity shapes drop the ``type`` field on references.
                 # Fall back to a name-match.
-                found.add(ref_name)
+                found.add(reference_name)
     return found
 
 
-def _collect_referenced_linked_service_names(activities: list[dict], ls_by_name: dict[str, dict]) -> set[str]:
+def _collect_referenced_linked_service_names(
+    activities: list[dict], linked_service_by_name: dict[str, dict]
+) -> set[str]:
     """Walks the activity tree to collect linked-service references.
 
     Args:
         activities: Flat list of activity dicts.
-        ls_by_name: Index used to filter linked service reference candidates.
+        linked_service_by_name: Index used to filter linked-service reference candidates.
 
     Returns:
         Unique linked-service names referenced directly by activities.
     """
     found: set[str] = set()
     for activity in activities:
-        for ref_name, ref_type in _iter_reference_pairs(activity):
-            if ref_type == "LinkedServiceReference" and ref_name in ls_by_name:
-                found.add(ref_name)
+        for reference_name, reference_type in _iter_reference_pairs(activity):
+            if reference_type == "LinkedServiceReference" and reference_name in linked_service_by_name:
+                found.add(reference_name)
     return found
 
 
@@ -588,12 +603,12 @@ def _iter_reference_pairs(value: Any):
         Pairs of ``(reference_name, type_or_None)`` discovered in *value*.
     """
     if isinstance(value, dict):
-        ref_name = value.get("reference_name")
-        ref_type = value.get("type")
-        if isinstance(ref_name, str):
-            yield ref_name, ref_type if isinstance(ref_type, str) else None
-        for nested in value.values():
-            yield from _iter_reference_pairs(nested)
+        reference_name = value.get("reference_name")
+        reference_type = value.get("type")
+        if isinstance(reference_name, str):
+            yield reference_name, reference_type if isinstance(reference_type, str) else None
+        for nested_value in value.values():
+            yield from _iter_reference_pairs(nested_value)
     elif isinstance(value, list):
         for item in value:
             yield from _iter_reference_pairs(item)
@@ -615,11 +630,11 @@ def _count_triggers_for_pipeline(pipeline_name: str, triggers: list[dict]) -> in
         if not isinstance(trigger, dict):
             continue
         bound_pipelines = (trigger.get("properties") or {}).get("pipelines") or []
-        for bound in bound_pipelines:
-            if not isinstance(bound, dict):
+        for bound_pipeline in bound_pipelines:
+            if not isinstance(bound_pipeline, dict):
                 continue
-            ref = bound.get("pipeline_reference") or {}
-            if isinstance(ref, dict) and ref.get("reference_name") == pipeline_name:
+            pipeline_reference = bound_pipeline.get("pipeline_reference") or {}
+            if isinstance(pipeline_reference, dict) and pipeline_reference.get("reference_name") == pipeline_name:
                 count += 1
                 break
     return count
@@ -660,34 +675,36 @@ def _count_datasets(
     Returns:
         A tuple of ``(ObjectCount, dataset_details, unsupported_type_names)``.
     """
-    ls_type_map = _build_linked_service_type_map(linked_services)
+    linked_service_type_map = _build_linked_service_type_map(linked_services)
 
     supported = 0
     unsupported = 0
     unsupported_types: set[str] = set()
     details: list[DatasetDetail] = []
 
-    for dset in datasets:
-        props = dset.get("properties", {})
-        ds_type = props.get("type") or "Unknown"
-        ls_ref = props.get("linked_service_name", {})
-        ls_name = ls_ref.get("reference_name") if isinstance(ls_ref, dict) else None
-        ls_type = ls_type_map.get(ls_name) if ls_name else None
+    for dataset in datasets:
+        properties = dataset.get("properties", {})
+        dataset_type = properties.get("type") or "Unknown"
+        linked_service_reference = properties.get("linked_service_name", {})
+        linked_service_name = (
+            linked_service_reference.get("reference_name") if isinstance(linked_service_reference, dict) else None
+        )
+        linked_service_type = linked_service_type_map.get(linked_service_name) if linked_service_name else None
 
         details.append(
             DatasetDetail(
-                dataset_name=dset.get("name", "Unknown"),
-                dataset_type=ds_type,
-                linked_service_name=ls_name,
-                linked_service_type=ls_type,
+                dataset_name=dataset.get("name", "Unknown"),
+                dataset_type=dataset_type,
+                linked_service_name=linked_service_name,
+                linked_service_type=linked_service_type,
             )
         )
 
-        if ds_type in SUPPORTED_DATASET_TYPES:
+        if dataset_type in SUPPORTED_DATASET_TYPES:
             supported += 1
         else:
             unsupported += 1
-            unsupported_types.add(ds_type)
+            unsupported_types.add(dataset_type)
 
     total = supported + unsupported
     return ObjectCount(total, supported, unsupported), details, sorted(unsupported_types)
@@ -696,7 +713,9 @@ def _count_datasets(
 def _count_linked_services(linked_services: list[dict]) -> ObjectCount:
     """Count supported vs unsupported linked services."""
     supported = sum(
-        1 for ls in linked_services if ls.get("properties", {}).get("type") in SUPPORTED_LINKED_SERVICE_TYPES
+        1
+        for linked_service in linked_services
+        if linked_service.get("properties", {}).get("type") in SUPPORTED_LINKED_SERVICE_TYPES
     )
     total = len(linked_services)
     return ObjectCount(total, supported, total - supported)
@@ -708,18 +727,20 @@ def _build_integration_runtime_details(
     """Build integration runtime details and counts.
 
     Returns:
-        A tuple of ``(ObjectCount, ir_details)``.
+        A tuple of ``(ObjectCount, integration_runtime_details)``.
     """
     details: list[IntegrationRuntimeDetail] = []
-    for irt in integration_runtimes:
-        props = irt.get("properties", {})
+    for integration_runtime in integration_runtimes:
+        properties = integration_runtime.get("properties", {})
         node_count = None
-        if props.get("type") == "SelfHosted":
-            node_count = props.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
+        if properties.get("type") == "SelfHosted":
+            node_count = (
+                properties.get("type_properties", {}).get("compute_properties", {}).get("number_of_nodes")
+            )
         details.append(
             IntegrationRuntimeDetail(
-                name=irt.get("name", "Unknown"),
-                runtime_type=props.get("type", "Unknown"),
+                name=integration_runtime.get("name", "Unknown"),
+                runtime_type=properties.get("type", "Unknown"),
                 node_count=node_count,
             )
         )
@@ -762,4 +783,7 @@ def _build_linked_service_type_map(linked_services: list[dict]) -> dict[str, str
     Returns:
         Mapping from linked service name to its type string.
     """
-    return {ls.get("name", ""): ls.get("properties", {}).get("type") for ls in linked_services}
+    return {
+        linked_service.get("name", ""): linked_service.get("properties", {}).get("type")
+        for linked_service in linked_services
+    }
