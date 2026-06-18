@@ -15,10 +15,12 @@ class PreparedWorkflow:
     Attributes:
         pipeline: Pipeline IR that this workflow was prepared from.
         activities: Prepared activities that make up this workflow's tasks.
+        setup_tasks: One-time setup tasks required before running the workflow.
     """
 
     pipeline: Pipeline
     activities: list[PreparedActivity]
+    setup_tasks: list[PreparedActivity] | None = None
 
     @property
     def tasks(self) -> list[dict[str, Any]]:
@@ -68,6 +70,22 @@ class PreparedWorkflow:
                 result.extend(activity.inner_workflow.inner_workflows)
         return result
 
+    @property
+    def all_setup_tasks(self) -> list["PreparedActivity"]:
+        """All setup tasks across this workflow and any nested inner workflows.
+
+        Setup tasks from individual activities are hoisted into
+        ``self.setup_tasks`` by ``prepare_workflow``, so we only need to
+        collect from there and recurse into inner workflows.
+        """
+        result: list[PreparedActivity] = []
+        if self.setup_tasks:
+            result.extend(self.setup_tasks)
+        for activity in self.activities:
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_setup_tasks)
+        return result
+
 
 @dataclass(slots=True)
 class PreparedActivity:
@@ -80,6 +98,7 @@ class PreparedActivity:
         pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
         secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
         inner_workflow: Additional workflow settings created for nested ForEach tasks.
+        setup_tasks: One-time setup tasks that must run before this activity can execute.
     """
 
     task: dict[str, Any]
@@ -87,6 +106,7 @@ class PreparedActivity:
     pipelines: list[PipelineInstruction] | None = None
     secrets: list[SecretInstruction] | None = None
     inner_workflow: "PreparedWorkflow" | None = None
+    setup_tasks: list["PreparedActivity"] | None = None
 
 
 @dataclass(slots=True)

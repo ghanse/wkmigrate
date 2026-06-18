@@ -216,6 +216,29 @@ class WebActivity(Activity):
 
 
 @dataclass(slots=True, kw_only=True)
+class DeleteActivity(Activity):
+    """
+    Delete activity metadata.
+
+    Represents an ADF Delete activity that removes files or folders from cloud
+    storage. Prepared as a notebook task using ``dbutils.fs.rm()``.
+
+    Attributes:
+        dataset_name: Reference name of the dataset identifying the storage location.
+        folder_path: Folder path within the dataset to delete, or ``None`` when unresolved.
+        recursive: When ``True`` the delete removes contents recursively.
+        wildcard_file_name: Glob pattern to filter files for deletion.
+        wildcard_folder_path: Glob pattern to filter folders for deletion.
+    """
+
+    dataset_name: str
+    folder_path: str | None = None
+    recursive: bool = True
+    wildcard_file_name: str | None = None
+    wildcard_folder_path: str | None = None
+
+
+@dataclass(slots=True, kw_only=True)
 class IfConditionActivity(Activity):
     """
     If Condition activity metadata.
