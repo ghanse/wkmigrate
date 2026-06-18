@@ -1,0 +1,91 @@
+{
+  "name": "mixed_conditions",
+  "properties": {
+    "activities": [
+      {
+        "name": "run_process",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/process"
+        }
+      },
+      {
+        "name": "log_result",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "run_process",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/log_result"
+        }
+      },
+      {
+        "name": "error_handler",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "run_process",
+            "dependencyConditions": ["Failed"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/error_handler"
+        }
+      },
+      {
+        "name": "finalize",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "log_result",
+            "dependencyConditions": ["Succeeded"]
+          },
+          {
+            "activity": "error_handler",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/finalize"
+        }
+      }
+    ],
+    "annotations": []
+  }
+}

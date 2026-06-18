@@ -49,6 +49,7 @@ Base class for translated pipeline activities.
 - `max_retries` - Maximum number of retry attempts on failure.
 - `min_retry_interval_millis` - Minimum delay between retry attempts in milliseconds.
 - `depends_on` - List of upstream task dependencies that must complete before this task runs.
+- `run_if` - Optional Databricks `run_if` condition for the task. Set automatically based on ADF dependency conditions: `Completed` maps to `ALL_DONE`, `Failed` maps to `AT_LEAST_ONE_FAILED`, and `Succeeded` (the default) leaves this as `None`.
 - `new_cluster` - Cluster configuration dictionary for tasks that provision a new cluster.
 - `libraries` - List of library dependencies (e.g. JARs or Python wheels) used by the activity.
 

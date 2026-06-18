@@ -454,9 +454,9 @@ def test_no_name_gets_default(unsupported_activity_fixtures: list[dict]) -> None
     assert result.task_key == "UNNAMED_TASK"
 
 
-def test_failed_dependency_creates_unsupported(unsupported_activity_fixtures: list[dict]) -> None:
-    """Test that dependency on Failed condition creates UnsupportedValue in depends_on."""
-    fixture = get_fixture(unsupported_activity_fixtures, "dependency_failed")
+def test_skipped_single_dependency_creates_unsupported(unsupported_activity_fixtures: list[dict]) -> None:
+    """Test that dependency on Skipped condition creates UnsupportedValue in depends_on."""
+    fixture = get_fixture(unsupported_activity_fixtures, "dependency_skipped_single")
     result = translate_activity(fixture["input"])
 
     assert result.depends_on is not None

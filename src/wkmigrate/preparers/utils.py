@@ -39,6 +39,7 @@ def get_base_task(activity: Activity) -> dict[str, Any]:
             "max_retries": activity.max_retries,
             "min_retry_interval_millis": activity.min_retry_interval_millis,
             "depends_on": depends_on,
+            "run_if": activity.run_if,
             "new_cluster": activity.new_cluster,
             "libraries": libraries,
         }

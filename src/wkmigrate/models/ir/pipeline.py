@@ -63,6 +63,7 @@ class Activity:
     depends_on: list["Dependency"] | None = None
     new_cluster: dict | None = None
     libraries: list[dict[str, Any]] | None = None
+    run_if: str | None = None
 
 
 @dataclass(slots=True, kw_only=True)
@@ -270,7 +271,7 @@ class Dependency:
 
     Attributes:
         task_key: Task key of the upstream activity this task depends on.
-        outcome: Required outcome of the upstream task (for example ``Succeeded``) for this dependency.
+        outcome: IfCondition branch outcome (``"true"`` or ``"false"``), or ``None`` for regular dependencies.
     """
 
     task_key: str

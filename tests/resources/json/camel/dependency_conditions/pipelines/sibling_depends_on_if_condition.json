@@ -1,0 +1,58 @@
+{
+  "name": "sibling_depends_on_if_condition",
+  "properties": {
+    "activities": [
+      {
+        "name": "Control_enabled",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(pipeline().parameters.mode, 'full')",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "run_main",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/Shared/notebooks/main"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "cleanup",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Control_enabled",
+            "dependencyConditions": ["Completed"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/cleanup"
+        }
+      }
+    ],
+    "parameters": {
+      "mode": { "type": "string", "defaultValue": "full" }
+    },
+    "annotations": []
+  }
+}

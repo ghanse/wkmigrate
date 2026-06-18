@@ -1,0 +1,45 @@
+{
+  "name": "multi_condition_dependency",
+  "properties": {
+    "activities": [
+      {
+        "name": "call_api",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/call_api"
+        }
+      },
+      {
+        "name": "log_outcome",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "call_api",
+            "dependencyConditions": ["Succeeded", "Failed"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/notebooks/log_outcome"
+        }
+      }
+    ],
+    "annotations": []
+  }
+}

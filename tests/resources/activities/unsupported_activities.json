@@ -83,17 +83,17 @@
     }
   },
   {
-    "id": "dependency_failed",
-    "description": "Activity with dependency on failed task creates UnsupportedValue",
+    "id": "dependency_skipped_single",
+    "description": "Activity with dependency on skipped task creates UnsupportedValue",
     "input": {
       "name": "failure_handler",
       "type": "DatabricksNotebook",
-      "description": "Handle upstream failure",
+      "description": "Handle upstream skip",
       "depends_on": [
         {
           "activity": "upstream_task",
           "dependency_conditions": [
-            "Failed"
+            "Skipped"
           ]
         }
       ],
@@ -138,7 +138,7 @@
           "activity": "upstream_task",
           "dependency_conditions": [
             "Succeeded",
-            "Failed"
+            "Skipped"
           ]
         }
       ],

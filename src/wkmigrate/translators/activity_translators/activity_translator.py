@@ -151,6 +151,7 @@ def visit_activity(
     activity_type = activity.get("type") or "Unsupported"
     with not_translatable_context(name, activity_type):
         base_properties = _get_base_properties(activity, is_conditional_task)
+        base_properties["depends_on"] = _expand_condition_task_deps(base_properties.get("depends_on"), context)
         result, context = _dispatch_activity(activity_type, activity, base_properties, context)
         translated = normalize_translated_result(result, base_properties)
 
@@ -304,6 +305,7 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
     cluster_spec = activity.get("linked_service_definition")
     new_cluster = translate_databricks_cluster_spec(cluster_spec) if cluster_spec else None
     task_key = activity.get("name") or "UNNAMED_TASK"
+    run_if = _derive_run_if(activity.get("depends_on"))
     return {
         "name": task_key,
         "task_key": task_key,
@@ -314,6 +316,7 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
         "depends_on": depends_on,
         "new_cluster": new_cluster,
         "libraries": activity.get("libraries"),
+        "run_if": run_if,
     }
 
 
@@ -367,6 +370,45 @@ def _parse_policy(policy: dict | None) -> dict:
     return parsed_policy
 
 
+def _normalize_dependency_conditions(raw_conditions: set[str]) -> set[str]:
+    """Normalize ADF dependency conditions to a canonical upper-case set.
+
+    ``{'SUCCEEDED', 'FAILED'}`` is equivalent to ``{'COMPLETED'}`` in ADF
+    semantics (run regardless of upstream outcome).
+    """
+    upper = {c.upper() for c in raw_conditions}
+    if upper == {"SUCCEEDED", "FAILED"}:
+        return {"COMPLETED"}
+    return upper
+
+
+def _derive_run_if(dependencies: list[dict] | None) -> str | None:
+    """Derive the Databricks ``run_if`` value from ADF dependency conditions.
+
+    ADF attaches conditions per dependency edge; Databricks ``run_if`` is a
+    single value per task.  When a task has dependencies with mixed conditions
+    the mapping is lossy.  We resolve with the following precedence:
+
+    - Any ``Failed`` edge  → ``AT_LEAST_ONE_FAILED``
+    - Any ``Completed`` edge → ``ALL_DONE``
+    - All ``Succeeded`` (or empty) → ``None`` (Databricks default)
+
+    ``Failed`` takes priority over ``Completed`` because a task that should run
+    on failure is more safety-critical than one that should always run.
+    """
+    if not dependencies:
+        return None
+    conditions = set()
+    for dep in dependencies:
+        dep_conditions = _normalize_dependency_conditions(set(dep.get("dependency_conditions", [])))
+        conditions.update(dep_conditions)
+    if "FAILED" in conditions:
+        return "AT_LEAST_ONE_FAILED"
+    if "COMPLETED" in conditions:
+        return "ALL_DONE"
+    return None
+
+
 def _parse_dependencies(
     dependencies: list[dict] | None, is_conditional_task: bool = False
 ) -> list[Dependency | UnsupportedValue] | None:
@@ -385,9 +427,27 @@ def _parse_dependencies(
     return [_parse_dependency(dependency, is_conditional_task) for dependency in dependencies]
 
 
-def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> Dependency | UnsupportedValue:
+def _parse_dependency(  # pylint: disable=unused-argument
+    dependency: dict, is_conditional_task: bool = False
+) -> Dependency | UnsupportedValue:
     """
     Parses an individual dependency from a dictionary.
+
+    There are two distinct shapes of dependency dict that arrive here:
+
+    1. **IfCondition parent wiring** (``is_conditional_task=False``).
+       These are *synthetic* dependencies injected by ``_translate_child_activities``
+       when it flattens IfCondition branches into top-level tasks.  They carry an
+       ``outcome`` field (``"true"`` / ``"false"``) and have **no**
+       ``dependency_conditions``.  We detect them by checking for ``outcome``.
+
+    2. **Regular ADF dependencies** (either top-level or inside a branch).
+       These carry ``dependency_conditions`` (``Succeeded``, ``Completed``,
+       ``Failed``, …) and have **no** ``outcome`` field.
+
+    The ``is_conditional_task`` flag is no longer used for dispatch — the
+    presence of ``outcome`` is sufficient — but the parameter is kept for
+    backward compatibility with existing call sites.
 
     Args:
         dependency: Dependency definition as a ``dict``.
@@ -396,24 +456,68 @@ def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> De
     Returns:
         Dependency object describing the upstream relationship.
     """
+    outcome = dependency.get("outcome")
+    if outcome is not None:
+        if outcome.upper() not in ("TRUE", "FALSE"):
+            return UnsupportedValue(
+                value=dependency, message=f"Unsupported outcome '{outcome}' in IfCondition dependency"
+            )
+        task_key = dependency.get("activity")
+        if not task_key:
+            return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
+        return Dependency(task_key=task_key, outcome=outcome)
+
     conditions = dependency.get("dependency_conditions", [])
-    if len(conditions) > 1:
+    upper_conditions = _normalize_dependency_conditions(set(conditions))
+
+    if len(upper_conditions) > 1:
         return UnsupportedValue(value=dependency, message="Dependencies with multiple conditions are not supported.")
 
-    if is_conditional_task:
-        supported_conditions = ["TRUE", "FALSE"]
-        outcome = dependency.get("outcome")
-    else:
-        supported_conditions = ["SUCCEEDED"]
-        outcome = None
-
-    if any(condition.upper() not in supported_conditions for condition in conditions):
+    supported_conditions = ["SUCCEEDED", "COMPLETED", "FAILED"]
+    if any(c not in supported_conditions for c in upper_conditions):
         return UnsupportedValue(
-            value=dependency, message="Dependencies with conditions other than 'Succeeded' are not supported."
+            value=dependency,
+            message="Dependencies with conditions other than 'Succeeded', 'Completed', or 'Failed' are not supported.",
         )
 
     task_key = dependency.get("activity")
     if not task_key:
         return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
 
-    return Dependency(task_key=task_key, outcome=outcome)
+    return Dependency(task_key=task_key, outcome=None)
+
+
+def _expand_condition_task_deps(
+    dependencies: list[Dependency | UnsupportedValue] | None,
+    context: TranslationContext,
+) -> list[Dependency | UnsupportedValue] | None:
+    """Expand dependencies targeting condition_tasks to dual-outcome edges.
+
+    When a regular ADF dependency (``outcome=None``) targets an IfCondition
+    activity, Databricks requires an explicit outcome on the dependency edge.
+    This function replaces such dependencies with two edges — one for each
+    branch outcome (``true`` and ``false``) — which is the Databricks
+    equivalent of ADF's ``Completed`` condition on a condition_task.
+
+    Dependencies that already have an outcome (IfCondition children) or
+    that target non-condition tasks are left unchanged.
+
+    Args:
+        dependencies: Parsed dependency list from ``_parse_dependencies``.
+        context: Translation context with the activity cache.
+
+    Returns:
+        Dependency list with condition_task targets expanded.
+    """
+    if not dependencies:
+        return dependencies
+    expanded: list[Dependency | UnsupportedValue] = []
+    for dep in dependencies:
+        if isinstance(dep, Dependency) and dep.outcome is None:
+            cached = context.get_activity(dep.task_key)
+            if isinstance(cached, IfConditionActivity):
+                expanded.append(Dependency(task_key=dep.task_key, outcome="true"))
+                expanded.append(Dependency(task_key=dep.task_key, outcome="false"))
+                continue
+        expanded.append(dep)
+    return expanded

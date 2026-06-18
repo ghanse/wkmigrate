@@ -1,0 +1,62 @@
+{
+  "name": "succeeded_inside_if_condition",
+  "properties": {
+    "activities": [
+      {
+        "name": "check_mode",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(pipeline().parameters.mode, 'full')",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [
+            {
+              "name": "run_fallback",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.02:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/Shared/notebooks/fallback"
+              }
+            },
+            {
+              "name": "log_fallback",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "run_fallback",
+                  "dependencyConditions": ["Succeeded"]
+                }
+              ],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/Shared/notebooks/log_fallback"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "mode": { "type": "string", "defaultValue": "full" }
+    },
+    "annotations": []
+  }
+}
