@@ -234,6 +234,28 @@ class IfConditionActivity(Activity):
 
 
 @dataclass(slots=True, kw_only=True)
+class ExecutePipelineActivity(Activity):
+    """
+    Execute Pipeline activity metadata.
+
+    Translates an ADF Execute Pipeline activity into a Run Job task that
+    invokes the corresponding translated workflow, passing pipeline parameters
+    as job parameters.
+
+    Attributes:
+        pipeline_name: Name of the referenced child pipeline.
+        pipeline: Translated child pipeline IR, or ``None`` when the definition could not be resolved.
+        parameters: Key-value pairs passed to the child pipeline, or ``None``.
+        wait_on_completion: Whether the parent waits for the child pipeline to finish.
+    """
+
+    pipeline_name: str
+    pipeline: Pipeline | None = None
+    parameters: dict[str, str] | None = None
+    wait_on_completion: bool = True
+
+
+@dataclass(slots=True, kw_only=True)
 class SetVariableActivity(Activity):
     """
     SetVariable activity metadata.

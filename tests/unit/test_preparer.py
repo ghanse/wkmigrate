@@ -8,6 +8,7 @@ from wkmigrate.models.ir.pipeline import (
     Authentication,
     ColumnMapping,
     CopyActivity,
+    ExecutePipelineActivity,
     ForEachActivity,
     LookupActivity,
     Pipeline,
@@ -321,3 +322,155 @@ def _make_run_job_with_lookup_pipeline(name: str = "RunJobTest") -> RunJobActivi
         task_key=name.lower(),
         pipeline=_make_pipeline_with_lookup(),
     )
+
+
+def _make_execute_pipeline_with_child(name: str = "ExecPipelineTest") -> ExecutePipelineActivity:
+    child_pipeline = Pipeline(
+        name="child_pipeline",
+        tasks=[_make_lookup_activity("ChildLookup")],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+    return ExecutePipelineActivity(
+        name=name,
+        task_key=name.lower(),
+        pipeline_name="child_pipeline",
+        pipeline=child_pipeline,
+        parameters={"env": "prod"},
+    )
+
+
+def _make_execute_pipeline_without_child(name: str = "ExecPipelineNoChild") -> ExecutePipelineActivity:
+    return ExecutePipelineActivity(
+        name=name,
+        task_key=name.lower(),
+        pipeline_name="unresolved_pipeline",
+        pipeline=None,
+        parameters={"batch_id": "123"},
+    )
+
+
+def test_execute_pipeline_with_child_produces_inner_workflow() -> None:
+    """Resolved child pipeline produces an inner workflow with __INNER_JOB__ placeholder."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is not None
+    assert len(result.inner_workflow.activities) == 1
+    run_job_task = result.task.get("run_job_task")
+    assert isinstance(run_job_task, dict)
+    assert run_job_task.get("job_id") == "__INNER_JOB__:child_pipeline"
+    assert run_job_task.get("job_parameters") == {"env": "prod"}
+
+
+def test_execute_pipeline_without_child_produces_placeholder() -> None:
+    """Unresolved child pipeline emits a placeholder job_id template."""
+    activity = _make_execute_pipeline_without_child()
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is None
+    run_job_task = result.task.get("run_job_task")
+    assert run_job_task is not None
+    assert "job_id_for_unresolved_pipeline" in str(run_job_task.get("job_id"))
+
+
+def test_execute_pipeline_default_scope_in_inner_notebook() -> None:
+    """Inner workflow notebooks use DEFAULT_CREDENTIALS_SCOPE by default."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
+
+    assert result.inner_workflow is not None
+    notebook_content = result.inner_workflow.activities[0].notebooks[0].content
+    assert f'scope="{DEFAULT_CREDENTIALS_SCOPE}"' in notebook_content
+
+
+def test_execute_pipeline_custom_scope_in_inner_notebook() -> None:
+    """Custom credentials_scope is forwarded into nested prepared notebooks."""
+    activity = _make_execute_pipeline_with_child()
+
+    result = prepare_run_job_activity(
+        activity,
+        default_files_to_delta_sinks=None,
+        credentials_scope="exec_vault",
+    )
+
+    assert result.inner_workflow is not None
+    notebook_content = result.inner_workflow.activities[0].notebooks[0].content
+    assert 'scope="exec_vault"' in notebook_content
+    assert DEFAULT_CREDENTIALS_SCOPE not in notebook_content
+
+
+def test_run_job_activity_emits_dict_run_job_task() -> None:
+    """RunJobActivity run_job_task is a dict with __INNER_JOB__ job_id placeholder."""
+    activity = _make_run_job_with_lookup_pipeline()
+
+    result = prepare_run_job_activity(activity, default_files_to_delta_sinks=None)
+
+    run_job_task = result.task.get("run_job_task")
+    assert isinstance(run_job_task, dict), "run_job_task must be a dict, not a plain string"
+    assert run_job_task.get("job_id") == f"__INNER_JOB__:{activity.name}"
+
+
+def test_prepare_workflow_dispatches_execute_pipeline() -> None:
+    """prepare_workflow routes ExecutePipelineActivity through the preparer."""
+    pipeline = Pipeline(
+        name="parent_pipeline",
+        tasks=[_make_execute_pipeline_with_child()],
+        parameters=None,
+        schedule=None,
+        tags={},
+    )
+
+    result = prepare_workflow(pipeline)
+
+    assert len(result.activities) == 1
+    assert result.activities[0].inner_workflow is not None
+
+
+def test_assign_inner_job_ids_resolves_run_job_activity_placeholder(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_ids resolves __INNER_JOB__: placeholders in RunJobActivity dict format."""
+    tasks = [
+        {"task_key": "run_inner", "run_job_task": {"job_id": "__INNER_JOB__:child_job"}},
+    ]
+    job_id_map = {"child_job": 42}
+
+    workspace_definition_store._assign_inner_job_ids(tasks, job_id_map)
+
+    assert tasks[0]["run_job_task"]["job_id"] == 42
+
+
+def test_assign_inner_job_ids_preserves_job_parameters(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_ids resolves __INNER_JOB__: placeholder while preserving job_parameters."""
+    tasks = [
+        {
+            "task_key": "exec_pipeline",
+            "run_job_task": {"job_id": "__INNER_JOB__:child_pipeline", "job_parameters": {"env": "prod"}},
+        },
+    ]
+    job_id_map = {"child_pipeline": 99}
+
+    workspace_definition_store._assign_inner_job_ids(tasks, job_id_map)
+
+    assert tasks[0]["run_job_task"]["job_id"] == 99
+    assert tasks[0]["run_job_task"]["job_parameters"] == {"env": "prod"}
+
+
+def test_assign_inner_job_refs_resolves_dict_placeholder(
+    workspace_definition_store: WorkspaceDefinitionStore,
+) -> None:
+    """_assign_inner_job_refs replaces __INNER_JOB__: placeholders with bundle resource refs."""
+    tasks = [
+        {"task_key": "run_inner", "run_job_task": {"job_id": "__INNER_JOB__:child_job"}},
+    ]
+
+    workspace_definition_store._assign_inner_job_refs(tasks)
+
+    assert tasks[0]["run_job_task"]["job_id"] == "${resources.jobs.child_job.id}"

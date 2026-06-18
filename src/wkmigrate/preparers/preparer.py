@@ -14,6 +14,7 @@ from wkmigrate.models.ir.pipeline import (
     Activity,
     CopyActivity,
     DatabricksNotebookActivity,
+    ExecutePipelineActivity,
     ForEachActivity,
     IfConditionActivity,
     LookupActivity,
@@ -83,7 +84,7 @@ def prepare_activity(
         return prepare_if_condition_activity(activity)
     if isinstance(activity, ForEachActivity):
         return prepare_for_each_activity(activity, default_files_to_delta_sinks, credentials_scope)
-    if isinstance(activity, RunJobActivity):
+    if isinstance(activity, (ExecutePipelineActivity, RunJobActivity)):
         return prepare_run_job_activity(activity, default_files_to_delta_sinks, credentials_scope)
     if isinstance(activity, CopyActivity):
         return prepare_copy_activity(activity, default_files_to_delta_sinks, credentials_scope)

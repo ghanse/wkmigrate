@@ -107,6 +107,7 @@ class JsonDefinitionStore(DefinitionStore):
         self._adapter = PipelineAdapter(
             get_dataset=self.get_dataset,
             get_linked_service=self.get_linked_service,
+            get_pipeline=self._get_raw_pipeline,
             source_property_case=SourcePropertyCase.SNAKE,  # already normalized
         )
 
@@ -178,6 +179,22 @@ class JsonDefinitionStore(DefinitionStore):
                 ):
                     return trigger
         return None
+
+    def _get_raw_pipeline(self, pipeline_name: str) -> dict:
+        """Return a pipeline dict suitable for adapter enrichment.
+
+        ARM normalization is intentionally *not* applied here because
+        ``_adapt_child_pipeline`` in the adapter already calls
+        ``normalize_arm_pipeline``.  Applying it twice is harmless but
+        wasteful and confusing.
+
+        Args:
+            pipeline_name: Name of the pipeline to look up.
+
+        Returns:
+            Raw pipeline dict.
+        """
+        return dict(self.get_pipeline(pipeline_name))
 
     def get_dataset(self, dataset_name: str) -> dict:
         """Return the dataset dict for the given name."""

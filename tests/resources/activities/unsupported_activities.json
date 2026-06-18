@@ -15,30 +15,6 @@
     }
   },
   {
-    "id": "execute_pipeline",
-    "description": "Execute Pipeline activity creates placeholder",
-    "input": {
-      "name": "call_child_pipeline",
-      "type": "ExecutePipeline",
-      "description": "Execute child pipeline",
-      "depends_on": [],
-      "policy": {
-        "timeout": "0.01:00:00"
-      },
-      "pipeline": {
-        "reference_name": "child_pipeline",
-        "type": "PipelineReference"
-      }
-    },
-    "expected": {
-      "name": "call_child_pipeline",
-      "task_key": "call_child_pipeline",
-      "activity_type": "ExecutePipeline",
-      "timeout_seconds": 3600,
-      "notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"
-    }
-  },
-  {
     "id": "wait_activity",
     "description": "Wait activity creates placeholder",
     "input": {

@@ -26,6 +26,9 @@ from wkmigrate.translators.activity_translators.copy_activity_translator import 
 from wkmigrate.translators.activity_translators.databricks_job_activity_translator import (
     translate_databricks_job_activity,
 )
+from wkmigrate.translators.activity_translators.execute_pipeline_activity_translator import (
+    translate_execute_pipeline_activity,
+)
 from wkmigrate.translators.activity_translators.for_each_activity_translator import translate_for_each_activity
 from wkmigrate.translators.activity_translators.if_condition_activity_translator import translate_if_condition_activity
 from wkmigrate.translators.activity_translators.lookup_activity_translator import translate_lookup_activity
@@ -45,6 +48,7 @@ _default_type_translators: dict[str, TypeTranslator] = {
     "DatabricksSparkJar": translate_spark_jar_activity,
     "DatabricksSparkPython": translate_spark_python_activity,
     "Copy": translate_copy_activity,
+    "ExecutePipeline": translate_execute_pipeline_activity,
     "Lookup": translate_lookup_activity,
     "WebActivity": translate_web_activity,
 }

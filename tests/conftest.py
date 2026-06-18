@@ -106,6 +106,12 @@ def databricks_job_activity_fixtures() -> list[dict]:
 
 
 @pytest.fixture
+def execute_pipeline_activity_fixtures() -> list[dict]:
+    """Load Execute Pipeline activity test fixtures."""
+    return load_fixtures("execute_pipeline_activities.json")
+
+
+@pytest.fixture
 def lookup_activity_fixtures() -> list[dict]:
     """Load Lookup activity test fixtures."""
     return load_fixtures("lookup_activities.json")
