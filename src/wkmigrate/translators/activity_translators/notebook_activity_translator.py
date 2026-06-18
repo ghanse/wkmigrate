@@ -5,11 +5,17 @@ representations. Each translator must validate required fields, parse the activi
 and emit ``UnsupportedValue`` objects for any unparsable inputs.
 """
 
+import re
 import warnings
+
 from wkmigrate.models.ir.pipeline import DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.not_translatable import NotTranslatableWarning
 from wkmigrate.supported_types import translates_activity
+
+# Braces are independently optional; ADF serializes consistently so unbalanced
+# forms like ``@pipeline().parameters.X}`` won't appear in practice.
+_PIPELINE_PARAM_PATTERN = re.compile(r"^@\{?pipeline\(\)\.parameters\.(\w+)\}?$")
 
 
 @translates_activity("DatabricksNotebook")
@@ -50,10 +56,11 @@ def _parse_notebook_parameters(parameters: dict | None) -> dict | None:
     """
     if parameters is None:
         return None
-    # Parse the parameters:
     parsed_parameters = {}
     for name, value in parameters.items():
-        if not isinstance(value, str):
+        if isinstance(value, dict):
+            value = _resolve_parameter_expression(name, value)
+        elif not isinstance(value, str):
             warnings.warn(
                 NotTranslatableWarning(
                     f"parameters.{name}",
@@ -64,3 +71,42 @@ def _parse_notebook_parameters(parameters: dict | None) -> dict | None:
             value = ""
         parsed_parameters[name] = value
     return parsed_parameters
+
+
+def _resolve_parameter_expression(name: str, expression: dict) -> str:
+    """Resolve an ADF expression dict in a notebook base_parameter.
+
+    Handles ``@pipeline().parameters.<param>`` by mapping it to the
+    Databricks job parameter reference ``{{job.parameters.<param>}}``.
+    Other expressions fall back to ``""`` with a warning.
+
+    Args:
+        name: Parameter name from the activity definition.
+        expression: Expression dictionary with ``type`` and ``value`` keys.
+
+    Returns:
+        Resolved parameter string, or ``""`` if the expression cannot be resolved.
+    """
+    if expression.get("type") != "Expression":
+        warnings.warn(
+            NotTranslatableWarning(
+                f"parameters.{name}",
+                f'Could not resolve default value for parameter {name}, setting to ""',
+            ),
+            stacklevel=4,
+        )
+        return ""
+
+    raw = expression.get("value", "")
+    match = _PIPELINE_PARAM_PATTERN.match(raw)
+    if match:
+        return f"{{{{job.parameters.{match.group(1)}}}}}"
+
+    warnings.warn(
+        NotTranslatableWarning(
+            f"parameters.{name}",
+            f'Could not resolve expression for parameter {name}, setting to ""',
+        ),
+        stacklevel=4,
+    )
+    return ""

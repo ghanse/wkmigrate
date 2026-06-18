@@ -156,13 +156,63 @@ def test_notebook_missing_path_returns_unsupported(notebook_activity_fixtures: l
 
 def test_notebook_expression_parameters_warns(notebook_activity_fixtures: list[dict]) -> None:
     """Test that expression parameters emit warnings and are set to empty string."""
-    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters")
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_complex")
 
     with pytest.warns(UserWarning):
         result = translate_activity(fixture["input"])
 
     assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["expression_param"] == ""
+    assert result.base_parameters["complex_param"] == ""
+
+
+def test_notebook_expression_parameters_resolved(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that simple @pipeline().parameters expressions are resolved to job parameter refs."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["static_param"] == "static_value"
+    assert result.base_parameters["expression_param"] == "{{job.parameters.dynamic_value}}"
+
+
+def test_notebook_multiple_pipeline_parameters(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that multiple @pipeline().parameters expressions resolve alongside static params."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_multiple")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["table_name"] == "{{job.parameters.tableName}}"
+    assert result.base_parameters["retention"] == "{{job.parameters.retentionDays}}"
+    assert result.base_parameters["static_value"] == "hardcoded"
+
+
+def test_notebook_braced_pipeline_parameter(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that @{pipeline().parameters.X} braced syntax resolves to a job parameter ref."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_braced")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["env"] == "{{job.parameters.environment}}"
+
+
+def test_notebook_activity_output_expression_warns(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that @activity().output expressions emit warnings and fall back to empty string."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_activity_output")
+
+    with pytest.warns(UserWarning):
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["result"] == ""
 
 
 def test_basic_spark_jar_activity(spark_jar_activity_fixtures: list[dict]) -> None:

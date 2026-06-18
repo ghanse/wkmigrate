@@ -238,7 +238,136 @@
       "notebook_path": "/Workspace/notebooks/expression_notebook",
       "base_parameters": {
         "static_param": "static_value",
-        "expression_param": ""
+        "expression_param": "{{job.parameters.dynamic_value}}"
+      }
+    },
+    "expects_warnings": false
+  },
+  {
+    "id": "expression_parameters_complex",
+    "description": "Notebook activity with complex expression parameters that cannot be resolved (should warn)",
+    "input": {
+      "name": "run_complex_expression_notebook",
+      "type": "DatabricksNotebook",
+      "description": "Execute notebook with complex expression parameters",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "notebook_path": "/Workspace/notebooks/complex_expression_notebook",
+      "base_parameters": {
+        "static_param": "static_value",
+        "complex_param": {
+          "value": "@concat(pipeline().parameters.prefix, '_', pipeline().parameters.suffix)",
+          "type": "Expression"
+        }
+      }
+    },
+    "expected": {
+      "name": "run_complex_expression_notebook",
+      "task_key": "run_complex_expression_notebook",
+      "activity_type": "DatabricksNotebook",
+      "notebook_path": "/Workspace/notebooks/complex_expression_notebook",
+      "base_parameters": {
+        "static_param": "static_value",
+        "complex_param": ""
+      }
+    },
+    "expects_warnings": true
+  },
+  {
+    "id": "expression_parameters_multiple",
+    "description": "Notebook activity with multiple pipeline parameter expressions and a static param",
+    "input": {
+      "name": "run_multi_param_notebook",
+      "type": "DatabricksNotebook",
+      "description": "Execute notebook with multiple expression parameters",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "notebook_path": "/Workspace/notebooks/multi_param_notebook",
+      "base_parameters": {
+        "table_name": {
+          "value": "@pipeline().parameters.tableName",
+          "type": "Expression"
+        },
+        "retention": {
+          "value": "@pipeline().parameters.retentionDays",
+          "type": "Expression"
+        },
+        "static_value": "hardcoded"
+      }
+    },
+    "expected": {
+      "name": "run_multi_param_notebook",
+      "task_key": "run_multi_param_notebook",
+      "activity_type": "DatabricksNotebook",
+      "notebook_path": "/Workspace/notebooks/multi_param_notebook",
+      "base_parameters": {
+        "table_name": "{{job.parameters.tableName}}",
+        "retention": "{{job.parameters.retentionDays}}",
+        "static_value": "hardcoded"
+      }
+    },
+    "expects_warnings": false
+  },
+  {
+    "id": "expression_parameters_braced",
+    "description": "Notebook activity with braced @{pipeline().parameters.X} syntax",
+    "input": {
+      "name": "run_braced_param_notebook",
+      "type": "DatabricksNotebook",
+      "description": "Execute notebook with braced pipeline parameter syntax",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "notebook_path": "/Workspace/notebooks/braced_param_notebook",
+      "base_parameters": {
+        "env": {
+          "value": "@{pipeline().parameters.environment}",
+          "type": "Expression"
+        }
+      }
+    },
+    "expected": {
+      "name": "run_braced_param_notebook",
+      "task_key": "run_braced_param_notebook",
+      "activity_type": "DatabricksNotebook",
+      "notebook_path": "/Workspace/notebooks/braced_param_notebook",
+      "base_parameters": {
+        "env": "{{job.parameters.environment}}"
+      }
+    },
+    "expects_warnings": false
+  },
+  {
+    "id": "expression_parameters_activity_output",
+    "description": "Notebook activity with @activity().output expression (should warn)",
+    "input": {
+      "name": "run_activity_ref_notebook",
+      "type": "DatabricksNotebook",
+      "description": "Execute notebook referencing activity output",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "notebook_path": "/Workspace/notebooks/activity_ref_notebook",
+      "base_parameters": {
+        "result": {
+          "value": "@activity('upstream').output.value",
+          "type": "Expression"
+        }
+      }
+    },
+    "expected": {
+      "name": "run_activity_ref_notebook",
+      "task_key": "run_activity_ref_notebook",
+      "activity_type": "DatabricksNotebook",
+      "notebook_path": "/Workspace/notebooks/activity_ref_notebook",
+      "base_parameters": {
+        "result": ""
       }
     },
     "expects_warnings": true
