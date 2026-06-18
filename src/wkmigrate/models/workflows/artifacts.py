@@ -59,6 +59,17 @@ class PreparedWorkflow:
         return result
 
     @property
+    def all_setup_tasks(self) -> list[dict[str, Any]]:
+        """All setup tasks across this workflow and any nested inner workflows."""
+        result: list[dict[str, Any]] = []
+        for activity in self.activities:
+            if activity.setup_task:
+                result.append(activity.setup_task)
+            if activity.inner_workflow:
+                result.extend(activity.inner_workflow.all_setup_tasks)
+        return result
+
+    @property
     def inner_workflows(self) -> list["PreparedWorkflow"]:
         """All inner workflows (recursively) produced by activities in this workflow."""
         result: list[PreparedWorkflow] = []
@@ -80,6 +91,7 @@ class PreparedActivity:
         pipelines: List of ``PipelineInstruction`` objects describing DLT pipelines to create.
         secrets: List of ``SecretInstruction`` objects describing secrets to materialize.
         inner_workflow: Additional workflow settings created for nested ForEach tasks.
+        setup_task: Optional one-time setup task configuration (e.g. UC connection creation).
     """
 
     task: dict[str, Any]
@@ -87,6 +99,7 @@ class PreparedActivity:
     pipelines: list[PipelineInstruction] | None = None
     secrets: list[SecretInstruction] | None = None
     inner_workflow: "PreparedWorkflow" | None = None
+    setup_task: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

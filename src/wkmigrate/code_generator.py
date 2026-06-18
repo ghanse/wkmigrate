@@ -61,6 +61,9 @@ def get_option_expressions(dataset_definition: dict, credentials_scope: str = DE
         List of Python source lines that creates an options dictionary.
     """
     dataset_type = dataset_definition.get("type")
+    provider_type = dataset_definition.get("provider_type")
+    if provider_type == "sftp":
+        return get_sftp_options(dataset_definition, dataset_type or "csv")
     if dataset_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_options(dataset_definition, dataset_type, credentials_scope=credentials_scope)
     if dataset_type in {"sqlserver", "postgresql", "mysql", "oracle"}:
@@ -94,6 +97,32 @@ def get_file_options(
         records_per_file = dataset_definition.get("records_per_file")
         config_lines.append(f'spark.conf.set("spark.sql.files.maxRecordsPerFile", "{records_per_file}")')
     config_lines.extend(_get_file_credential_lines(dataset_definition, service_name, provider_type, credentials_scope))
+    return [f"{dataset_name}_options = {{}}", *config_lines]
+
+
+def get_sftp_options(dataset_definition: dict, file_type: str) -> list[str]:
+    """
+    Generates code to create a Spark data source options dictionary for an SFTP file dataset.
+
+    SFTP datasets use a Unity Catalog connection and Auto Loader to read files.
+    Format-specific options (such as CSV delimiters) are included alongside the
+    SFTP connection path.
+
+    Args:
+        dataset_definition: Dataset definition dictionary.
+        file_type: File type (for example ``"csv"`` or ``"parquet"``).
+
+    Returns:
+        List of Python source lines that create the options dictionary.
+    """
+    dataset_name = dataset_definition["dataset_name"]
+    service_name = dataset_definition.get("service_name", "")
+    config_lines = [
+        rf'{dataset_name}_options["{option}"] = r"{dataset_definition.get(option)}"'
+        for option in DATASET_OPTIONS.get(file_type, [])
+        if dataset_definition.get(option)
+    ]
+    config_lines.append(f'{dataset_name}_options["cloudFiles.connectionName"] = "{service_name}_sftp_connection"')
     return [f"{dataset_name}_options = {{}}", *config_lines]
 
 
@@ -178,7 +207,10 @@ def get_read_expression(source_definition: dict, source_query: str | None = None
         ValueError: If the dataset type is not supported for reading.
     """
     source_type = source_definition.get("type")
+    provider_type = source_definition.get("provider_type")
 
+    if provider_type == "sftp":
+        return get_sftp_read_expression(source_definition)
     if source_type in {"avro", "csv", "json", "orc", "parquet"}:
         return get_file_read_expression(source_definition)
     if source_type == "delta":
@@ -215,6 +247,95 @@ def get_file_uri(definition: dict) -> str:
     # Default: ABFS (ADLS Gen2)
     storage_account_name = definition.get("storage_account_name", "")
     return f"abfss://{container}@{storage_account_name}.dfs.core.windows.net/{folder_path}"
+
+
+def sftp_file_uri(definition: dict) -> str:
+    """
+    Builds the direct SFTP URI for an SFTP dataset definition.
+
+    The URI uses the ``sftp://`` scheme and references the host, port, and
+    folder path directly.  Unity Catalog volumes cannot be created from an
+    SFTP connection, so the URI must point to the SFTP server directly.
+
+    Args:
+        definition: Dataset definition dictionary containing url (or host/port)
+            and folder_path.
+
+    Returns:
+        SFTP URI string (e.g. ``sftp://host:port/path``).
+    """
+    from urllib.parse import urlparse
+
+    url = definition.get("url", "")
+    parsed = urlparse(url)
+    host = parsed.hostname or definition.get("host", "<SFTP_HOST>")
+    port = parsed.port or definition.get("port", 22)
+    folder_path = definition.get("folder_path", "")
+    return f"sftp://{host}:{port}/{folder_path}"
+
+
+def get_sftp_read_expression(source_definition: dict) -> str:
+    """
+    Generates code to read data from an SFTP dataset into a DataFrame using Auto Loader.
+
+    Auto Loader (``cloudFiles``) streams files from the SFTP volume path and
+    supports all common file formats.
+
+    Args:
+        source_definition: Dataset definition dictionary.
+
+    Returns:
+        Python source lines that read data into a DataFrame via Auto Loader.
+    """
+    source_name = source_definition["dataset_name"]
+    source_type = source_definition.get("type", "csv")
+    file_uri = sftp_file_uri(source_definition)
+
+    return f"""{source_name}_df = (
+                        spark.readStream.format("cloudFiles")
+                            .option("cloudFiles.format", "{source_type}")
+                            .options(**{source_name}_options)
+                            .load("{file_uri}")
+                        )
+                    """
+
+
+def get_sftp_write_expression(
+    dataset_name: str,
+    sink_format: str,
+    sink_path: str,
+    checkpoint_path: str,
+) -> str:
+    """
+    Generates a streaming write expression for Auto Loader SFTP ingestion.
+
+    Auto Loader requires ``readStream`` / ``writeStream``.  Using
+    ``trigger(availableNow=True)`` processes all available files and then
+    stops, giving batch-like semantics on top of streaming infrastructure.
+
+    Writes use ``format`` / ``option("path", ...)`` / ``start()`` /
+    ``awaitTermination()`` rather than ``toTable`` because the sink may not
+    be a Delta table.
+
+    Args:
+        dataset_name: Name of the DataFrame variable (without ``_df`` suffix).
+        sink_format: Spark write format (e.g. ``"delta"``, ``"csv"``, ``"parquet"``).
+        sink_path: Output path for the written data.
+        checkpoint_path: Path used by Structured Streaming for checkpointing.
+
+    Returns:
+        Python source fragment with the streaming write expression.
+    """
+    return (
+        f"{dataset_name}_df.writeStream \\\n"
+        f'    .format("{sink_format}") \\\n'
+        f'    .outputMode("append") \\\n'
+        f"    .trigger(availableNow=True) \\\n"
+        f'    .option("checkpointLocation", "{checkpoint_path}") \\\n'
+        f'    .option("path", "{sink_path}") \\\n'
+        f"    .start() \\\n"
+        f"    .awaitTermination()\n"
+    )
 
 
 def get_file_read_expression(source_definition: dict) -> str:
@@ -439,7 +560,7 @@ def _get_file_credential_lines(
     # Default: ABFS (ADLS Gen2)
     return [
         f"""spark.conf.set(
-                "fs.azure.account.key.{dataset_definition.get('storage_account_name')}.dfs.core.windows.net",
+                "fs.azure.account.key.{dataset_definition.get("storage_account_name")}.dfs.core.windows.net",
                     dbutils.secrets.get(
                         scope="{credentials_scope}",
                         key="{service_name}_storage_account_key"

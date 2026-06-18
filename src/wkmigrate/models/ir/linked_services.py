@@ -105,6 +105,24 @@ class AzureBlobLinkedService(LinkedService):
 
 
 @dataclass(slots=True)
+class SftpLinkedService(LinkedService):
+    """
+    Linked-service metadata for an SFTP server.
+
+    Attributes:
+        host: Hostname or IP address of the SFTP server.
+        port: TCP port number for the SFTP connection.
+        user_name: Username used to authenticate with the SFTP server.
+        authentication_type: Authentication mechanism (for example ``Basic`` or ``SshPublicKey``).
+    """
+
+    host: str
+    port: int = 22
+    user_name: str | None = None
+    authentication_type: str | None = None
+
+
+@dataclass(slots=True)
 class DatabricksClusterLinkedService(LinkedService):
     """
     Linked-service metadata describing a Databricks workspace/cluster.

@@ -21,7 +21,6 @@ from wkmigrate.preparers.preparer import prepare_workflow
 from wkmigrate.preparers.run_job_activity_preparer import prepare_run_job_activity
 from wkmigrate.preparers.web_activity_preparer import prepare_web_activity
 
-
 _CSV_SOURCE = {
     "type": "csv",
     "dataset_name": "my_csv",
