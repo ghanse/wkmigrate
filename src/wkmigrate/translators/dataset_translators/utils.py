@@ -110,6 +110,9 @@ def parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
     """
     Parses the file path from a cloud dataset definition.
 
+    Accepts datasets with only a ``folder_path`` (common for wildcard or
+    directory-level reads), only a ``file_name``, or both.
+
     Args:
         properties: File properties from the dataset definition.
 
@@ -122,15 +125,25 @@ def parse_cloud_file_path(properties: dict) -> str | UnsupportedValue:
 
     folder_path = location.get("folder_path")
     file_name = location.get("file_name")
-    if file_name is None:
-        return UnsupportedValue(value=properties, message="Missing property 'file_name' in dataset properties")
 
-    return file_name if not folder_path else f"{folder_path}/{file_name}"
+    if folder_path and file_name:
+        return f"{folder_path}/{file_name}"
+    if file_name:
+        return file_name
+    if folder_path:
+        return folder_path
+    return UnsupportedValue(
+        value=properties,
+        message="Missing both 'folder_path' and 'file_name' in dataset location",
+    )
 
 
 def parse_abfs_file_path(properties: dict) -> str | UnsupportedValue:
     """
     Parses the ABFS file path from a dataset definition.
+
+    Accepts datasets with only a ``folder_path`` (common for wildcard or
+    directory-level reads), only a ``file_name``, or both.
 
     Args:
         properties: File properties from the dataset definition.
@@ -144,10 +157,17 @@ def parse_abfs_file_path(properties: dict) -> str | UnsupportedValue:
 
     folder_path = location.get("folder_path")
     file_name = location.get("file_name")
-    if file_name is None:
-        return UnsupportedValue(value=properties, message="Missing property 'file_name' in dataset properties")
 
-    return file_name if not folder_path else f"{folder_path}/{file_name}"
+    if folder_path and file_name:
+        return f"{folder_path}/{file_name}"
+    if file_name:
+        return file_name
+    if folder_path:
+        return folder_path
+    return UnsupportedValue(
+        value=properties,
+        message="Missing both 'folder_path' and 'file_name' in dataset location",
+    )
 
 
 def _parse_avro_format_options(dataset: dict) -> dict:

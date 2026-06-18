@@ -416,4 +416,11 @@ def _normalize_activity_type_properties(activity: dict) -> dict:
             if converted_key in activity:
                 continue
             activity[converted_key] = original_value
+
+    for branch_key in ("if_false_activities", "if_true_activities", "activities"):
+        branch = activity.get(branch_key)
+        if isinstance(branch, list):
+            activity[branch_key] = [
+                _normalize_activity_type_properties(dict(nested)) for nested in branch if isinstance(nested, dict)
+            ]
     return activity

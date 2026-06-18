@@ -83,7 +83,8 @@ class PipelineAdapter:
 
     def _enrich_activity(self, activity: dict) -> dict:
         """
-        Returns an activity dict enriched with datasets and linked services.
+        Returns an activity dict enriched with datasets, linked services, and
+        recursively enriched nested activities (e.g. inside ForEach or IfCondition).
 
         Args:
             activity: Input activity as a dictionary.
@@ -93,6 +94,7 @@ class PipelineAdapter:
         """
         result = self._enrich_datasets(activity)
         result = self._enrich_linked_service(result)
+        result = self._enrich_nested_activities(result)
         return result
 
     def _enrich_datasets(self, activity: dict) -> dict:
@@ -135,7 +137,7 @@ class PipelineAdapter:
 
     def _enrich_linked_service(self, activity: dict) -> dict:
         """
-        Returns an activity dictionary with linked-service definitions and enriched nested activities.
+        Returns an activity dictionary with linked-service definitions populated.
 
         Args:
             activity: Input activity as a dictionary.
@@ -143,26 +145,40 @@ class PipelineAdapter:
         Returns:
             Activity with linked service metadata.
         """
-        additions: dict = {}
-
         linked_service_reference = activity.get("linked_service_name")
-        if linked_service_reference is not None:
-            linked_service_name = linked_service_reference.get("reference_name")
-            if linked_service_name:
-                try:
-                    raw = self.get_linked_service(linked_service_name)
-                    additions["linked_service_definition"] = self.normalize_casing(
-                        raw, ("linked_service", linked_service_name)
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Linked service '{linked_service_name}' not found; skipping cluster spec for activity."
-                    )
+        if linked_service_reference is None:
+            return activity
 
+        linked_service_name = linked_service_reference.get("reference_name")
+        if not linked_service_name:
+            return activity
+
+        try:
+            raw = self.get_linked_service(linked_service_name)
+            definition = self.normalize_casing(raw, ("linked_service", linked_service_name))
+        except ValueError:
+            logger.warning(f"Linked service '{linked_service_name}' not found; skipping cluster spec for activity.")
+            return activity
+
+        return {**activity, "linked_service_definition": definition}
+
+    def _enrich_nested_activities(self, activity: dict) -> dict:
+        """
+        Recursively enriches nested activities within control-flow constructs
+        (ForEach, IfCondition) so that inner activities receive dataset and
+        linked-service metadata.
+
+        Args:
+            activity: Input activity as a dictionary.
+
+        Returns:
+            Activity with enriched nested activities.
+        """
+        additions: dict = {}
         for branch_key in ("if_false_activities", "if_true_activities", "activities"):
             branch = activity.get(branch_key)
             if branch is not None:
-                additions[branch_key] = [self._enrich_linked_service(branch_activity) for branch_activity in branch]
+                additions[branch_key] = [self._enrich_activity(nested) for nested in branch]
 
         if not additions:
             return activity
